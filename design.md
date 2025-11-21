@@ -260,6 +260,21 @@
 
 7. 共通レイアウト  
    - ヘッダー: ログイン状態 / プロフィール遷移 / アルバム作成ボタン常駐
+   
+    【具体的実装手順】
+    7-1. ヘッダー構成要素: ロゴ/タイトル, 認証状態表示 (displayName), プロフィール遷移リンク, アルバム作成ボタン, ログアウト or ログイン遷移。 
+    7-2. ファイル追加: `components/Header.tsx` (client component), `lib/hooks/useAuthUser.ts` (購読フック)。
+    7-3. 認証購読: `onAuthStateChanged(auth, ...)` を useEffect で購読し user を state に保持。`loading` フラグ表示でちらつき防止。 
+    7-4. プロフィールリンク: ログイン済みなら `/u/${uid}` へ遷移するボタン。未ログイン時は非表示。 
+    7-5. アルバム作成: `/album/new` へのリンク（未ログイン時は disabled）。後でモーダル化可能。 
+    7-6. ログアウト: `signOut(auth)` 実行 → `/login` へ router.push。 
+    7-7. ログイン誘導: 未ログインなら "ログイン" ボタンを表示し `/login` へ遷移。 
+    7-8. レイアウト統合: `app/layout.tsx` に `<Header />` を追加し `<main>` で子コンテンツを包む。 
+    7-9. スタイル最小案: Flex / space-between / sticky top。Tailwind: `sticky top-0 bg-white border-b z-50`. 
+    7-10. 型安全: Hook 戻り値 `{ user, loading }`。user は Firebase User | null。 
+    7-11. アクセシビリティ: ナビゲーションに `nav` 要素、ユーザー名は `aria-label` で意味付け。 
+    7-12. 将来拡張: 通知ベル / 未読件数 / 検索バー / ダークモードトグル。 
+
 8. アルバム作成フロー  
    - モーダル: コメント（200文字以内）+ 撮影場所URL（任意）+ 画像選択（最大4枚）  
    - 画像アップロード順: Storage へ put → ダウンロードURL → albumImages に保存 → albums 作成  
