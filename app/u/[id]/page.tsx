@@ -3,6 +3,10 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuthUser } from '../../../lib/hooks/useAuthUser';
 import { getUser } from '../../../lib/repos/userRepo';
+import { listAlbumsByOwner } from '../../../lib/repos/albumRepo';
+import { listAlbumIdsByUploader } from '../../../lib/repos/imageRepo';
+import { listCommentsByUser } from '../../../lib/repos/commentRepo';
+import { getAlbum } from '../../../lib/repos/albumRepo';
 import { getFriendStatus, sendFriendRequest, acceptFriend, cancelFriendRequest, removeFriend } from '../../../lib/repos/friendRepo';
 import { isWatched, addWatch, removeWatch } from '../../../lib/repos/watchRepo';
 import { translateError } from '../../../lib/errors';
@@ -18,6 +22,13 @@ export default function ProfilePage() {
   const [busy, setBusy] = useState(false);
   const [watching, setWatching] = useState(false);
   const [watchBusy, setWatchBusy] = useState(false);
+  // プロフィール拡張データ
+  const [ownAlbums, setOwnAlbums] = useState<any[] | null>(null);
+  const [joinedAlbums, setJoinedAlbums] = useState<any[] | null>(null);
+  const [userComments, setUserComments] = useState<any[] | null>(null);
+  const [stats, setStats] = useState<{ ownCount: number; joinedCount: number; commentCount: number } | null>(null);
+  const [loadingExtra, setLoadingExtra] = useState(false);
+  const [extraError, setExtraError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!profileUid) return;
@@ -49,6 +60,40 @@ export default function ProfilePage() {
     })();
     return () => { active = false; };
   }, [profileUid, user]);
+
+  // 拡張情報ロード
+  useEffect(() => {
+    if (!profileUid) return;
+    let active = true;
+    (async () => {
+      setLoadingExtra(true); setExtraError(null);
+      try {
+        // 作成アルバム
+        const own = await listAlbumsByOwner(profileUid);
+        // 参加アルバムID → アルバム取得（自分が作成したものは除外）
+        const joinedIds = await listAlbumIdsByUploader(profileUid);
+        const filteredIds = joinedIds.filter(id => !own.some(a => a.id === id));
+        const joined = await Promise.all(filteredIds.map(id => getAlbum(id)));
+        // コメント一覧
+        const comments = await listCommentsByUser(profileUid, 50);
+        if (active) {
+          setOwnAlbums(own);
+          setJoinedAlbums(joined.filter(a => !!a));
+          setUserComments(comments);
+          setStats({
+            ownCount: own.length,
+            joinedCount: filteredIds.length,
+            commentCount: comments.length,
+          });
+        }
+      } catch (e:any) {
+        if (active) setExtraError(translateError(e));
+      } finally {
+        if (active) setLoadingExtra(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [profileUid]);
 
   async function doSend() {
     if (!user || !profileUid) return;
@@ -156,6 +201,70 @@ export default function ProfilePage() {
         </section>
       )}
       {error && <p className="text-sm text-red-600">{error}</p>}
+      <section className="space-y-4 pt-4 border-t">
+        <h2 className="text-lg font-medium">活動概要</h2>
+        {loadingExtra && <p className="text-sm text-gray-500">読み込み中...</p>}
+        {extraError && <p className="text-sm text-red-600">{extraError}</p>}
+        {stats && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+            <div className="p-3 rounded bg-gray-100">
+              <p className="text-xs text-gray-600">作成アルバム</p>
+              <p className="text-lg font-semibold">{stats.ownCount}</p>
+            </div>
+            <div className="p-3 rounded bg-gray-100">
+              <p className="text-xs text-gray-600">参加アルバム</p>
+              <p className="text-lg font-semibold">{stats.joinedCount}</p>
+            </div>
+            <div className="p-3 rounded bg-gray-100">
+              <p className="text-xs text-gray-600">コメント</p>
+              <p className="text-lg font-semibold">{stats.commentCount}</p>
+            </div>
+            {/* いいねしたアルバム数は後工程で */}
+          </div>
+        )}
+        <div className="space-y-6 mt-4">
+          <div>
+            <h3 className="font-medium mb-2">作成アルバム</h3>
+            {!ownAlbums && <p className="text-sm text-gray-500">-</p>}
+            {ownAlbums && ownAlbums.length === 0 && <p className="text-sm text-gray-500">まだアルバムがありません</p>}
+            <ul className="space-y-2">
+              {ownAlbums && ownAlbums.map(a => (
+                <li key={a.id} className="p-2 border rounded">
+                  <a href={`/album/${a.id}`} className="text-blue-600 text-sm font-medium hover:underline">{a.title || '無題'}</a>
+                  <p className="text-xs text-gray-500">{a.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3 className="font-medium mb-2">参加アルバム</h3>
+            {!joinedAlbums && <p className="text-sm text-gray-500">-</p>}
+            {joinedAlbums && joinedAlbums.length === 0 && <p className="text-sm text-gray-500">参加アルバムはまだありません</p>}
+            <ul className="space-y-2">
+              {joinedAlbums && joinedAlbums.map((a: any, i: number) => (
+                <li key={i} className="p-2 border rounded">
+                  <a href={`/album/${a.id}`} className="text-blue-600 text-sm font-medium hover:underline">{a.title || '無題'}</a>
+                  <p className="text-xs text-gray-500">{a.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3 className="font-medium mb-2">投稿コメント (最大50件)</h3>
+            {!userComments && <p className="text-sm text-gray-500">-</p>}
+            {userComments && userComments.length === 0 && <p className="text-sm text-gray-500">コメントはまだありません</p>}
+            <ul className="space-y-2">
+              {userComments && userComments.map(c => (
+                <li key={c.id} className="p-2 border rounded text-sm">
+                  <p className="whitespace-pre-line">{c.body}</p>
+                  <a href={`/album/${c.albumId}`} className="text-xs text-blue-600 hover:underline">アルバムへ</a>
+                  <p className="text-[10px] text-gray-500">{c.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

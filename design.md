@@ -657,10 +657,49 @@
     - 解除 → 削除  
     - 件数表示: likes where albumId の count
 17. プロフィール (/u/[id])  
-    - users 取得 → アイコン / 自己紹介  
-    - 作成アルバム: albums where ownerId == id  
-    - 参加アルバム: albumImages where uploaderId == id → albumId 一覧 → 重複除去して表示  
-    - 投稿コメント: comments where userId == id  
+    - 目的: ユーザーの活動概要を一覧化し、他ユーザーが閲覧できる情報カードを提供する（公開プロフィール）。  
+    - 表示要素（最小構成）: 基本情報 / 作成アルバム一覧 / 参加アルバム一覧 / 投稿コメント一覧 / 簡易統計（総アルバム数 / 参加アルバム数 / コメント数 / いいねしたアルバム数(任意)）。  
+    - 初期バージョンは全て同期取得（並列）。後でページネーションや遅延タブ読込へ拡張。  
+
+    【具体的実装手順】  
+    17-1. データ取得戦略:  
+        - プロフィール本体 `getUser(uid)`。  
+        - 作成アルバム: `listAlbumsByOwner(uid)` 新規追加 (orderBy createdAt desc)。  
+        - 参加アルバム: `listAlbumIdsByUploader(uid)` で albumImages の albumId Distinct → その ID で `getAlbum` を並列取得（自分がオーナーのものは除外）。  
+        - 投稿コメント: `listCommentsByUser(uid, { limit: 50 })` （後でページネーション要検討）。  
+        - いいねしたアルバム数 (任意): likes where userId == uid → size （初期版は後回しでも可）。  
+    17-2. リポジトリ拡張:  
+        - `albumRepo.listAlbumsByOwner(ownerId: string): Promise<any[]>` → collection(albums) where ownerId==X orderBy(createdAt,'desc').  
+        - `imageRepo.listAlbumIdsByUploader(userId: string): Promise<string[]>` → albumImages where uploaderId==X → albumId を Set で重複排除。  
+        - `commentRepo.listCommentsByUser(userId: string, limitCount = 50): Promise<any[]>` → comments where userId==X orderBy(createdAt,'desc') limit(limitCount)。インデックス必要時はフォールバック。  
+        - （任意）`likeRepo.countLikedAlbumsByUser(userId)`：likes where userId==X → albumId を Set.size（後工程）。  
+    17-3. UI 構成案 (`app/u/[id]/page.tsx`):  
+        - Header: displayName / UID / bio。本人なら編集ボタン（後工程）。  
+        - Stats 行: 作成アルバム数 / 参加アルバム数 / コメント数 / (いいね数) を小さなカード表示。  
+        - セクション:  
+            (A) 作成アルバム: タイトル + 画像数(後で) / createdAt。リンク→ `/album/{id}`。  
+            (B) 参加アルバム: 同上。自分がオーナーのものは除外。  
+            (C) 投稿コメント: 先頭数十件を表示（body + 対象アルバムリンク）。  
+        - ローディング: 全体で最初読み込み中 → 部分読み込みを分離する拡張余地。  
+        - エラー: いずれか失敗時に個別セクション内へメッセージ表示 + 再試行ボタン。  
+    17-4. 型/契約:  
+        - `ProfileData { user, ownAlbums, joinedAlbums, comments, stats }`。stats: `{ ownCount:number; joinedCount:number; commentCount:number; likedCount?:number }`。  
+    17-5. パフォーマンス注意: joinedAlbums 取得時に albumIds が多い場合は batch get が増える → 後で Cloud Function でユーザー参加アルバムリストを集計キャッシュ可能。  
+    17-6. インデックス注意: comments where userId + orderBy(createdAt) は `userId+createdAt` の複合インデックスが必要。missing 時は orderBy を外してクライアントソート。  
+    17-7. テストシナリオ:  
+        1) 作成アルバムが表示される / 件数が stats と一致。  
+        2) 参加アルバムに自分の作成アルバムが重複表示されない。  
+        3) コメント一覧が最大50件表示される。  
+        4) 空ユーザー（活動なし）で各セクションが空メッセージ表示。  
+        5) エラー（ネットワーク遮断）でセクション単位再試行ボタン動作。  
+    17-8. 拡張案:  
+        - タブUI / Lazy load / Infinite scroll。  
+        - プロフィール編集（アイコンアップロード / bio 編集）。  
+        - 共通統計キャッシュ (likeCount 合計 / 最近の活動タイムライン)。  
+        - SSR 化 & Edge キャッシュ（公開プロフィール高速表示）。  
+        - アクセス制御: フレンド限定項目 (参加アルバムなど) の段階的非表示。  
+    17-9. アクセシビリティ: セクション見出しを `<h2>`、統計カードに `aria-label="作成アルバム数"` など付与。  
+    17-10. フォールバック: 参加アルバム取得で 0 件かエラーのときはメッセージ表示し UI 維持（他セクションへの影響なし）。  
 18. アクセス制御（最初はフロントで簡易）  
     - アルバム詳細表示条件: (owner) or (friend) or (watch)  
     - 画像追加条件: owner or friend  

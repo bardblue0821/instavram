@@ -25,6 +25,20 @@ export async function listImages(albumId: string) {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
 }
 
+// ユーザーが画像を投稿したアルバムID一覧（重複除去）
+export async function listAlbumIdsByUploader(userId: string, limitCount = 500) {
+  // limitCount は将来 where + orderBy で制御するための予約。現状は全件取得後に slice
+  const q = query(collection(db, COL.albumImages), where('uploaderId', '==', userId))
+  const { getDocs } = await import('firebase/firestore')
+  const snap = await getDocs(q)
+  const set = new Set<string>()
+  for (const d of snap.docs) {
+    const data: any = d.data()
+    if (data.albumId) set.add(data.albumId)
+  }
+  return Array.from(set).slice(0, limitCount)
+}
+
 export async function deleteImage(imageId: string) {
   // ルール側で uploader または owner を許可。ここでは単純削除。
   await deleteDoc(doc(db, COL.albumImages, imageId))
