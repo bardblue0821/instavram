@@ -22,6 +22,15 @@ export async function touchAlbum(id: string) {
   await updateDoc(doc(db, COL.albums, id), { updatedAt: new Date() })
 }
 
+// 部分更新 (title, placeUrl) - 空文字は null へ。オーナー権限チェックは Firestore ルール側で担保。
+export async function updateAlbum(id: string, data: { title?: string; placeUrl?: string }) {
+  const patch: any = {}
+  if (data.title !== undefined) patch.title = data.title.trim() === '' ? null : data.title
+  if (data.placeUrl !== undefined) patch.placeUrl = data.placeUrl.trim() === '' ? null : data.placeUrl
+  patch.updatedAt = new Date()
+  await updateDoc(doc(db, COL.albums, id), patch)
+}
+
 // タイムライン暫定取得（フィルタは呼び出し側で）
 export async function getLatestAlbums(limitCount = 50) {
   const q = query(collection(db, COL.albums), orderBy('createdAt', 'desc'), limit(limitCount))

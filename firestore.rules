@@ -2,39 +2,52 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{db}/documents {
     function authed() { return request.auth != null; }
+    function isOwner(albumId) {
+      return get(/databases/$(db)/documents/albums/$(albumId)).data.ownerId == request.auth.uid;
+    }
 
+    // users: 公開 read / 本人のみ作成・更新
     match /users/{uid} {
       allow read: if true;
       allow create, update: if authed() && uid == request.auth.uid;
     }
 
-    match /albums/{id} {
-      allow read: if authed();
+    // albums: 公開閲覧に変更 (以前は authed のみだった) / 作成はログイン / 更新削除はオーナー
+    match /albums/{albumId} {
+      allow read: if true;
       allow create: if authed();
       allow update, delete: if authed() && resource.data.ownerId == request.auth.uid;
     }
 
-    match /albumImages/{id} {
-      allow read: if authed();
+    // albumImages: 公開閲覧 / 作成はログイン / 削除はアップロード者またはオーナー
+    match /albumImages/{imageId} {
+      allow read: if true;
       allow create: if authed();
-      allow delete: if authed() && resource.data.uploaderId == request.auth.uid;
+      allow delete: if authed() && (resource.data.uploaderId == request.auth.uid || isOwner(resource.data.albumId));
     }
 
-    match /comments/{id} {
-      allow read, create: if authed();
-      allow delete: if authed() && resource.data.userId == request.auth.uid;
+    // comments: 公開閲覧 / 作成はログイン / 更新削除は投稿者またはアルバムオーナー
+    match /comments/{commentId} {
+      allow read: if true;
+      allow create: if authed();
+      allow update, delete: if authed() && (resource.data.userId == request.auth.uid || isOwner(resource.data.albumId));
     }
 
-    match /likes/{id} {
+    // likes: ログインユーザーのみ操作
+    match /likes/{likeId} {
       allow read, create, delete: if authed();
     }
 
-    match /friends/{id} {
-      allow read, create, update: if authed();
+    // friends: userId 本人のみ作成・更新 (resource でなく request.resource を用いて新規作成時の値検証も可能)
+    match /friends/{friendId} {
+      allow read: if authed();
+      allow create, update: if authed() && request.resource.data.userId == request.auth.uid;
     }
 
-    match /watches/{id} {
-      allow read, create, delete: if authed();
+    // watches: userId 本人のみ作成・削除
+    match /watches/{watchId} {
+      allow read: if authed();
+      allow create, delete: if authed() && request.resource.data.userId == request.auth.uid;
     }
   }
 }

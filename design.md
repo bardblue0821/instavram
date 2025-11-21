@@ -406,11 +406,41 @@
    - オーナーのみ: コメント編集 / 撮影場所編集 / 全画像削除可  
    - フレンド: 新規画像追加可（自分が追加した画像のみ削除可能）  
    - 画像削除条件: (owner) または (image.uploaderId === currentUser.uid)
+
+        【具体的実装手順】
+        10-1. Firestore ルール調整（任意強化）: image 削除をオーナーも可能にするため albums 参照関数を追加。
+                ```
+                function isOwner(albumId) {
+                    return get(/databases/$(db)/documents/albums/$(albumId)).data.ownerId == request.auth.uid;
+                }
+                match /albumImages/{id} {
+                    allow delete: if authed() && (resource.data.uploaderId == request.auth.uid || isOwner(resource.data.albumId));
+                }
+                match /comments/{id} {
+                    allow delete: if authed() && (resource.data.userId == request.auth.uid || isOwner(resource.data.albumId));
+                    allow update: if authed() && (resource.data.userId == request.auth.uid || isOwner(resource.data.albumId));
+                }
+                ```
+        10-2. リポジトリ機能追加:
+                - `albumRepo.updateAlbum(id, { title?, placeUrl? })` で部分更新（空文字は null に変換）。
+                - `imageRepo.deleteImage(imageId)` 画像削除。`addImage` 時に doc id をセットするため image ドキュメントへ `id` フィールド付加。
+                - `imageRepo.listImages(albumId)` で一覧取得（`id` を含む）。
+                - `commentRepo.updateComment(commentId, body)` / `commentRepo.deleteComment(commentId)`。`addComment` も `id` を保存するよう修正。
+        10-3. 既存データの互換性: 過去に保存した image/comment に `id` フィールドが無い場合、編集/削除ボタン押下でエラーになるため、一覧取得時に Firestore の `doc.id` をオブジェクトへマージ。
+        10-4. UI 改修 (`app/album/[id]/page.tsx`):
+                - アルバムヘッダーにオーナー用フォーム（タイトル・場所URL）を表示し Save ボタンで更新。変更前後で loading スピナー。
+                - 画像カードに削除ボタン（オーナーまたは uploader）。クリック時確認ダイアログ → 成功後再取得。
+                - コメント項目に (自身 or オーナー) の場合は [編集] [削除] ボタン。編集は textarea 切替 + 保存/キャンセル。
+                - 画像追加は既存ロジック維持（後で Storage 化）。
+        10-5. エラーハンドリング: repository からの throw を `translateError` で表示。権限不足は `PERMISSION_DENIED` にマッピング。
+        10-6. UX 細部: 更新成功時に "保存しました" のトースト的メッセージ（初期版は state メッセージで十分）。削除前に confirm。
+        10-7. 後で強化: 楽観的更新、差分のみ再フェッチ、画像一括削除、コメント編集履歴。
+        10-8. テストシナリオ: オーナーがタイトル変更→反映 / オーナーが他人画像削除→成功 / 投稿者が自分の画像削除→成功 / 第三者は削除ボタン非表示 / コメント編集権限確認 / 権限違反でボタン非表示。
 11. フレンド機能  
     - プロフィールに「フレンド申請」ボタン → friends に {status:"pending"}  
     - 相手が承認すると status:"accepted"  
     - フレンド判定: 双方向 accepted (簡易) か一方向 accepted (ルール決めて実装)
-12. ウォッチ機能  
+12. ウォッチ機能
     - 他ユーザーのプロフィールに「ウォッチ」ボタン → watches に保存  
     - タイムライン取得時: (自分がウォッチしている ownerId) + (自分のフレンドの ownerId) の albums を並べる
 13. タイムライン表示 (/timeline)  
