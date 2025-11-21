@@ -279,6 +279,23 @@
    - モーダル: コメント（200文字以内）+ 撮影場所URL（任意）+ 画像選択（最大4枚）  
    - 画像アップロード順: Storage へ put → ダウンロードURL → albumImages に保存 → albums 作成  
    - 同一 uploader がその album に既に 4 枚なら追加ボタン disabled
+    
+    【具体的実装手順】
+    8-1. UI 仕様: 画像 (複数 / 最大4) 選択フィールド + コメント textarea(200文字制限) + 撮影場所URL input + 作成ボタン。未入力許可: コメントは空OK（初期は省略可 / 後で必須に変更可能）。
+    8-2. 事前 ID 生成: Firestore の addDoc は ID 取得後に画像参照を遡るのが難しいため `const newRef = doc(collection(db, COL.albums))` で ID を先に生成し利用後に setDoc。
+    8-3. 処理順序 (仕様準拠): (a) Storage へ各画像 uploadBytes → getDownloadURL (b) Firestore `albumImages` に各 URL を保存 (c) albums ドキュメント作成 (d) 初回コメントあれば comments 追加。
+    8-4. 画像パス構成: `albums/{albumId}/{uploaderId}/{timestamp}_{index}.{ext}` 拡張子は file.name 末尾から取得。MIME 不正時は `.bin`。
+    8-5. 4枚制限: 選択段階で files.length > 4 は警告。追加実行時にも `imageRepo.addImage` 経由で二重防止。UI では残り枚数を表示。
+    8-6. エラーハンドリング: 途中失敗時 → 既に upload 済み画像のクリーンアップは初期版では省略（後で削除 API）。ユーザーへ失敗メッセージ表示 + 再実行誘導。
+    8-7. 並列 vs 逐次: 初期は逐次 upload (for...of) で進行バー簡易表示。後で Promise.all + rate limit 検討。
+    8-8. フック/サービス: `lib/services/createAlbumWithImages.ts` にメイン関数。入力: ownerId, {title?, placeUrl?, firstComment?}, files: File[]。戻り値: albumId。
+    8-9. 戻り値契約: 成功→ albumId, 失敗→ throw (UI で translateError)。
+    8-10. コメント検証: firstComment が 200 超 → `TOO_LONG` throw。空または空白のみは追加しない。
+    8-11. UI コンポーネント: `components/AlbumCreateModal.tsx` (client) でフォーム + 進捗表示 (現在 x/total)。
+    8-12. ページ統合: 既存 `/album/new` ページでモーダルの中身を直接表示（後でモーダル化）。成功後 `/album/{id}` へ遷移（詳細ページ後で作成）。
+    8-13. アクセシビリティ: ファイル input に `aria-label="画像選択"`、進捗領域に `role="status"`。
+    8-14. 今後拡張: 失敗時リトライ個別画像 / 画像プレビュー / 圧縮 / EXIF 読み取り / 同時並列アップロード。
+
 9. アルバム編集  
    - オーナーのみ: コメント編集 / 撮影場所編集 / 全画像削除可  
    - フレンド: 新規画像追加可（自分が追加した画像のみ削除可能）  
