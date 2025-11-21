@@ -565,45 +565,75 @@
         - likes/comment の最近更新ソート (更新日時を albums に反映 or 別コレクション)。
     13-8. アクセシビリティ: カードのリンク要素に `aria-label="アルバム: {title || '無題'}"` 追加。
     13-9. エラー/再試行ボタン: ネットワーク不安定時に album 取得と画像取得を再実行。
-14. コメント機能  
+
+14. いいね機能 (likes) / アルバム詳細への導入  
+    - 目的: ユーザーがアルバムに「いいね」し、一覧/詳細で人気指標を表示できる基盤作り（初期は詳細ページのみ表示）。  
+    - コレクション: `likes` （ドキュメントID: `<albumId>_<userId>` 重複防止）  
+    - 最低限フィールド: `{ albumId, userId, createdAt }`  
+    - 権限 (firestore.rules): create/delete は本人のみ。read はログインユーザーのみ (将来的に公開表示にする場合は調整)。  
+
+    【具体的実装手順】  
+    14-1. Repository 拡充: 既存 `toggleLike(albumId, userId)` に加え:  
+        - `countLikes(albumId): Promise<number>`: `where('albumId','==',albumId)` で件数。  
+        - `hasLiked(albumId, userId): Promise<boolean>`: ドキュメント存在チェック。  
+    14-2. UI 追加 (`app/album/[id]/page.tsx`):  
+        - アルバムタイトル付近に Like ボタンとカウント表示。  
+        - 状態: 未ログイン → グレー表示 & ツールチップ。  
+        - 押下処理: 楽観的更新 → toggleLike → 失敗時ロールバック。  
+    14-3. 初期ロード: アルバム詳細取得後に `hasLiked` + `countLikes` を並列取得し state へ。  
+    14-4. 型: `LikeState { liked: boolean; count: number; busy: boolean }` を page 内で管理。  
+    14-5. エラー処理: トグル失敗時は `translateError` でメッセージ表示、前状態へ戻す。  
+    14-6. テストシナリオ:  
+        1) 自分が Like 済み → ボタンが取り消しモード。  
+        2) 取り消し後 count が -1。再 Like → +1。  
+        3) 未ログインでボタン非活性。  
+        4) 同一アルバムを他ユーザーが Like → 手動リロードで count 増加。 (リアルタイムは後工程)  
+    14-7. 拡張余地:  
+        - リアルタイム購読: onSnapshot で likes 件数サブスク。  
+        - 人気アルバム一覧: likes 件数降順インデックス用 Cloud Function 集計 or BigQuery 連携。  
+        - ユーザーごとの Like 履歴一覧ページ (/likes)。  
+        - 通知: 自分のアルバムが Like されたとき通知送信。  
+    14-8. パフォーマンス注意: 単純な count クエリは N 件分のドキュメントを転送するため大量アクセスで負荷 → 後で `albums` に `likeCount` キャッシュを持たせ Cloud Function でインクリ/デクリ。  
+    14-9. アクセシビリティ: ボタンに `aria-pressed` を付与し状態を明示。  
+15. コメント機能  
     - アルバム詳細カードにコメント一覧表示 (comments where albumId)  
     - 投稿: フレンド or オーナーのみフォーム表示  
     - 削除: 自分のコメント or オーナー（仕様に合わせる）
-15. いいね機能  
+16. いいね機能  
     - ハートボタン押下 → likes ドキュメント (albumId+userId) 追加  
     - 解除 → 削除  
     - 件数表示: likes where albumId の count
-16. プロフィール (/u/[id])  
+17. プロフィール (/u/[id])  
     - users 取得 → アイコン / 自己紹介  
     - 作成アルバム: albums where ownerId == id  
     - 参加アルバム: albumImages where uploaderId == id → albumId 一覧 → 重複除去して表示  
     - 投稿コメント: comments where userId == id  
-17. アクセス制御（最初はフロントで簡易）  
+18. アクセス制御（最初はフロントで簡易）  
     - アルバム詳細表示条件: (owner) or (friend) or (watch)  
     - 画像追加条件: owner or friend  
-18. Firestore セキュリティルール（後で強化）  
+19. Firestore セキュリティルール（後で強化）  
     - request.auth != null を基本  
     - albums 書き込み: request.auth.uid == ownerId  
     - albumImages 追加: owner か friends コレクションで関係確認（最初は緩く→後カスタム）  
-19. 4枚/ユーザー判定実装例  
+20. 4枚/ユーザー判定実装例  
     - albumImages where albumId == X and uploaderId == currentUser.uid を取得して length >= 4 ならアップロード拒否
-20. UI コンポーネント実装順  
+21. UI コンポーネント実装順  
     - ボタン類（ログイン / アルバム作成）  
     - アルバムカード（画像グリッド・場所URL表示）  
     - コメントリスト / 入力欄  
     - フレンド/ウォッチ操作ボタン  
     - プロフィールタブ（作成 / 参加 / コメント）
-21. 簡易テスト（手動）  
+22. 簡易テスト（手動）  
     - 新規ユーザー → アルバム作成 → 画像4枚追加 → 5枚目不可  
     - フレンド申請/承認 → 相手アルバムに画像追加可確認  
     - ウォッチ登録 → タイムライン表示確認  
     - コメント投稿/削除権限確認  
     - いいね往復確認
-22. PostgreSQL を使う場合（後で移行可能）  
+23. PostgreSQL を使う場合（後で移行可能）  
     - prisma init → schema.prisma に同等モデル作成 (User, Album, AlbumImage, Comment, Like, Friend, Watch)  
     - npx prisma migrate dev → API ルートで Prisma Client 使用  
     - 画像URL は同じく Firebase Storage
-23. 改善余地メモ  
+24. 改善余地メモ  
     - タイムライン取得最適化 (複合インデックス / サーバ側フィルタ)  
     - コメント編集履歴 / 通知  
     - フレンド承認ワークフロー UI 整備

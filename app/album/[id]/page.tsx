@@ -8,6 +8,7 @@ import { useAuthUser } from '../../../lib/hooks/useAuthUser';
 import { addImage, listImages, deleteImage } from '../../../lib/repos/imageRepo';
 import { addComment, updateComment, deleteComment } from '../../../lib/repos/commentRepo';
 import { updateAlbum } from '../../../lib/repos/albumRepo';
+import { toggleLike, hasLiked, countLikes } from '../../../lib/repos/likeRepo';
 import { translateError } from '../../../lib/errors';
 
 export default function AlbumDetailPage() {
@@ -29,6 +30,9 @@ export default function AlbumDetailPage() {
   const [uploading, setUploading] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [commenting, setCommenting] = useState(false);
+  const [likeCount, setLikeCount] = useState<number>(0);
+  const [liked, setLiked] = useState<boolean>(false);
+  const [likeBusy, setLikeBusy] = useState(false);
 
   useEffect(() => {
     if (!albumId) return;
@@ -48,6 +52,20 @@ export default function AlbumDetailPage() {
         const cSnap = await getDocs(cQ);
         const comm: any[] = [];
         cSnap.forEach(d => comm.push({ id: d.id, ...d.data() }));
+        // like 状態取得
+        if (user) {
+          const [likedFlag, cnt] = await Promise.all([
+            hasLiked(albumId, user.uid),
+            countLikes(albumId)
+          ]);
+          if (active) {
+            setLiked(likedFlag);
+            setLikeCount(cnt);
+          }
+        } else {
+          // 未ログイン時は件数のみ（仕様上 read は authed 限定→ 0 のまま）
+          setLiked(false); setLikeCount(0);
+        }
         if (active) {
           // createdAt がない古いデータでも並び替えが壊れないようにフォールバック
           setImages(imgs.sort((a:any,b:any)=> ((b.createdAt?.seconds||b.createdAt||0) - (a.createdAt?.seconds||a.createdAt||0))));
@@ -78,6 +96,25 @@ export default function AlbumDetailPage() {
       setError(translateError(e));
     } finally {
       setUploading(false);
+    }
+  }
+  async function handleToggleLike() {
+    if (!user || !albumId) return;
+    setLikeBusy(true);
+    const prevLiked = liked;
+    const prevCount = likeCount;
+    // 楽観的更新
+    setLiked(!prevLiked);
+    setLikeCount(prevLiked ? prevCount - 1 : prevCount + 1);
+    try {
+      await toggleLike(albumId, user.uid);
+    } catch (e:any) {
+      // ロールバック
+      setLiked(prevLiked);
+      setLikeCount(prevCount);
+      setError(translateError(e));
+    } finally {
+      setLikeBusy(false);
     }
   }
 
@@ -179,6 +216,18 @@ export default function AlbumDetailPage() {
         <h1 className="text-2xl font-semibold mb-2">アルバム詳細</h1>
         <p className="text-sm text-gray-700">ID: {album.id}</p>
         {!isOwner && album.title && <p className="mt-1 text-lg">{album.title}</p>}
+        <div className="mt-2 flex items-center gap-3">
+          <div className="flex items-center gap-1">
+            <button
+              aria-pressed={liked}
+              disabled={!user || likeBusy}
+              onClick={handleToggleLike}
+              className={`text-sm px-2 py-1 rounded border ${liked ? 'bg-pink-600 text-white border-pink-600' : 'bg-white text-gray-700 border-gray-300'} disabled:opacity-50`}
+            >{liked ? '♥ いいね済み' : '♡ いいね'}</button>
+            <span className="text-xs text-gray-600">{likeCount}</span>
+          </div>
+          {!user && <span className="text-[11px] text-gray-500">ログインでいいね可能</span>}
+        </div>
         {!isOwner && album.placeUrl && <a href={album.placeUrl} target="_blank" rel="noreferrer" className="text-blue-600 text-sm underline">撮影場所</a>}
         {isOwner && (
           <div className="space-y-3 mt-2 border rounded p-3 bg-gray-50">
