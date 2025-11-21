@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import { useAuthUser } from '../../../lib/hooks/useAuthUser';
 import { getUser } from '../../../lib/repos/userRepo';
 import { getFriendStatus, sendFriendRequest, acceptFriend, cancelFriendRequest, removeFriend } from '../../../lib/repos/friendRepo';
+import { isWatched, addWatch, removeWatch } from '../../../lib/repos/watchRepo';
 import { translateError } from '../../../lib/errors';
 
 export default function ProfilePage() {
@@ -15,6 +16,8 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [friendState, setFriendState] = useState<'none'|'sent'|'received'|'accepted'>('none');
   const [busy, setBusy] = useState(false);
+  const [watching, setWatching] = useState(false);
+  const [watchBusy, setWatchBusy] = useState(false);
 
   useEffect(() => {
     if (!profileUid) return;
@@ -24,6 +27,7 @@ export default function ProfilePage() {
       try {
         const p = await getUser(profileUid);
         if (active) setProfile(p);
+        let watchedFlag = false;
         if (user && profileUid !== user.uid) {
           const forward = await getFriendStatus(user.uid, profileUid); // 自分 -> 相手
           const backward = await getFriendStatus(profileUid, user.uid); // 相手 -> 自分
@@ -32,9 +36,11 @@ export default function ProfilePage() {
           else if (forward === 'pending') st = 'sent';
           else if (backward === 'pending') st = 'received';
           if (active) setFriendState(st);
+          watchedFlag = await isWatched(user.uid, profileUid);
         } else {
           if (active) setFriendState('none');
         }
+        if (active) setWatching(watchedFlag);
       } catch (e:any) {
         if (active) setError(translateError(e));
       } finally {
@@ -82,6 +88,24 @@ export default function ProfilePage() {
     finally { setBusy(false); }
   }
 
+  async function doWatchToggle() {
+    if (!user || !profileUid || user.uid === profileUid) return;
+    setWatchBusy(true); setError(null);
+    try {
+      if (watching) {
+        await removeWatch(user.uid, profileUid);
+        setWatching(false);
+      } else {
+        await addWatch(user.uid, profileUid);
+        setWatching(true);
+      }
+    } catch (e:any) {
+      setError(translateError(e));
+    } finally {
+      setWatchBusy(false);
+    }
+  }
+
   if (loading) return <div className="p-4 text-sm text-gray-500">読み込み中...</div>;
   if (!profile) return <div className="p-4 text-sm text-gray-600">ユーザーが見つかりません</div>;
 
@@ -119,6 +143,15 @@ export default function ProfilePage() {
               <button disabled={busy} onClick={doRemove} className="bg-red-600 text-white text-xs px-2 py-1 rounded disabled:opacity-50">解除</button>
             </div>
           )}
+          <div className="pt-2 border-t mt-3">
+            <h3 className="text-sm font-medium mb-1">ウォッチ</h3>
+            {!watching && (
+              <button disabled={watchBusy} onClick={doWatchToggle} className="bg-indigo-600 text-white text-xs px-2 py-1 rounded disabled:opacity-50">ウォッチ</button>
+            )}
+            {watching && (
+              <button disabled={watchBusy} onClick={doWatchToggle} className="bg-gray-600 text-white text-xs px-2 py-1 rounded disabled:opacity-50">ウォッチ解除</button>
+            )}
+          </div>
           {!user && <p className="text-sm text-gray-600">ログインすると操作できます</p>}
         </section>
       )}

@@ -495,6 +495,41 @@
 12. ウォッチ機能
     - 他ユーザーのプロフィールに「ウォッチ」ボタン → watches に保存  
     - タイムライン取得時: (自分がウォッチしている ownerId) + (自分のフレンドの ownerId) の albums を並べる
+
+    【具体的実装手順】
+    12-1. Firestore ルール確認: watches コレクションで
+        ```
+        match /watches/{watchId} {
+          allow read: if authed();
+          allow create, delete: if authed() && request.resource.data.userId == request.auth.uid;
+        }
+        ```
+        - 自分自身をウォッチする操作はクライアント側で拒否 (SELF_WATCH エラー)。
+    12-2. データモデル: 既存 `WatchDoc { id,userId,ownerId,createdAt }`。id は `userId_ownerId`。
+    12-3. リポジトリ (`watchRepo.ts`) 既存関数:
+        - `addWatch(userId, ownerId)` / `removeWatch(userId, ownerId)` / `toggleWatch(userId, ownerId)` / `listWatchedOwnerIds(userId)`。
+        追加で:
+        - `isWatched(userId, ownerId)` 単一判定 (doc.exists)。
+        - `listWatchers(ownerId)` ownerId をウォッチしている userId 一覧（後で通知や公開数表示）。
+    12-4. UI 追加 (プロフィール `/u/[id]`):
+        - フレンドボタン群の下にウォッチ状態表示領域。
+        - 状態判定: `isWatched(currentUser.uid, profileUid)` → true なら「ウォッチ解除」ボタン / false なら「ウォッチ」ボタン。
+        - クリック後は即座に楽観的に表示更新しつつ非同期処理。失敗時は復元 + エラーメッセージ。
+    12-5. タイムライン取得ロジック（簡易案）:
+        - `const watched = await listWatchedOwnerIds(currentUser.uid)`。
+        - フレンド accepted 一覧 (listAcceptedFriends) で得たオーナー id とマージし Set 化。
+        - その集合に含まれる ownerId の albums をクエリする最初の最適化は後回し。初期版: 全 albums orderBy('createdAt','desc') limit(50) → クライアント側フィルタ。
+    12-6. エラー処理:
+        - 自分自身ウォッチ: 'SELF_WATCH' → 「自分はウォッチできません」。
+        - ルール拒否 (userId 不一致) → 「権限がありません」。
+    12-7. テストシナリオ:
+        1) A が B をウォッチ → タイムラインで B のアルバムが表示される。
+        2) A が解除 → 再読込後表示から消える（フレンドであれば残る）。
+        3) 自分自身プロフィールでウォッチボタン非表示。
+        4) エラー時 (一時的ネットワーク遮断) でメッセージ表示。
+    12-8. 将来拡張案:
+        - ウォッチ数表示 / 通知生成 / フレンドとウォッチの優先度設定 / ミュート機能 / 推薦アルゴリズム。
+        - タイムラインクエリの `where('ownerId', 'in', [...])` 分割最適化。
 13. タイムライン表示 (/timeline)  
     - Firestore クエリ簡略版: 最初は全 albums orderBy(createdAt desc) → クライアント側で対象 (friends + watches + 自分) にフィルタ  
     - 後で最適化: ownerId in [...] クエリ（必要なら分割取得）

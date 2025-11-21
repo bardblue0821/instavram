@@ -41,3 +41,17 @@ export async function listWatchedOwnerIds(userId: string): Promise<string[]> {
   res.forEach(d => ids.push((d.data() as WatchDoc).ownerId));
   return ids;
 }
+
+export async function isWatched(userId: string, ownerId: string): Promise<boolean> {
+  const id = watchId(userId, ownerId);
+  const snap = await getDoc(doc(db, COL.watches, id));
+  return snap.exists();
+}
+
+export async function listWatchers(ownerId: string): Promise<string[]> {
+  const q = query(collection(db, COL.watches), where('ownerId', '==', ownerId));
+  const res = await getDocs(q);
+  const ids: string[] = [];
+  res.forEach(d => ids.push((d.data() as WatchDoc).userId));
+  return ids;
+}
