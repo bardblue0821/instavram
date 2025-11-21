@@ -301,12 +301,12 @@
 
      【目的】現状機能 (認証 / アルバム作成 / 画像アップロード / コメント基礎) を早期に本番相当環境へ公開し、運用/課題を洗い出す。
 
-     ### 前提チェック
+     #### 前提チェック
      - .env.local の `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` が `instavram3.appspot.com` であること (typo: firebasestorage.app などは不可)
      - Firebase Console: Authentication 有効 (Email/Password + Google)、Firestore/Storage 作成済み
      - ローカルで `npm run build` 成功
 
-     ### Firebase セキュリティルール (最初の安全ライン)
+     #### Firebase セキュリティルール (最初の安全ライン)
      Firestore（最小案）:
      ```
      rules_version = '2';
@@ -350,13 +350,13 @@
      }
      ```
 
-     ### Git リポジトリ準備
+     #### Git リポジトリ準備
      1. `git init`
      2. `.gitignore` に `/.env.local` を追加
      3. `git add . && git commit -m "initial deploy"`
      4. GitHub に新規リポジトリ作成 → `git remote add origin <repo-url>` → `git push -u origin main`
 
-     ### Vercel へデプロイ
+     #### Vercel へデプロイ
      1. Vercel ダッシュボード → New Project → GitHub リポジトリ選択
      2. Framework 自動検出 (Next.js) 設定はデフォルト (Build: `next build`, Output: `.next`)
      3. Environment Variables に以下を登録:
@@ -370,7 +370,7 @@
      4. Deploy 実行 → 完了後 URL メモ
      5. Firebase Authentication 許可ドメインに Vercel の生成ドメイン (例: `instavram3.vercel.app`) を追加（未追加ならログイン失敗）
 
-     ### 本番動作確認チェックリスト
+     #### 本番動作確認チェックリスト
      - ログイン画面で Email 登録 → 成功後 Firestore `users` にドキュメント生成
      - Google ログイン成功確認 (初回 user 作成)
      - アルバム作成 → 画像 1 枚アップロード進捗が進む → 完了後詳細ページへ遷移
@@ -379,7 +379,7 @@
      - いいねトグル反応 (likes ドキュメント生成/削除)
      - 再読み込みして表示が維持される
 
-     ### トラブルシュート早見表
+     #### トラブルシュート早見表
      | 症状 | 想定原因 | 対処 |
      |------|---------|------|
      | 画像アップロードが 0% 固定 | Storage bucket typo / ルール拒否 | `.env.local` と Console 再確認 / ルール緩和テスト |
@@ -388,14 +388,14 @@
      | Google ログイン失敗 | 許可ドメイン未設定 | Firebase Auth 設定に本番ドメイン追加 |
      | 404 (バケット) | STORAGE_BUCKET typo | `<projectId>.appspot.com` に修正 |
 
-     ### 改善フェーズでの次ステップ (任意)
+     #### 改善フェーズでの次ステップ (任意)
      - 追加画像アップロード画面の進捗統一
      - Cloud Functions で不要画像クリーンアップ
      - 画像サムネイル生成 (サイズ削減)
      - エラーコード日本語化共通モジュール
      - Lighthouse / Web Vitals 測定でパフォーマンス改善
 
-     ### デプロイ後の安全化 TODO
+     #### デプロイ後の安全化 TODO
      - 期間限定の緩いルールを日付スケジュールで厳格化
      - バックアップ / ログ監視 (Firestore/Storage の使用量確認)
      - IAM で不要サービスキーの削除
@@ -440,6 +440,58 @@
     - プロフィールに「フレンド申請」ボタン → friends に {status:"pending"}  
     - 相手が承認すると status:"accepted"  
     - フレンド判定: 双方向 accepted (簡易) か一方向 accepted (ルール決めて実装)
+
+    【具体的実装手順】
+    11-1. Firestore ルール強化（friends コレクション）:
+        - 作成/更新時に request.resource.data.userId == request.auth.uid を必須（既に強化済み）。
+        - 受信者が承認する操作は友達申請ドキュメントの userId が申請者、targetId が受信者のため、受信者側も update できるようにするには OR 条件を追加。
+        例:
+        ```
+        match /friends/{friendId} {
+          allow read: if authed();
+          allow create: if authed() && request.resource.data.userId == request.auth.uid;
+          allow update: if authed() && (
+            request.resource.data.userId == request.auth.uid || // 申請者
+            request.resource.data.targetId == request.auth.uid   // 受信者（承認操作）
+          );
+        }
+        ```
+    11-2. データモデル: 既存 `FriendDoc { id,userId,targetId,status,createdAt }` を利用。`status` は 'pending' | 'accepted'。解除は将来 'removed' を追加しても良い。
+    11-3. リポジトリ拡張 (`friendRepo.ts`):
+        - `cancelFriendRequest(userId, targetId)` : pending のみ削除。
+        - `removeFriend(userId, targetId)` : accepted を削除（双方どちらからでも）。
+        - `listPendingReceived(userId)` : targetId==userId かつ status=='pending'。
+    11-4. フレンド判定ロジック: シンプルに「任意方向の accepted が存在すればフレンド」とみなす。
+        - 拡張で双方向承認を必須にしたい場合、accepted が userId->targetId と targetId->userId の両方あるかチェック。
+    11-5. UI (プロフィール `/u/[id]` ページに追加):
+        - 自分以外のプロフィール閲覧時: 状態に応じてボタン表示
+            - 未申請: 「フレンド申請」→ sendFriendRequest
+            - 送信済み (pending で自分が userId): 「申請中…」表示 + キャンセルボタン
+            - 受信 (pending で自分が targetId): 「承認」ボタン + 「拒否」(削除) ボタン
+            - accepted: 「フレンド解除」ボタン
+        - 状態取得: `getFriendStatus(viewerUid, profileUid)` と逆向き `getFriendStatus(profileUid, viewerUid)` を併用し役割判定。
+    11-6. 状態決定テーブル（優先順）:
+        | viewer→profile | profile→viewer | 表示状態 |
+        |----------------|----------------|-----------|
+        | accepted       | *              | 解除ボタン |
+        | pending        | *              | 申請中 (キャンセル可) |
+        | *              | pending        | 承認 / 拒否 |
+        | null           | null           | 申請ボタン |
+    11-7. 申請処理フロー:
+        - 申請: `sendFriendRequest(currentUser.uid, profileUid)` → 成功後 state 更新。
+        - 承認: `acceptFriend(senderUid, currentUser.uid)` （repo拡張で順序明記）→ status を 'accepted'。
+        - 拒否/キャンセル: 該当ドキュメント削除。
+        - 解除: accepted ドキュメント削除。
+    11-8. 楽観的 UI: ボタン押下で即ラベル更新→非同期結果失敗時に復元 & エラー表示。
+    11-9. テストシナリオ:
+        1) A が B プロフィールで申請 → B に pending 受信が表示。
+        2) B が承認 → 双方 accepted 表示 / A の「解除」ボタン出現。
+        3) A が解除 → A/B とも未申請状態に戻る。
+        4) 自分自身のプロフィールではボタン非表示。
+    11-10. 将来拡張案:
+        - 双方向承認方式 / 申請メッセージ / 通知連携 / フレンド一覧ページ / 検索 / ブロック機能。
+        - フレンド数上限と rate limit (悪用防止)。
+        - Cloud Functions で承認イベント時通知ドキュメント生成。
 12. ウォッチ機能
     - 他ユーザーのプロフィールに「ウォッチ」ボタン → watches に保存  
     - タイムライン取得時: (自分がウォッチしている ownerId) + (自分のフレンドの ownerId) の albums を並べる

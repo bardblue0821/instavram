@@ -1,42 +1,128 @@
 "use client";
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useAuthUser } from '../../../lib/hooks/useAuthUser';
 import { getUser } from '../../../lib/repos/userRepo';
+import { getFriendStatus, sendFriendRequest, acceptFriend, cancelFriendRequest, removeFriend } from '../../../lib/repos/friendRepo';
+import { translateError } from '../../../lib/errors';
 
-export default function UserProfilePage() {
+export default function ProfilePage() {
   const params = useParams();
-  const id = params?.id as string | undefined;
+  const profileUid = params?.id as string | undefined;
+  const { user } = useAuthUser();
+  const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [friendState, setFriendState] = useState<'none'|'sent'|'received'|'accepted'>('none');
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!id) return;
+    if (!profileUid) return;
     let active = true;
     (async () => {
-      setLoading(true);
+      setLoading(true); setError(null);
       try {
-        const u = await getUser(id);
-        if (active) setUser(u || null);
-      } catch (e: any) {
-        if (active) setError(e.message || '取得失敗');
+        const p = await getUser(profileUid);
+        if (active) setProfile(p);
+        if (user && profileUid !== user.uid) {
+          const forward = await getFriendStatus(user.uid, profileUid); // 自分 -> 相手
+          const backward = await getFriendStatus(profileUid, user.uid); // 相手 -> 自分
+          let st: 'none'|'sent'|'received'|'accepted' = 'none';
+          if (forward === 'accepted' || backward === 'accepted') st = 'accepted';
+          else if (forward === 'pending') st = 'sent';
+          else if (backward === 'pending') st = 'received';
+          if (active) setFriendState(st);
+        } else {
+          if (active) setFriendState('none');
+        }
+      } catch (e:any) {
+        if (active) setError(translateError(e));
       } finally {
         if (active) setLoading(false);
       }
     })();
     return () => { active = false; };
-  }, [id]);
+  }, [profileUid, user]);
 
-  if (loading) return <div className="text-sm text-gray-500">読み込み中...</div>;
-  if (error) return <div className="text-sm text-red-600">{error}</div>;
-  if (!user) return <div className="text-sm text-gray-600">ユーザーが見つかりません</div>;
+  async function doSend() {
+    if (!user || !profileUid) return;
+    setBusy(true); setError(null);
+    try {
+      await sendFriendRequest(user.uid, profileUid);
+      setFriendState('sent');
+    } catch (e:any) { setError(translateError(e)); }
+    finally { setBusy(false); }
+  }
+  async function doAccept() {
+    if (!user || !profileUid) return;
+    setBusy(true); setError(null);
+    try {
+      await acceptFriend(profileUid, user.uid); // 申請者=profileUid, 受信者=user.uid
+      setFriendState('accepted');
+    } catch (e:any) { setError(translateError(e)); }
+    finally { setBusy(false); }
+  }
+  async function doCancel() {
+    if (!user || !profileUid) return;
+    setBusy(true); setError(null);
+    try {
+      await cancelFriendRequest(user.uid, profileUid);
+      setFriendState('none');
+    } catch (e:any) { setError(translateError(e)); }
+    finally { setBusy(false); }
+  }
+  async function doRemove() {
+    if (!user || !profileUid) return;
+    if (!confirm('フレンドを解除しますか？')) return;
+    setBusy(true); setError(null);
+    try {
+      await removeFriend(user.uid, profileUid);
+      setFriendState('none');
+    } catch (e:any) { setError(translateError(e)); }
+    finally { setBusy(false); }
+  }
+
+  if (loading) return <div className="p-4 text-sm text-gray-500">読み込み中...</div>;
+  if (!profile) return <div className="p-4 text-sm text-gray-600">ユーザーが見つかりません</div>;
+
+  const isMe = user && user.uid === profileUid;
 
   return (
-    <div>
-      <h1 className="text-xl font-semibold mb-2">{user.displayName}</h1>
-      {user.bio && <p className="mb-4 text-sm text-gray-700">{user.bio}</p>}
-      <p className="text-xs text-gray-500">UID: {user.uid}</p>
-      {/* 後で: アルバム一覧 / 参加アルバム / コメント一覧 をここにタブで追加 */}
+    <div className="max-w-xl mx-auto p-4 space-y-6">
+      <header className="space-y-2">
+        <h1 className="text-2xl font-semibold">プロフィール</h1>
+        <p className="text-sm text-gray-700">UID: {profile.uid}</p>
+        {profile.displayName && <p className="text-lg">{profile.displayName}</p>}
+        {profile.bio && <p className="text-sm whitespace-pre-line">{profile.bio}</p>}
+      </header>
+      {!isMe && user && (
+        <section className="space-y-2">
+          <h2 className="text-lg font-medium">フレンド</h2>
+          {friendState === 'none' && (
+            <button disabled={busy} onClick={doSend} className="bg-blue-600 text-white text-sm px-3 py-1 rounded disabled:opacity-50">フレンド申請</button>
+          )}
+          {friendState === 'sent' && (
+            <div className="flex gap-2 items-center">
+              <span className="text-sm text-gray-600">申請中...</span>
+              <button disabled={busy} onClick={doCancel} className="bg-gray-500 text-white text-xs px-2 py-1 rounded disabled:opacity-50">キャンセル</button>
+            </div>
+          )}
+          {friendState === 'received' && (
+            <div className="flex gap-2">
+              <button disabled={busy} onClick={doAccept} className="bg-green-600 text-white text-sm px-3 py-1 rounded disabled:opacity-50">承認</button>
+              <button disabled={busy} onClick={doCancel} className="bg-red-600 text-white text-sm px-3 py-1 rounded disabled:opacity-50">拒否</button>
+            </div>
+          )}
+          {friendState === 'accepted' && (
+            <div className="flex gap-3 items-center">
+              <span className="text-sm text-green-700">フレンドです</span>
+              <button disabled={busy} onClick={doRemove} className="bg-red-600 text-white text-xs px-2 py-1 rounded disabled:opacity-50">解除</button>
+            </div>
+          )}
+          {!user && <p className="text-sm text-gray-600">ログインすると操作できます</p>}
+        </section>
+      )}
+      {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   );
 }
