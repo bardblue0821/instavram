@@ -9,6 +9,8 @@ import { addImage, listImages, deleteImage } from '../../../lib/repos/imageRepo'
 import { addComment, updateComment, deleteComment } from '../../../lib/repos/commentRepo';
 import { updateAlbum } from '../../../lib/repos/albumRepo';
 import { toggleLike, hasLiked, countLikes } from '../../../lib/repos/likeRepo';
+import { getFriendStatus } from '../../../lib/repos/friendRepo';
+import { isWatched } from '../../../lib/repos/watchRepo';
 import { translateError } from '../../../lib/errors';
 
 export default function AlbumDetailPage() {
@@ -35,6 +37,11 @@ export default function AlbumDetailPage() {
   const [likeBusy, setLikeBusy] = useState(false);
   // 仮コメント追跡 (楽観的表示 → 実ドキュメント到着で除去)
   const [pendingLocalComments, setPendingLocalComments] = useState<{id:string; body:string; userId:string; createdAt:Date}[]>([]);
+  // アクセス制御状態
+  const [accessLoading, setAccessLoading] = useState(true);
+  const [isFriend, setIsFriend] = useState(false);
+  const [isWatcher, setIsWatcher] = useState(false);
+  const [accessError, setAccessError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!albumId) return;
@@ -83,6 +90,34 @@ export default function AlbumDetailPage() {
     })();
     return () => { active = false; };
   }, [albumId]);
+
+  // アクセス判定 (album 取得後 / user 変更時)
+  useEffect(() => {
+    let ignore = false;
+    async function run() {
+      if (!album || !user) { setIsFriend(false); setIsWatcher(false); setAccessLoading(false); return; }
+      setAccessLoading(true); setAccessError(null);
+      try {
+        // フレンド判定 (双方向 accepted のどちらか)
+        const [forward, backward] = await Promise.all([
+          getFriendStatus(user.uid, album.ownerId),
+          getFriendStatus(album.ownerId, user.uid),
+        ]);
+        const friendFlag = (forward === 'accepted' || backward === 'accepted');
+        const watchFlag = await isWatched(user.uid, album.ownerId);
+        if (!ignore) {
+          setIsFriend(friendFlag);
+          setIsWatcher(watchFlag);
+        }
+      } catch (e:any) {
+        if (!ignore) setAccessError(e.message || '権限判定失敗');
+      } finally {
+        if (!ignore) setAccessLoading(false);
+      }
+    }
+    run();
+    return () => { ignore = true; };
+  }, [album, user]);
 
   // コメント / いいね リアルタイム購読（インデックス未作成時はフォールバック）
   useEffect(() => {
@@ -259,9 +294,27 @@ export default function AlbumDetailPage() {
   if (error) return <div className="text-sm text-red-600">{error}</div>;
   if (!album) return <div className="text-sm text-gray-600">アルバムが見つかりません</div>;
 
+  const isOwner = user && album && album.ownerId === user.uid;
+  const canView = isOwner || isFriend || isWatcher;
+
+  if (!user) {
+    return <div className="p-4 space-y-3">
+      <h1 className="text-lg font-semibold">アルバム</h1>
+      <p className="text-sm text-gray-600">ログインが必要です。</p>
+      <a href="/login" className="inline-block bg-blue-600 text-white text-sm px-3 py-1 rounded">ログインへ</a>
+    </div>;
+  }
+  if (accessLoading) return <div className="text-sm text-gray-500">権限確認中...</div>;
+  if (!canView) return <div className="p-4 space-y-2">
+    <h1 className="text-lg font-semibold">アルバム</h1>
+    <p className="text-sm text-red-600">閲覧権限がありません。</p>
+    {accessError && <p className="text-xs text-gray-500">{accessError}</p>}
+  </div>;
+
   const myCount = images.filter(img => img.uploaderId === user?.uid).length;
   const remaining = 4 - myCount;
-  const isOwner = user && album && album.ownerId === user.uid;
+  const canAddImages = isOwner || isFriend; // watcher には非表示
+  const canPostComment = isOwner || isFriend; // 暫定仕様
 
   return (
     <div className="space-y-6">
@@ -313,7 +366,7 @@ export default function AlbumDetailPage() {
             </figure>
           ))}
         </div>
-        {user && (
+        {user && canAddImages && (
           <div className="mt-4">
             <h3 className="text-sm font-medium mb-1">画像追加 (残り {remaining} 枚)</h3>
             {remaining <= 0 && <p className="text-xs text-red-600">これ以上追加できません</p>}
@@ -358,7 +411,7 @@ export default function AlbumDetailPage() {
           })}
           {comments.length === 0 && <li className="text-sm text-gray-500">コメントなし</li>}
         </ul>
-        {user && (
+        {user && canPostComment && (
           <form onSubmit={handleAddComment} className="space-y-2 max-w-md">
             <textarea
               value={commentText}
@@ -381,6 +434,11 @@ export default function AlbumDetailPage() {
         )}
       </section>
       {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="text-xs text-gray-500 space-y-1">
+        <p>権限: {isOwner ? 'オーナー' : isFriend ? 'フレンド' : isWatcher ? 'ウォッチャー' : 'その他'}</p>
+        {!canAddImages && <p>※ 画像追加はオーナーまたはフレンドのみ。</p>}
+        {!canPostComment && <p>※ コメント投稿はオーナーまたはフレンドのみ。</p>}
+      </div>
       <p className="text-xs text-gray-500">※ 簡易版: 画像追加は DataURL 保存。本番は Firebase Storage 経由へ差し替え予定。</p>
     </div>
   );

@@ -701,8 +701,41 @@
     17-9. アクセシビリティ: セクション見出しを `<h2>`、統計カードに `aria-label="作成アルバム数"` など付与。  
     17-10. フォールバック: 参加アルバム取得で 0 件かエラーのときはメッセージ表示し UI 維持（他セクションへの影響なし）。  
 18. アクセス制御（最初はフロントで簡易）  
-    - アルバム詳細表示条件: (owner) or (friend) or (watch)  
-    - 画像追加条件: owner or friend  
+    - 目的: 非公開ロジック強化前の暫定ガード。ビュー側で owner/friend/watch による可視性と操作権限を制御し、後段で Firestore ルールに反映するための土台を作る。  
+    - 表示条件 (Album 詳細): `(isOwner || isFriend || isWatcher)` を満たす場合のみ本文表示。満たさない場合は簡易メッセージ「閲覧権限がありません」。未ログインならログイン誘導。  
+    - 画像追加条件: `isOwner || isFriend`（watcher は閲覧のみ）。削除条件は既存通り `(isOwner || image.uploaderId == currentUser.uid)`。  
+    - コメント/いいね条件: 閲覧許可がある場合はいいねボタン表示。コメント投稿は `isOwner || isFriend` に限定（暫定）。初期バージョンは緩めて watcher もコメント可としてもよいが後で絞る。  
+
+    【具体的実装手順】  
+    18-1. 判定取得: アルバム詳細ページで `album.ownerId` を基点に以下並列取得。  
+        - フレンド判定: `getFriendStatus(viewerUid, ownerId)` および逆向き → どちらか accepted なら `isFriend = true`。  
+        - ウォッチ判定: `isWatched(viewerUid, ownerId)` → true なら `isWatcher = true`。  
+        - オーナー判定: `album.ownerId === viewerUid`。  
+    18-2. Hook 化（任意）: `useAlbumAccess(albumOwnerId)` を作り、`{ isOwner, isFriend, isWatcher, loading }` を返却。再利用性向上。  
+    18-3. UI ガード: 読み込み完了後に `(isOwner || isFriend || isWatcher)` が false → 権限メッセージを返して他要素レンダリングを中断。  
+    18-4. 権限別表示:  
+        - 画像追加フォーム: `isOwner || isFriend` のみ。  
+        - コメント投稿フォーム: 同上（段階的公開を想定）。  
+        - アルバム編集フォーム: `isOwner` のみ（既存）。  
+    18-5. エラー戦略: 判定クエリ失敗時（ネットワーク等）は Conservative に表示を拒否しメッセージ + 再試行。  
+    18-6. Firestore ルール拡張（後工程案）:  
+        - albums 読み取り: 現在公開 (read: if true) → 将来 `(isOwner(request.auth.uid) || isFriendWithOwner(request.auth.uid, resource.data.ownerId) || isWatchedOwner(request.auth.uid, resource.data.ownerId))` に変更。  
+        - comments create: `(isOwner || isFriend)` 条件へ。  
+        - albumImages create: `(isOwner || isFriend)` 条件へ。  
+        - Cloud Functions による friend/watch 判定キャッシュドキュメントを利用しルール式を簡潔化。  
+    18-7. インデックス: 判定取得は単一ドキュメント参照か単純 where で複合インデックス不要。friends の accepted 状態は ID が `userId_targetId` 形式であれば doc.get 一回で判定可能（将来最適化）。  
+    18-8. テストシナリオ:  
+        1) オーナーが閲覧 → 全操作可。  
+        2) フレンドが閲覧 → 画像追加/コメント可能。  
+        3) ウォッチャーが閲覧 → 画像追加ボタン非表示 / コメントフォーム非表示（仕様選択に応じて）。  
+        4) 非関係ユーザーが直接 URL アクセス → 権限メッセージ表示。  
+        5) 未ログインユーザー → ログイン誘導表示。  
+        6) 友達解除後リロード → 画像追加フォームが消える。  
+    18-9. 拡張案:  
+        - 公開/限定/非公開アルバムフラグによる柔軟アクセス。  
+        - ミュート/ブロック機能で表示除外。  
+        - SSR 時にアクセストークン検証 & 403 レスポンス。  
+    18-10. セキュリティ注意: クライアント側制御のみでは改ざん可能。早期に Firestore ルールへ移植し二重防御。  
 19. Firestore セキュリティルール（後で強化）  
     - request.auth != null を基本  
     - albums 書き込み: request.auth.uid == ownerId  
