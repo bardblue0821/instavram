@@ -229,6 +229,35 @@
    - メール登録 & ログインボタン  
    - Google ログインボタン  
    - 成功後: users に存在しなければ作成
+   
+   【具体的実装手順】
+   6-1. ページ作成: `app/login/page.tsx` を作成し `"use client"` を先頭に記述（Firebase Auth はブラウザ依存）。
+   6-2. 依存読込: `import { auth } from '../../lib/firebase'` と `createUser/getUser` を `lib/repos/userRepo` から、`GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword` を firebase/auth からインポート。
+   6-3. 状態管理: `email`, `password`, `mode` ("login"|"register"), `loading`, `error`, `info` を useState で保持。
+   6-4. バリデーション: 
+       - email: 簡易で `/@.+\./` を満たさなければエラー。
+       - password: 6文字未満はエラー。
+   6-5. 登録フロー (register): 
+       1) `createUserWithEmailAndPassword(auth,email,password)`
+       2) `getUser(uid)` で Firestore 未作成なら `createUser(uid, displayName || email.split('@')[0])`。
+       3) 完了後 `/` へ遷移。
+   6-6. ログインフロー (login): 
+       1) `signInWithEmailAndPassword(auth,email,password)`
+       2) Firestore ドキュメントが無ければ `createUser(...)` （初期バージョンは常に保証する）
+   6-7. Google ログイン: 
+       - `const provider = new GoogleAuthProvider()` → `signInWithPopup(auth,provider)` → 同じく ensureUser ドキュメント作成。
+   6-8. 初回ユーザー作成共通化: `lib/authUser.ts` に `export async function ensureUser(uid:string, displayName:string|undefined)` を実装し各フローで呼び出し。
+   6-9. エラーハンドリング: Firebase が返す `auth/` 系エラーコードを switch し日本語化（例: `auth/email-already-in-use` → "既に登録済み"）。
+   6-10. UI 要素: 
+       - タブ/トグル: "ログイン" と "新規登録" の切替ボタン。
+       - フィールド: email, password。
+       - ボタン: 登録/ログイン (mode に応じて), Google ログイン, TOPへ戻る。
+       - 状態表示: loading スピナーまたは "処理中..."、error メッセージ赤、info 緑。
+   6-11. 成功後遷移: `router.push('/')` （App Router の `useRouter`）。
+   6-12. 未ログインアクセス保護: `/login` は常に表示可。ログイン後再度アクセスされたら `/` に即時リダイレクトするため `useEffect` で `onAuthStateChanged` を監視。
+   6-13. アクセシビリティ簡易: form 要素 + label, `aria-live="polite"` でメッセージ領域。
+   6-14. 今後拡張: パスワードリセットリンク / 永続セッション / MFA / reCAPTCHA / プロフィール編集。
+
 7. 共通レイアウト  
    - ヘッダー: ログイン状態 / プロフィール遷移 / アルバム作成ボタン常駐
 8. アルバム作成フロー  
