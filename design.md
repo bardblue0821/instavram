@@ -8,7 +8,7 @@
 - Tailwind CSS
 - TypeScript
 
-## 手順
+## 手順: スプリント１
 ### 初心者向け全体手順
 1. 開発環境準備  
    - Node.js と VS Code をインストール  
@@ -533,6 +533,38 @@
 13. タイムライン表示 (/timeline)  
     - Firestore クエリ簡略版: 最初は全 albums orderBy(createdAt desc) → クライアント側で対象 (friends + watches + 自分) にフィルタ  
     - 後で最適化: ownerId in [...] クエリ（必要なら分割取得）
+
+    【具体的実装手順】
+    13-1. 取得方針 (初期版): パフォーマンス最優先よりも簡易実装を優先し、最新 50 件のアルバムを取得後にフロントでフィルタ。
+        - `getLatestAlbums(50)` を呼び出し → `listAcceptedFriends(currentUser.uid)` と `listWatchedOwnerIds(currentUser.uid)` を取得 → Set 化し ownerId が (自分 or friends or watched) に一致するもののみ表示。
+        - 未ログイン時は最新公開アルバムをそのまま表示（後で「ログインすると絞り込み」とガイド）。
+    13-2. カード表示要素（最小）: タイトル / オーナーID / 作成日時 / 先頭画像サムネイル (albumImages から 1件) / 画像枚数 (optional)。
+        - 画像サムネイル取得: 各 albumId ごとに `query(albumImages where albumId==...) limit(1)` で最初の画像URL。並列取得で Promise.all。
+        - 画像枚数は後回しでもよい。実装するなら count クエリ (albumImages where albumId==X)。
+    13-3. UI 構成 (/timeline):
+        - ログイン状態: ヘッダー下に "タイムライン" のタイトルと簡易説明。
+        - ローディング: スケルトンまたは "読み込み中..."。
+        - 空の場合: "対象アルバムがありません"。
+        - エラー表示: `translateError` 利用し再試行ボタン。
+        - 最初の最適化余地: friends + watched の ownerId 数が多い場合は `in` クエリ分割 (10件ずつ) を後で導入。
+    13-4. 型/契約:
+        - `TimelineAlbum { id:string; ownerId:string; title?:string|null; createdAt:Date; firstImageUrl?:string }`。
+        - firstImageUrl が未取得ならプレースホルダー画像 (例: /placeholder.png) を表示。
+    13-5. 失敗時考慮:
+        - 画像取得が一部失敗してもアルバム本体は表示し、失敗画像はプレースホルダー差し替え。
+        - friends / watches の取得失敗時: フィルタをスキップし全公開アルバム表示（エラー通知は軽く）。
+    13-6. テストシナリオ:
+        1) ログインユーザーが friend + watch を設定後、相手アルバムがタイムラインに出る。
+        2) watch 解除後 friend のみが残る。
+        3) ログアウト時に全体最新リストが表示。
+        4) 先頭画像が無いアルバムにプレースホルダーが表示。
+    13-7. 次段階最適化案:
+        - `ownerId in [...]` で直接フィルタした Firestore クエリ (最大10件制限回避のバッチ化)。
+        - ページネーション / infinite scroll。
+        - Cloud Function でユーザーごとの personalized feed を事前集計。
+        - likes/comment の最近更新ソート (更新日時を albums に反映 or 別コレクション)。
+    13-8. アクセシビリティ: カードのリンク要素に `aria-label="アルバム: {title || '無題'}"` 追加。
+    13-9. エラー/再試行ボタン: ネットワーク不安定時に album 取得と画像取得を再実行。
 14. コメント機能  
     - アルバム詳細カードにコメント一覧表示 (comments where albumId)  
     - 投稿: フレンド or オーナーのみフォーム表示  
