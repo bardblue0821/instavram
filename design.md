@@ -811,11 +811,59 @@
     20-6. 手動テスト: 自分のアルバムに 4 枚追加 → 5 枚目で UI が無効化されること / 別ユーザーで同アルバムに 4 枚追加 → 5 枚目でエラーが発生し Firestore に保存されないことを確認。  
     20-7. 将来拡張: Firestore 側でルールを追加し、`albumImages` 書き込み時に Cloud Functions またはセキュリティルールで 4 枚制限を二重に enforce する案も検討。
 21. UI コンポーネント実装順  
-    - ボタン類（ログイン / アルバム作成）  
-    - アルバムカード（画像グリッド・場所URL表示）  
-    - コメントリスト / 入力欄  
-    - フレンド/ウォッチ操作ボタン  
-    - プロフィールタブ（作成 / 参加 / コメント）
+    【具体的実装ロードマップ】  
+    21-1. ボタン類（ログイン / アルバム作成）  
+        - 目的: どのページからでも主要アクションへ遷移できる導線を確保。  
+        - 対応ファイル: `components/Header.tsx`, `app/login/page.tsx`, `app/(timeline)/page.tsx` 等。  
+        - 実装手順:  
+            1) 共通 `PrimaryButton` / `SecondaryButton` を `components/ui/Button.tsx` に用意（variant, size, loading state を props で制御）。  
+            2) ヘッダー内ログイン/ログアウト/アルバム作成ボタンを上記コンポーネントへ差し替え、`useRouter` で遷移。  
+            3) `/album/new` へのリンクボタンは `disabled={!user}` とし、`aria-disabled` も設定。  
+            4) Storybook もしくは簡易スナップショットテスト（任意）でデザイン崩れを検証。  
+    21-2. アルバムカード（画像グリッド・場所URL表示）  
+        - 目的: タイムライン/プロフィールで共通表示されるアルバム一覧 UI を整備。  
+        - 対応ファイル: `components/AlbumCard.tsx`, `app/timeline/page.tsx`, `app/u/[id]/page.tsx`。  
+        - 実装手順:  
+            1) `AlbumCard` コンポーネントを新規作成し props で `{ id, title, owner, firstImageUrl, placeUrl, likeCount?, commentCount? }` を受け取る。  
+            2) 画像は `next/image` を利用し、無い場合はプレースホルダーを表示。  
+            3) 場所URLが存在する場合は外部リンクアイコン付きで `target="_blank" rel="noreferrer"`。  
+            4) タイムライン/プロフィールでは Firestore から取得したデータを `AlbumCard` に map する。  
+            5) スケルトン表示を導入し、読み込み中は `animate-pulse` なダミーカードを並べる。  
+    21-3. コメントリスト / 入力欄  
+        - 目的: アルバム詳細ページのコメント UI を再利用可能なブロックへ分離。  
+        - 対応ファイル: `components/comments/CommentList.tsx`, `components/comments/CommentForm.tsx`, `app/album/[id]/page.tsx`。  
+        - 実装手順:  
+            1) 現在ページ内にあるコメント描画ロジックを `CommentList` へ切り出し（props: comments, currentUserId, onEdit, onDelete, isOwner）。  
+            2) 投稿フォームは `CommentForm` として `value`, `onSubmit`, `busy`, `maxLength` 等を props で受け渡し。  
+            3) Tailwind のフォームスタイルを統一し、`wrap-break-word` など共通ユーティリティを適用。  
+            4) エラーメッセージ領域は `role="alert"` を付与しアクセシビリティを担保。  
+            5) 将来リアルタイム購読を他ページで使い回せるよう、コメント関連ロジックをカスタムフック (`useAlbumComments`) に整理。  
+    21-4. フレンド/ウォッチ操作ボタン  
+        - 目的: プロフィールページでの関係操作を一元化し UX を統一。  
+        - 対応ファイル: `components/profile/FriendActions.tsx`, `components/profile/WatchActions.tsx`, `lib/repos/friendRepo.ts`, `lib/repos/watchRepo.ts`。  
+        - 実装手順:  
+            1) それぞれのコンポーネントで `status` / `loading` / `onAction` を props で受け取る汎用ボタン群を作成。  
+            2) `useFriendship(profileUid)` フックを実装し、`sendFriendRequest`, `cancel`, `accept`, `remove` を返却。  
+            3) 同様に `useWatch(profileUid)` フックで `toggleWatch` を提供、楽観的更新とエラーリカバリを標準化。  
+            4) プロフィールページではフックから得た状態をボタンコンポーネントへ渡して描画。  
+            5) 状態ラベルと説明テキストを `i18n` 用 dictionary へ登録し翻訳対応しやすくする（任意）。  
+    21-5. プロフィールタブ（作成 / 参加 / コメント）  
+        - 目的: `/u/[id]` の情報をタブ UI で整理し、Lazy Load でパフォーマンスを確保。  
+        - 対応ファイル: `components/profile/ProfileTabs.tsx`, `components/profile/ProfileStats.tsx`, `app/u/[id]/page.tsx`。  
+        - 実装手順:  
+            1) Headless UI の `Tab` もしくは自前のタブコンポーネントを用意し、`tabs = [{ key:'own', label:'作成したアルバム', count }, ...]` の配列で構成。  
+            2) 各タブ内容は `AlbumCard` または `CommentList` を利用して一覧表示。  
+            3) データ取得は初回はまとめて行い、将来的に `useDeferredValue` や Suspense chunk で遅延ロードできるよう API を分割。  
+            4) レスポンシブ対応: モバイルでは水平スクロールタブ、デスクトップでは中央揃え。  
+            5) アクセシビリティ: `role="tablist"`, `role="tab"`, `aria-selected`, `aria-controls` を設定。  
+    21-6. 品質チェック  
+        - Storybook があれば `npm run storybook` で各コンポーネントの見た目を確認。  
+        - `npm run lint` / `npm run test` / `npm run build` を順に実行し型エラーやビルド崩れがないか確認。  
+        - Lighthouse（Chrome DevTools）で主要画面のパフォーマンスとアクセシビリティをざっくり把握。  
+    21-7. 今後の拡張メモ  
+        - ボタンやカードにデザインシステムを適用し、色や影をトークン化。  
+        - タブを含むプロフィールレイアウトを SSR + ISR に対応させ表示速度を向上。  
+        - 富豪効果を防ぐため、Skeleton → 実データへのスムーズな遷移アニメーションを追加。
 22. 簡易テスト（手動）  
     - 新規ユーザー → アルバム作成 → 画像4枚追加 → 5枚目不可  
     - フレンド申請/承認 → 相手アルバムに画像追加可確認  
