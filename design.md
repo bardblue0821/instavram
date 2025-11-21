@@ -736,10 +736,71 @@
         - ミュート/ブロック機能で表示除外。  
         - SSR 時にアクセストークン検証 & 403 レスポンス。  
     18-10. セキュリティ注意: クライアント側制御のみでは改ざん可能。早期に Firestore ルールへ移植し二重防御。  
-19. Firestore セキュリティルール（後で強化）  
-    - request.auth != null を基本  
-    - albums 書き込み: request.auth.uid == ownerId  
-    - albumImages 追加: owner か friends コレクションで関係確認（最初は緩く→後カスタム）  
+19. Firestore セキュリティルール（強化計画）  
+        - 目的: フロント側ガード(18章)をデータ層で強制し不正操作/スパム/改ざんを阻止。公開/限定/非公開モードや rate limit 追加の足場。  
+        - 当面の方針: Read は初期公開維持 / Write を厳格化 → 後で visibility 追加時に read 条件を切替。  
+    
+        【関数案】  
+        ```
+        function authed() { return request.auth != null; }
+        function isOwner(albumId) {
+            return get(/databases/$(db)/documents/albums/$(albumId)).data.ownerId == request.auth.uid;
+        }
+        // 双方向どちらか accepted ならフレンド扱い
+        function isFriend(targetUid) {
+            return (
+                exists(/databases/$(db)/documents/friends/$(request.auth.uid + '_' + targetUid)) &&
+                get(/databases/$(db)/documents/friends/$(request.auth.uid + '_' + targetUid)).data.status == 'accepted'
+            ) || (
+                exists(/databases/$(db)/documents/friends/$(targetUid + '_' + request.auth.uid)) &&
+                get(/databases/$(db)/documents/friends/$(targetUid + '_' + request.auth.uid)).data.status == 'accepted'
+            );
+        }
+        // ウォッチ: 一方向存在
+        function isWatchedOwner(ownerUid) {
+            return exists(/databases/$(db)/documents/watches/$(request.auth.uid + '_' + ownerUid));
+        }
+        ```
+    
+        【write 権限詳細】  
+        - albums create: `authed()`  
+        - albums update/delete: `authed() && resource.data.ownerId == request.auth.uid && resource.data.ownerId == request.resource.data.ownerId` (ownerId 改ざん禁止)  
+        - albumImages create: `(authed() && (isOwner(request.resource.data.albumId) || isFriend(get(/databases/$(db)/documents/albums/$(request.resource.data.albumId)).data.ownerId)))`  
+        - albumImages delete: `(authed() && (resource.data.uploaderId == request.auth.uid || isOwner(resource.data.albumId)))`  
+        - comments create: `(authed() && (isOwner(request.resource.data.albumId) || isFriend(get(/databases/$(db)/documents/albums/$(request.resource.data.albumId)).data.ownerId)))`  
+        - comments update/delete: `(authed() && (resource.data.userId == request.auth.uid || isOwner(resource.data.albumId)))`  
+        - likes create: `authed() && request.resource.data.userId == request.auth.uid` / delete: `authed() && resource.data.userId == request.auth.uid`  
+        - friends create: `authed() && request.resource.data.userId == request.auth.uid`  
+        - friends update(承認): `authed() && (request.resource.data.userId == request.auth.uid || request.resource.data.targetId == request.auth.uid)`  
+        - watches create: `authed() && request.resource.data.userId == request.auth.uid && request.resource.data.userId != request.resource.data.ownerId`  
+        - watches delete: `authed() && resource.data.userId == request.auth.uid`  
+    
+        【フィールド制約 (必要時)】  
+        - likes/comment: 余分フィールド禁止 → `request.resource.data.keys().hasOnly(['albumId','userId','createdAt'])`  
+        - albums update: タイトル/場所URLのみ許可 → keys 差分チェック（初期は省略可）  
+    
+        【テスト (Emulator)】  
+        1) オーナー更新 OK / 他ユーザー更新 DENY  
+        2) フレンド画像追加 OK / 非フレンド DENY  
+        3) ウォッチャー画像追加 DENY（閲覧のみ）  
+        4) コメント投稿: フレンド OK / 非フレンド DENY  
+        5) likes userId 偽造作成 DENY  
+        6) SELF_WATCH DENY  
+        7) ownerId 改ざん更新 DENY  
+    
+        【性能注意】  
+        - exists/get 呼び出し増 → read コスト増。必要になったら `relations/{uid}` キャッシュドキュメントで friendIds / watchedOwnerIds をまとめる。  
+    
+        【拡張案】  
+        - album に `visibility: 'public'|'social'|'private'` 追加して read 条件を切替  
+        - rate limit: Cloud Functions + カウンタ (最近 N 分の書込み数) をルール参照  
+        - ブロック機能: blocks コレクション存在時は isFriend/isWatched を上書き拒否  
+    
+        【導入手順】  
+        1) 現行ルールバックアップ  
+        2) Emulator に新ルール反映→テスト通過  
+        3) 本番デプロイ→ deny ログ監視 24h  
+        4) visibility / キャッシュ設計を次フェーズで導入  
 20. 4枚/ユーザー判定実装例  
     - albumImages where albumId == X and uploaderId == currentUser.uid を取得して length >= 4 ならアップロード拒否
 21. UI コンポーネント実装順  
@@ -789,9 +850,6 @@
   - 撮影場所を設定可能
     - VRChat API を使用して、ワールド検索を可能に
     - VRChat API を使用して、フレンドの紐づけを可能に
-  - ここじゃない？投稿
-  - 私もいたよ！/私はいないよ投稿
-  - リプライ機能
 - お気に入り機能
 - リポスト機能
 - プロフィール

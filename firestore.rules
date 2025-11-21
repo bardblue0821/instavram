@@ -5,6 +5,20 @@ service cloud.firestore {
     function isOwner(albumId) {
       return get(/databases/$(db)/documents/albums/$(albumId)).data.ownerId == request.auth.uid;
     }
+    // 双方向 accepted いずれかでフレンド判定
+    function isFriend(targetUid) {
+      return (
+        exists(/databases/$(db)/documents/friends/$(request.auth.uid + '_' + targetUid)) &&
+        get(/databases/$(db)/documents/friends/$(request.auth.uid + '_' + targetUid)).data.status == 'accepted'
+      ) || (
+        exists(/databases/$(db)/documents/friends/$(targetUid + '_' + request.auth.uid)) &&
+        get(/databases/$(db)/documents/friends/$(targetUid + '_' + request.auth.uid)).data.status == 'accepted'
+      );
+    }
+    // ウォッチ判定（閲覧用途 / 現段階では write 権限に使わず）
+    function isWatchedOwner(ownerUid) {
+      return exists(/databases/$(db)/documents/watches/$(request.auth.uid + '_' + ownerUid));
+    }
 
     // users: 公開 read / 本人のみ作成・更新
     match /users/{uid} {
@@ -14,40 +28,63 @@ service cloud.firestore {
 
     // albums: 公開閲覧に変更 (以前は authed のみだった) / 作成はログイン / 更新削除はオーナー
     match /albums/{albumId} {
-      allow read: if true;
+      allow read: if true; // 後で visibility に応じて条件化
       allow create: if authed();
-      allow update, delete: if authed() && resource.data.ownerId == request.auth.uid;
+      // ownerId 改ざん禁止 & オーナーのみ更新/削除
+      allow update, delete: if authed() && resource.data.ownerId == request.auth.uid && resource.data.ownerId == request.resource.data.ownerId;
     }
 
     // albumImages: 公開閲覧 / 作成はログイン / 削除はアップロード者またはオーナー
     match /albumImages/{imageId} {
       allow read: if true;
-      allow create: if authed();
+      // 作成はオーナーまたはフレンドのみ（ウォッチャーは不可）
+      allow create: if authed() && (
+        isOwner(request.resource.data.albumId) ||
+        isFriend(get(/databases/$(db)/documents/albums/$(request.resource.data.albumId)).data.ownerId)
+      );
       allow delete: if authed() && (resource.data.uploaderId == request.auth.uid || isOwner(resource.data.albumId));
     }
 
     // comments: 公開閲覧 / 作成はログイン / 更新削除は投稿者またはアルバムオーナー
     match /comments/{commentId} {
       allow read: if true;
-      allow create: if authed();
+      // 投稿はオーナーまたはフレンド限定（仕様 18/19）
+      allow create: if authed() && (
+        isOwner(request.resource.data.albumId) ||
+        isFriend(get(/databases/$(db)/documents/albums/$(request.resource.data.albumId)).data.ownerId)
+      );
       allow update, delete: if authed() && (resource.data.userId == request.auth.uid || isOwner(resource.data.albumId));
     }
 
     // likes: ログインユーザーのみ操作
     match /likes/{likeId} {
-      allow read, create, delete: if authed();
+      allow read: if authed(); // 公開表示したければ if true
+      // 作成時 userId 偽装防止 & 必須フィールドのみ（簡易）
+      allow create: if authed() && request.resource.data.userId == request.auth.uid &&
+        request.resource.data.keys().hasOnly(['albumId','userId','createdAt']);
+      allow delete: if authed() && resource.data.userId == request.auth.uid;
     }
 
     // friends: userId 本人のみ作成・更新 (resource でなく request.resource を用いて新規作成時の値検証も可能)
     match /friends/{friendId} {
       allow read: if authed();
-      allow create, update: if authed() && request.resource.data.userId == request.auth.uid;
+      // 作成は申請者 userId のみ
+      allow create: if authed() && request.resource.data.userId == request.auth.uid;
+      // 承認更新は申請者 or 受信者（targetId）
+      allow update: if authed() && (
+        request.resource.data.userId == request.auth.uid || request.resource.data.targetId == request.auth.uid
+      );
+      // 削除（解除）は関係当事者のみ（resource 参照）
+      allow delete: if authed() && (
+        resource.data.userId == request.auth.uid || resource.data.targetId == request.auth.uid
+      );
     }
 
     // watches: userId 本人のみ作成・削除
     match /watches/{watchId} {
       allow read: if authed();
-      allow create, delete: if authed() && request.resource.data.userId == request.auth.uid;
+      allow create: if authed() && request.resource.data.userId == request.auth.uid && request.resource.data.userId != request.resource.data.ownerId;
+      allow delete: if authed() && resource.data.userId == request.auth.uid;
     }
   }
 }
