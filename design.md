@@ -595,10 +595,63 @@
         - 通知: 自分のアルバムが Like されたとき通知送信。  
     14-8. パフォーマンス注意: 単純な count クエリは N 件分のドキュメントを転送するため大量アクセスで負荷 → 後で `albums` に `likeCount` キャッシュを持たせ Cloud Function でインクリ/デクリ。  
     14-9. アクセシビリティ: ボタンに `aria-pressed` を付与し状態を明示。  
-15. コメント機能  
-    - アルバム詳細カードにコメント一覧表示 (comments where albumId)  
-    - 投稿: フレンド or オーナーのみフォーム表示  
-    - 削除: 自分のコメント or オーナー（仕様に合わせる）
+15. コメント機能（詳細 / 編集 / リアルタイム / 権限）  
+    - 目的: アルバムに対するテキストリアクション（最大200文字）を安全・快適に扱う。編集/削除権限とリアルタイム反映を整理。  
+    - コレクション: `comments` ドキュメント構造 `{ id, albumId, userId, body, createdAt }`（id は Firestore doc.id を保存）  
+    - 表示対象: アルバム詳細ページで最新順（createdAt desc）  
+    - 投稿権限: 最初は「ログインしていれば誰でも」にしておき、後で (owner or friend) に制限可能（ルール/クエリ変更）。  
+    - 編集権限: 投稿者本人 or アルバムオーナー  
+    - 削除権限: 投稿者本人 or アルバムオーナー  
+    - リアルタイム: onSnapshot により新規/編集/削除を即時反映（再取得不要）  
+
+    【具体的実装手順】  
+    15-1. バリデーション: `body.trim().length === 0` → `EMPTY`; `body.length > 200` → `TOO_LONG`。UI 側で残文字数を表示。  
+    15-2. Repository 確認/強化 (`commentRepo.ts`):  
+        - `addComment(albumId, userId, body)` 既存。throw コード維持。  
+        - `updateComment(commentId, body)` / `deleteComment(commentId)` 既存。  
+        - （任意）`subscribeComments(albumId, cb)` を追加し購読解放関数を返す。初期版はページ側で直接 onSnapshot を使用。  
+    15-3. Firestore ルール再確認:  
+        ```
+        match /comments/{commentId} {
+          allow read: if true; // 公開閲覧
+          allow create: if authed();
+          allow update, delete: if authed() && (resource.data.userId == request.auth.uid || isOwner(resource.data.albumId));
+        }
+        ```  
+        - 投稿制限を friend のみにしたい場合は後で: `isFriend(request.auth.uid, resource.data.albumOwnerId)` 関数導入案。  
+    15-4. UI 改修 (`app/album/[id]/page.tsx`):  
+        - useEffect で `query(comments where albumId==X orderBy(createdAt,'desc'))` → onSnapshot 購読。  
+        - 編集中は textarea に切替 + 保存/キャンセルボタン。保存時は楽観的でなく完了後に編集モード終了。  
+        - 削除前 `confirm()`。  
+        - リアルタイム導入後は add/edit/delete 後の再 getDocs を削除（購読が反映）。  
+    15-5. ソート戦略: createdAt 昇順（古い→新しい）。Timestamp 不整合（欠損）の場合は fallback 0 を与えて並び替え破綻回避。  
+        - Firestore で `where(albumId == X)` + `orderBy(createdAt asc)` を同時利用するには複合インデックスが必要になる（未作成時 `The query requires an index` エラー）。  
+        - 作成手順: エラーに表示されるリンクを開きそのまま "作成"。または Firebase Console → Firestore Database → Indexes → Composite → Add Index → Collection `comments`, Fields: `albumId` Asc / `createdAt` Asc。  
+        - 一時フォールバック: インデックス未作成時は orderBy を外しクライアント側で sort(昇順)。後でインデックスができれば自動で高速化可能。  
+    15-6. 状態管理:  
+        - `comments: CommentDoc[]`  
+        - `editingCommentId` / `editingCommentBody`  
+        - `commentText` / `commenting`  
+        - エラー共通: `error`  
+    15-7. エラーハンドリング: repository の Error.message を `translateError` 経由で UI 表示。EMPTY/TOO_LONG の和訳（例: "空のコメントは送信できません" / "200文字を超えています"）を後で追加。  
+    15-8. テストシナリオ:  
+        1) 新規コメント投稿 → 即リストに反映。  
+        2) 編集 → body が更新され即反映。  
+        3) 削除 → リストから消える。  
+        4) オーナーが他人コメント削除可能 / 第三者は削除ボタン非表示。  
+        5) 文字数201で投稿不可。  
+        6) 未ログイン時フォーム非表示。  
+    15-9. 拡張案:  
+        - ページネーション / infinite scroll (一定件数 limit + startAfter)  
+        - 返信ツリー (parentCommentId) / メンション通知  
+        - 編集履歴保持 (別サブコレクション)  
+        - NG ワードフィルタ / モデレーションキュー  
+        - 通知連携 (Cloud Functions で新規コメント時に通知ドキュメント追加)  
+    15-10. パフォーマンス留意: 高頻度更新アルバムではコメント購読が負荷。後で limit + pagination に変更、あるいは last 50 件のみ購読。  
+    15-11. アクセシビリティ: フォーム領域に `aria-label="コメント入力"` と送信ボタンに適切なラベル、エラー領域は `role="alert"`。  
+    15-12. セキュリティ拡張 (後工程): Cloud Functions で投稿時に内容を検査 (不適切語検出) しフラグ付与、UI で非表示。  
+    15-13. 楽観的更新検討: 現段階は onSnapshot 即反映のため不要。大規模化時は local insert → snapshot 確定で二重排除。  
+    15-14. 失敗時フォールバック: 購読失敗（権限変更等）時は一度 getDocs で静的読み込みに切り替え、エラーバナー表示。  
 16. いいね機能  
     - ハートボタン押下 → likes ドキュメント (albumId+userId) 追加  
     - 解除 → 削除  

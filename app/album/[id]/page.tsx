@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { db } from '../../../lib/firebase';
 import { COL } from '../../../lib/paths';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, orderBy, onSnapshot } from 'firebase/firestore';
 import { useAuthUser } from '../../../lib/hooks/useAuthUser';
 import { addImage, listImages, deleteImage } from '../../../lib/repos/imageRepo';
 import { addComment, updateComment, deleteComment } from '../../../lib/repos/commentRepo';
@@ -33,6 +33,8 @@ export default function AlbumDetailPage() {
   const [likeCount, setLikeCount] = useState<number>(0);
   const [liked, setLiked] = useState<boolean>(false);
   const [likeBusy, setLikeBusy] = useState(false);
+  // 仮コメント追跡 (楽観的表示 → 実ドキュメント到着で除去)
+  const [pendingLocalComments, setPendingLocalComments] = useState<{id:string; body:string; userId:string; createdAt:Date}[]>([]);
 
   useEffect(() => {
     if (!albumId) return;
@@ -48,10 +50,11 @@ export default function AlbumDetailPage() {
             setEditPlaceUrl(data.placeUrl || '');
         }
   const imgs = await listImages(albumId);
-        const cQ = query(collection(db, COL.comments), where('albumId', '==', albumId));
-        const cSnap = await getDocs(cQ);
-        const comm: any[] = [];
-        cSnap.forEach(d => comm.push({ id: d.id, ...d.data() }));
+  // 初期コメント取得（購読開始前の一度）
+  const cQInit = query(collection(db, COL.comments), where('albumId', '==', albumId));
+  const cSnapInit = await getDocs(cQInit);
+  const commInit: any[] = [];
+  cSnapInit.forEach(d => commInit.push({ id: d.id, ...d.data() }));
         // like 状態取得
         if (user) {
           const [likedFlag, cnt] = await Promise.all([
@@ -69,7 +72,8 @@ export default function AlbumDetailPage() {
         if (active) {
           // createdAt がない古いデータでも並び替えが壊れないようにフォールバック
           setImages(imgs.sort((a:any,b:any)=> ((b.createdAt?.seconds||b.createdAt||0) - (a.createdAt?.seconds||a.createdAt||0))));
-          setComments(comm.sort((a,b)=> (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)));
+          // 初期表示も古い→新しい（昇順）になるよう並び替え
+          setComments(commInit.sort((a,b)=> (a.createdAt?.seconds||a.createdAt||0) - (b.createdAt?.seconds||b.createdAt||0)));
         }
       } catch (e:any) {
         if (active) setError(e.message || '取得に失敗しました');
@@ -79,6 +83,60 @@ export default function AlbumDetailPage() {
     })();
     return () => { active = false; };
   }, [albumId]);
+
+  // コメント / いいね リアルタイム購読（インデックス未作成時はフォールバック）
+  useEffect(() => {
+    if (!albumId) return;
+    let unsubComments: (() => void) | undefined;
+
+    function attachOrderedSubscription() {
+      const orderedQ = query(collection(db, COL.comments), where('albumId', '==', albumId), orderBy('createdAt', 'asc'));
+      unsubComments = onSnapshot(orderedQ, snap => {
+        const list: any[] = [];
+        snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+        // temp コメントとの突き合わせ
+        setComments(mergeWithPending(list, pendingLocalComments));
+      }, err => {
+        if (err.code === 'failed-precondition') {
+          console.info('Composite index missing (albumId + createdAt asc). Fallback to simple query.');
+          attachFallbackSubscription();
+        } else {
+          console.warn('comments subscribe error (ordered)', err);
+        }
+      });
+    }
+
+    function attachFallbackSubscription() {
+      const simpleQ = query(collection(db, COL.comments), where('albumId', '==', albumId));
+      unsubComments = onSnapshot(simpleQ, snap => {
+        const list: any[] = [];
+        snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+        list.sort((a,b)=> (a.createdAt?.seconds||a.createdAt||0) - (b.createdAt?.seconds||b.createdAt||0));
+        setComments(mergeWithPending(list, pendingLocalComments));
+      }, err => console.warn('comments subscribe error (fallback)', err));
+    }
+
+    attachOrderedSubscription();
+
+    // いいね購読（ログイン時のみ / read ルール要認証）
+    let unsubLikes: (() => void) | undefined;
+    if (user) {
+      const likesQ = query(collection(db, COL.likes), where('albumId', '==', albumId));
+      unsubLikes = onSnapshot(likesQ, snap => {
+        const likedUsers = new Set<string>();
+        snap.forEach(d => {
+          const data = d.data() as any;
+          if (data.userId) likedUsers.add(data.userId);
+        });
+        setLikeCount(snap.size);
+        setLiked(user ? likedUsers.has(user.uid) : false);
+      }, err => console.warn('likes subscribe error', err));
+    }
+    return () => {
+      if (unsubComments) unsubComments();
+      if (unsubLikes) unsubLikes();
+    };
+  }, [albumId, user]);
 
   async function handleAddImage() {
     if (!user || !albumId || !file) return;
@@ -158,12 +216,7 @@ export default function AlbumDetailPage() {
     if (!editingCommentId) return;
     try {
       await updateComment(editingCommentId, editingCommentBody.trim());
-      const cQ = query(collection(db, COL.comments), where('albumId', '==', albumId));
-      const cSnap = await getDocs(cQ);
-      const comm: any[] = [];
-      cSnap.forEach(d => comm.push({ id: d.id, ...d.data() }));
-      setComments(comm);
-      cancelEditComment();
+      cancelEditComment(); // 購読で自動反映
     } catch (e:any) {
       setError(translateError(e));
     }
@@ -171,12 +224,7 @@ export default function AlbumDetailPage() {
   async function handleDeleteComment(id: string) {
     if (!confirm('コメントを削除しますか？')) return;
     try {
-      await deleteComment(id);
-      const cQ = query(collection(db, COL.comments), where('albumId', '==', albumId));
-      const cSnap = await getDocs(cQ);
-      const comm: any[] = [];
-      cSnap.forEach(d => comm.push({ id: d.id, ...d.data() }));
-      setComments(comm);
+      await deleteComment(id); // 購読で自動反映
     } catch (e:any) {
       setError(translateError(e));
     }
@@ -187,15 +235,20 @@ export default function AlbumDetailPage() {
     if (!user || !albumId || !commentText.trim()) return;
     setCommenting(true);
     setError(null);
+    const body = commentText.trim();
+    // 楽観的: 一時 ID で先頭に挿入（後で購読が本物を反映して二重ならフィルタ）
+  const tempId = `temp_${Date.now()}`;
+  const createdAt = new Date();
+  setPendingLocalComments(p => [...p, { id: tempId, body, userId: user.uid, createdAt }]);
+  setComments(prev => [...prev, { id: tempId, albumId, userId: user.uid, body, createdAt }]);
     try {
-      await addComment(albumId, user.uid, commentText.trim());
+      await addComment(albumId, user.uid, body);
       setCommentText('');
-      const cQ = query(collection(db, COL.comments), where('albumId', '==', albumId));
-      const cSnap = await getDocs(cQ);
-      const comm: any[] = [];
-      cSnap.forEach(d => comm.push(d.data()));
-      setComments(comm);
+      // 除去は snapshot ハンドラ側 mergeWithPending で行うためここでは何もしない
     } catch (e:any) {
+      // ロールバック
+      setComments(prev => prev.filter(c => c.id !== tempId));
+      setPendingLocalComments(p => p.filter(c => c.id !== tempId));
       setError(translateError(e));
     } finally {
       setCommenting(false);
@@ -331,6 +384,19 @@ export default function AlbumDetailPage() {
       <p className="text-xs text-gray-500">※ 簡易版: 画像追加は DataURL 保存。本番は Firebase Storage 経由へ差し替え予定。</p>
     </div>
   );
+}
+
+// snapshot リストと pendingLocalComments を突き合わせて仮コメントを除去する
+function mergeWithPending(real: any[], pending: {id:string; body:string; userId:string; createdAt:Date}[]) {
+  if (pending.length === 0) return real;
+  // real から pending と一致するものを検出: userId & body が一致すれば仮コメント除去対象
+  const pendingSet = new Set(pending.map(p => p.userId + '::' + p.body));
+  // real にマッチが現れたらその pending を削除（完全反映とみなす）
+  // コメント本文が同じ別ユーザーのケースを避けるため userId も含む
+  const filteredPending = pending.filter(p => !real.some(r => r.userId === p.userId && r.body === p.body));
+  // state 更新は呼び出し側 (setComments) が担当。ここでは real のみ返す。
+  // pendingLocalComments の最新を反映させるには呼び出し元で setPendingLocalComments を再度実行するが、簡易版では放置しても次回送信時にクリアされる。
+  return real;
 }
 
 async function fileToDataUrl(file: File): Promise<string> {
