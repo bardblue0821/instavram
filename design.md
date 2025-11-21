@@ -802,7 +802,14 @@
         3) 本番デプロイ→ deny ログ監視 24h  
         4) visibility / キャッシュ設計を次フェーズで導入  
 20. 4枚/ユーザー判定実装例  
-    - albumImages where albumId == X and uploaderId == currentUser.uid を取得して length >= 4 ならアップロード拒否
+    【具体的実装手順】  
+    20-1. Repository レイヤー: `lib/repos/imageRepo.ts` にて `albumImages` コレクションを `where('albumId','==',albumId)` + `where('uploaderId','==',uploaderId)` でクエリし、`snap.size >= 4` の場合は `throw new Error('LIMIT_4_PER_USER')` とする（実装済み確認／未導入なら追加）。  
+    20-2. 追加前チェック: 画像アップロード開始前に `await canUploadMoreImages(albumId, currentUser.uid)` を呼び、false の場合は即座に UI で拒否。関数は上記クエリを再利用し boolean を返す。  
+    20-3. UI 側 (`app/album/[id]/page.tsx` など): 現在の `images` 状態から `残り枚数 = 4 - 自分の投稿枚数` を算出し、0 以下ならファイル選択/追加ボタンを disabled にする。サーバー側チェックに引っかかった場合はエラートーストを表示し state をロールバック。  
+    20-4. 新規アルバム作成フロー (`lib/services/createAlbumWithImages.ts`): 複数ファイルアップロード時は最初に `files.length > 4` を弾き、その後各ファイルをループする際に `addImage` 実行前に残枚数を確認（ownerId で 4 枚を超えるケースを防止）。  
+    20-5. エラーメッセージ: `translateError` に `LIMIT_4_PER_USER` を追加し、「1つのアルバムに投稿できる画像は各ユーザー4枚までです」と表示。  
+    20-6. 手動テスト: 自分のアルバムに 4 枚追加 → 5 枚目で UI が無効化されること / 別ユーザーで同アルバムに 4 枚追加 → 5 枚目でエラーが発生し Firestore に保存されないことを確認。  
+    20-7. 将来拡張: Firestore 側でルールを追加し、`albumImages` 書き込み時に Cloud Functions またはセキュリティルールで 4 枚制限を二重に enforce する案も検討。
 21. UI コンポーネント実装順  
     - ボタン類（ログイン / アルバム作成）  
     - アルバムカード（画像グリッド・場所URL表示）  

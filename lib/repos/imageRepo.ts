@@ -10,6 +10,11 @@ async function countUserImages(albumId: string, uploaderId: string) {
   return snap.size
 }
 
+export async function canUploadMoreImages(albumId: string, uploaderId: string) {
+  const current = await countUserImages(albumId, uploaderId)
+  return current < 4
+}
+
 export async function addImage(albumId: string, uploaderId: string, url: string) {
   const current = await countUserImages(albumId, uploaderId)
   if (current >= 4) throw new Error('LIMIT_4_PER_USER')

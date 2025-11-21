@@ -5,13 +5,14 @@ import { db } from '../../../lib/firebase';
 import { COL } from '../../../lib/paths';
 import { doc, getDoc, collection, query, where, getDocs, orderBy, onSnapshot } from 'firebase/firestore';
 import { useAuthUser } from '../../../lib/hooks/useAuthUser';
-import { addImage, listImages, deleteImage } from '../../../lib/repos/imageRepo';
+import { addImage, listImages, deleteImage, canUploadMoreImages } from '../../../lib/repos/imageRepo';
 import { addComment, updateComment, deleteComment } from '../../../lib/repos/commentRepo';
 import { updateAlbum } from '../../../lib/repos/albumRepo';
 import { toggleLike, hasLiked, countLikes } from '../../../lib/repos/likeRepo';
 import { getFriendStatus } from '../../../lib/repos/friendRepo';
 import { isWatched } from '../../../lib/repos/watchRepo';
 import { translateError } from '../../../lib/errors';
+import { ERR } from '../../../types/models';
 
 export default function AlbumDetailPage() {
   const params = useParams();
@@ -178,6 +179,11 @@ export default function AlbumDetailPage() {
     setUploading(true);
     setError(null);
     try {
+      const allowMore = await canUploadMoreImages(albumId, user.uid);
+      if (!allowMore) {
+        setError(translateError(ERR.LIMIT_4_PER_USER));
+        return;
+      }
       // 単一ファイルを既存アルバムに追加 (サービス関数は複数向けなので直接 addImage)
       // 事前に Storage へアップロードせず URL がないため、簡易版: DataURL 化 (本番は Storage 利用)
       const url = await fileToDataUrl(file); // 簡易テスト用: 実際は Firebase Storage へアップロード
@@ -393,7 +399,7 @@ export default function AlbumDetailPage() {
             const editing = editingCommentId === c.id;
             return (
               <li key={c.id} className="border rounded px-3 py-2 text-sm space-y-1">
-                {!editing && <p className="whitespace-pre-line break-words">{c.body}</p>}
+                {!editing && <p className="whitespace-pre-line wrap-break-word">{c.body}</p>}
                 {editing && (
                   <textarea value={editingCommentBody} onChange={e=>setEditingCommentBody(e.target.value)} className="w-full border rounded px-2 py-1 text-sm" rows={3} />
                 )}

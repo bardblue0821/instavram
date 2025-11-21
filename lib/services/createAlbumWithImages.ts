@@ -2,7 +2,7 @@ import { db, storage } from '../../lib/firebase';
 import { COL } from '../../lib/paths';
 import { doc, setDoc, collection } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { addImage } from '../repos/imageRepo';
+import { addImage, canUploadMoreImages } from '../repos/imageRepo';
 import { addComment } from '../repos/commentRepo';
 
 interface CreateAlbumOptions { title?: string; placeUrl?: string; firstComment?: string }
@@ -39,6 +39,10 @@ export async function createAlbumWithImages(
   const perFileBytesTransferred: number[] = files.map(() => 0);
 
   for (let i = 0; i < files.length; i++) {
+    const canUpload = await canUploadMoreImages(albumId, ownerId);
+    if (!canUpload) {
+      throw new Error('LIMIT_4_PER_USER');
+    }
     const file = files[i];
     const ext = extractExt(file.name);
     const path = `albums/${albumId}/${ownerId}/${Date.now()}_${i}.${ext}`;
