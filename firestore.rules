@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function authed() { return request.auth != null; }
+
+    match /users/{uid} {
+      allow read: if true;
+      allow create, update: if authed() && uid == request.auth.uid;
+    }
+
+    match /albums/{id} {
+      allow read: if authed();
+      allow create: if authed();
+      allow update, delete: if authed() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /albumImages/{id} {
+      allow read: if authed();
+      allow create: if authed();
+      allow delete: if authed() && resource.data.uploaderId == request.auth.uid;
+    }
+
+    match /comments/{id} {
+      allow read, create: if authed();
+      allow delete: if authed() && resource.data.userId == request.auth.uid;
+    }
+
+    match /likes/{id} {
+      allow read, create, delete: if authed();
+    }
+
+    match /friends/{id} {
+      allow read, create, update: if authed();
+    }
+
+    match /watches/{id} {
+      allow read, create, delete: if authed();
+    }
+  }
+}
