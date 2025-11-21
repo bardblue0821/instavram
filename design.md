@@ -30,15 +30,16 @@
 
           // Your web app's Firebase configuration
           // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-          const firebaseConfig = {
-            apiKey: "AIzaSyDpx2YhHDQbjn2FG0LkWAeVVjO4Uqf8RH0",
-            authDomain: "instavram3.firebaseapp.com",
-            projectId: "instavram3",
-            storageBucket: "instavram3.firebasestorage.app",
-            messagingSenderId: "244098860504",
-            appId: "1:244098860504:web:c0edf72e7e1cedd092dead",
-            measurementId: "G-6D5ZV5JK4E"
-          };
+                    const firebaseConfig = {
+                        apiKey: "AIzaSyDpx2YhHDQbjn2FG0LkWAeVVjO4Uqf8RH0",
+                        authDomain: "instavram3.firebaseapp.com",
+                        projectId: "instavram3",
+                        // 修正: storageBucket は <projectId>.appspot.com 形式
+                        storageBucket: "instavram3.appspot.com",
+                        messagingSenderId: "244098860504",
+                        appId: "1:244098860504:web:c0edf72e7e1cedd092dead",
+                        measurementId: "G-6D5ZV5JK4E"
+                    };
 
           // Initialize Firebase
           const app = initializeApp(firebaseConfig);
@@ -296,59 +297,165 @@
     8-13. アクセシビリティ: ファイル input に `aria-label="画像選択"`、進捗領域に `role="status"`。
     8-14. 今後拡張: 失敗時リトライ個別画像 / 画像プレビュー / 圧縮 / EXIF 読み取り / 同時並列アップロード。
 
-9. アルバム編集  
+9. 一旦デプロイ
+
+     【目的】現状機能 (認証 / アルバム作成 / 画像アップロード / コメント基礎) を早期に本番相当環境へ公開し、運用/課題を洗い出す。
+
+     ### 前提チェック
+     - .env.local の `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` が `instavram3.appspot.com` であること (typo: firebasestorage.app などは不可)
+     - Firebase Console: Authentication 有効 (Email/Password + Google)、Firestore/Storage 作成済み
+     - ローカルで `npm run build` 成功
+
+     ### Firebase セキュリティルール (最初の安全ライン)
+     Firestore（最小案）:
+     ```
+     rules_version = '2';
+     service cloud.firestore {
+         match /databases/{db}/documents {
+             function authed() { return request.auth != null; }
+             match /users/{uid} {
+                 allow read: if true;
+                 allow create,update: if authed() && uid == request.auth.uid;
+             }
+             match /albums/{id} {
+                 allow read: if true; // 公開閲覧なら true
+                 allow create: if authed();
+                 allow update,delete: if authed() && resource.data.ownerId == request.auth.uid;
+             }
+             match /albumImages/{id} {
+                 allow read: if true;
+                 allow create: if authed();
+                 allow delete: if authed() && resource.data.uploaderId == request.auth.uid;
+             }
+             match /comments/{id} {
+                 allow read: if true;
+                 allow create: if authed();
+                 allow delete: if authed() && resource.data.userId == request.auth.uid;
+             }
+             match /likes/{id} { allow read,create,delete: if authed(); }
+             match /friends/{id} { allow read,create,update: if authed(); }
+             match /watches/{id} { allow read,create,delete: if authed(); }
+         }
+     }
+     ```
+     Storage（初期案）:
+     ```
+     service firebase.storage {
+         match /b/{bucket}/o {
+             match /albums/{allPaths=**} {
+                 allow read: if true;
+                 allow write: if request.auth != null; // 認証ユーザーのみアップロード
+             }
+         }
+     }
+     ```
+
+     ### Git リポジトリ準備
+     1. `git init`
+     2. `.gitignore` に `/.env.local` を追加
+     3. `git add . && git commit -m "initial deploy"`
+     4. GitHub に新規リポジトリ作成 → `git remote add origin <repo-url>` → `git push -u origin main`
+
+     ### Vercel へデプロイ
+     1. Vercel ダッシュボード → New Project → GitHub リポジトリ選択
+     2. Framework 自動検出 (Next.js) 設定はデフォルト (Build: `next build`, Output: `.next`)
+     3. Environment Variables に以下を登録:
+            - NEXT_PUBLIC_FIREBASE_API_KEY
+            - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+            - NEXT_PUBLIC_FIREBASE_PROJECT_ID
+            - NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+            - NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+            - NEXT_PUBLIC_FIREBASE_APP_ID
+            - NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID (利用するなら)
+     4. Deploy 実行 → 完了後 URL メモ
+     5. Firebase Authentication 許可ドメインに Vercel の生成ドメイン (例: `instavram3.vercel.app`) を追加（未追加ならログイン失敗）
+
+     ### 本番動作確認チェックリスト
+     - ログイン画面で Email 登録 → 成功後 Firestore `users` にドキュメント生成
+     - Google ログイン成功確認 (初回 user 作成)
+     - アルバム作成 → 画像 1 枚アップロード進捗が進む → 完了後詳細ページへ遷移
+     - 画像 URL 表示 (403/404 がない)
+     - コメント投稿可能
+     - いいねトグル反応 (likes ドキュメント生成/削除)
+     - 再読み込みして表示が維持される
+
+     ### トラブルシュート早見表
+     | 症状 | 想定原因 | 対処 |
+     |------|---------|------|
+     | 画像アップロードが 0% 固定 | Storage bucket typo / ルール拒否 | `.env.local` と Console 再確認 / ルール緩和テスト |
+     | ログイン後も Firestore 書き込み不可 | ルール条件 mismatch | Firestore ルールで一時的に `allow read, write: if request.auth != null;` |
+     | 画像表示が 403 | Storage 読み取りルール / 認証必須設定 | read 条件を `if true` に緩和し再確認 |
+     | Google ログイン失敗 | 許可ドメイン未設定 | Firebase Auth 設定に本番ドメイン追加 |
+     | 404 (バケット) | STORAGE_BUCKET typo | `<projectId>.appspot.com` に修正 |
+
+     ### 改善フェーズでの次ステップ (任意)
+     - 追加画像アップロード画面の進捗統一
+     - Cloud Functions で不要画像クリーンアップ
+     - 画像サムネイル生成 (サイズ削減)
+     - エラーコード日本語化共通モジュール
+     - Lighthouse / Web Vitals 測定でパフォーマンス改善
+
+     ### デプロイ後の安全化 TODO
+     - 期間限定の緩いルールを日付スケジュールで厳格化
+     - バックアップ / ログ監視 (Firestore/Storage の使用量確認)
+     - IAM で不要サービスキーの削除
+
+     ---
+
+
+10. アルバム編集  
    - オーナーのみ: コメント編集 / 撮影場所編集 / 全画像削除可  
    - フレンド: 新規画像追加可（自分が追加した画像のみ削除可能）  
    - 画像削除条件: (owner) または (image.uploaderId === currentUser.uid)
-10. フレンド機能  
+11. フレンド機能  
     - プロフィールに「フレンド申請」ボタン → friends に {status:"pending"}  
     - 相手が承認すると status:"accepted"  
     - フレンド判定: 双方向 accepted (簡易) か一方向 accepted (ルール決めて実装)
-11. ウォッチ機能  
+12. ウォッチ機能  
     - 他ユーザーのプロフィールに「ウォッチ」ボタン → watches に保存  
     - タイムライン取得時: (自分がウォッチしている ownerId) + (自分のフレンドの ownerId) の albums を並べる
-12. タイムライン表示 (/timeline)  
+13. タイムライン表示 (/timeline)  
     - Firestore クエリ簡略版: 最初は全 albums orderBy(createdAt desc) → クライアント側で対象 (friends + watches + 自分) にフィルタ  
     - 後で最適化: ownerId in [...] クエリ（必要なら分割取得）
-13. コメント機能  
+14. コメント機能  
     - アルバム詳細カードにコメント一覧表示 (comments where albumId)  
     - 投稿: フレンド or オーナーのみフォーム表示  
     - 削除: 自分のコメント or オーナー（仕様に合わせる）
-14. いいね機能  
+15. いいね機能  
     - ハートボタン押下 → likes ドキュメント (albumId+userId) 追加  
     - 解除 → 削除  
     - 件数表示: likes where albumId の count
-15. プロフィール (/u/[id])  
+16. プロフィール (/u/[id])  
     - users 取得 → アイコン / 自己紹介  
     - 作成アルバム: albums where ownerId == id  
     - 参加アルバム: albumImages where uploaderId == id → albumId 一覧 → 重複除去して表示  
     - 投稿コメント: comments where userId == id  
-16. アクセス制御（最初はフロントで簡易）  
+17. アクセス制御（最初はフロントで簡易）  
     - アルバム詳細表示条件: (owner) or (friend) or (watch)  
     - 画像追加条件: owner or friend  
-17. Firestore セキュリティルール（後で強化）  
+18. Firestore セキュリティルール（後で強化）  
     - request.auth != null を基本  
     - albums 書き込み: request.auth.uid == ownerId  
     - albumImages 追加: owner か friends コレクションで関係確認（最初は緩く→後カスタム）  
-18. 4枚/ユーザー判定実装例  
+19. 4枚/ユーザー判定実装例  
     - albumImages where albumId == X and uploaderId == currentUser.uid を取得して length >= 4 ならアップロード拒否
-19. UI コンポーネント実装順  
+20. UI コンポーネント実装順  
     - ボタン類（ログイン / アルバム作成）  
     - アルバムカード（画像グリッド・場所URL表示）  
     - コメントリスト / 入力欄  
     - フレンド/ウォッチ操作ボタン  
     - プロフィールタブ（作成 / 参加 / コメント）
-20. 簡易テスト（手動）  
+21. 簡易テスト（手動）  
     - 新規ユーザー → アルバム作成 → 画像4枚追加 → 5枚目不可  
     - フレンド申請/承認 → 相手アルバムに画像追加可確認  
     - ウォッチ登録 → タイムライン表示確認  
     - コメント投稿/削除権限確認  
     - いいね往復確認
-21. PostgreSQL を使う場合（後で移行可能）  
+22. PostgreSQL を使う場合（後で移行可能）  
     - prisma init → schema.prisma に同等モデル作成 (User, Album, AlbumImage, Comment, Like, Friend, Watch)  
     - npx prisma migrate dev → API ルートで Prisma Client 使用  
     - 画像URL は同じく Firebase Storage
-22. 改善余地メモ  
+23. 改善余地メモ  
     - タイムライン取得最適化 (複合インデックス / サーバ側フィルタ)  
     - コメント編集履歴 / 通知  
     - フレンド承認ワークフロー UI 整備

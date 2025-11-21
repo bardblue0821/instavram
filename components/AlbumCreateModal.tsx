@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { useAuthUser } from '../lib/hooks/useAuthUser';
-import { createAlbumWithImages } from '../lib/services/createAlbumWithImages';
+import { createAlbumWithImages, AlbumCreateProgress } from '../lib/services/createAlbumWithImages';
 import { useRouter } from 'next/navigation';
 import { translateError } from '../lib/errors';
 
@@ -16,6 +16,7 @@ export default function AlbumCreateModal({ onCreated }: Props) {
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<number>(0);
+  const [fileProgress, setFileProgress] = useState<AlbumCreateProgress[]>([]);
   const [loading, setLoading] = useState(false);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -38,8 +39,19 @@ export default function AlbumCreateModal({ onCreated }: Props) {
     setProgress(0);
     try {
       // 逐次進捗: files.length が0ならそのまま
-      const albumId = await createAlbumWithImages(user.uid, { title: title || undefined, placeUrl: placeUrl || undefined, firstComment: comment || undefined }, files);
-      // createAlbumWithImages 内で逐次アップロードだが、ここでは簡易的に完了時100% とする
+      const albumId = await createAlbumWithImages(
+        user.uid,
+        { title: title || undefined, placeUrl: placeUrl || undefined, firstComment: comment || undefined },
+        files,
+        (p) => {
+          setProgress(p.overallPercent);
+          setFileProgress(prev => {
+            const copy = [...prev];
+            copy[p.fileIndex] = p;
+            return copy;
+          });
+        }
+      );
       setProgress(100);
       if (onCreated) onCreated(albumId);
       router.push(`/album/${albumId}`); // 詳細ページは後で
@@ -104,7 +116,18 @@ export default function AlbumCreateModal({ onCreated }: Props) {
           )}
         </div>
         {error && <p className="text-red-600 text-sm">{error}</p>}
-        {loading && <p role="status" className="text-sm text-blue-600">アップロード中... {progress}%</p>}
+        {loading && (
+          <div role="status" className="space-y-2">
+            <p className="text-sm text-blue-600">アップロード中... {progress}%</p>
+            <ul className="text-xs text-gray-600 space-y-1">
+              {fileProgress.map((fp,i)=>(
+                <li key={i}>
+                  画像{i+1}: {fp.percent}% {fp.state==='error' && <span className="text-red-600">(失敗 {fp.error})</span>} {fp.state==='success' && <span className="text-green-600">OK</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <button
           type="submit"
             className="bg-blue-600 text-white rounded px-4 py-2 disabled:opacity-50"
