@@ -74,7 +74,7 @@ export default function AlbumCreateModal({ onCreated }: Props) {
             onChange={e => setTitle(e.target.value)}
             className="w-full border rounded px-3 py-2"
             disabled={loading || !user}
-            placeholder="集合写真など"
+            placeholder="なんのアルバム？"
           />
         </div>
         <div>
@@ -84,7 +84,8 @@ export default function AlbumCreateModal({ onCreated }: Props) {
             onChange={e => setPlaceUrl(e.target.value)}
             className="w-full border rounded px-3 py-2"
             disabled={loading || !user}
-            placeholder="https://vrc.world/..."
+
+            placeholder="https://vrchat.com/..."
           />
         </div>
         <div>
@@ -96,7 +97,7 @@ export default function AlbumCreateModal({ onCreated }: Props) {
             disabled={loading || !user}
             maxLength={200}
             rows={3}
-            placeholder="楽しかった！など"
+            placeholder="どうだった？"
           />
           <p className="text-xs text-gray-500 text-right">{comment.length}/200</p>
         </div>
