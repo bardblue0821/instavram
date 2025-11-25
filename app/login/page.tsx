@@ -5,21 +5,28 @@ import { auth } from '../../lib/firebase';
 import { ensureUser } from '../../lib/authUser';
 import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 
+// セキュリティ方針: アカウント存在可否を推測されないため、認証失敗は統一メッセージにまとめる。
+// ただし UI/UX 維持のためフォーマット不正・弱いパスワードなど入力検証系は区別。
 function mapAuthError(code: string): string {
   switch (code) {
-    case 'auth/email-already-in-use':
-      return '既に登録済みのメールアドレスです';
+    // 入力バリデーション系は詳細を返す
     case 'auth/invalid-email':
       return 'メールアドレス形式が正しくありません';
-    case 'auth/user-not-found':
-    case 'auth/wrong-password':
-      return 'メールまたはパスワードが違います';
     case 'auth/weak-password':
-      return 'パスワードが弱すぎます (6文字以上推奨)';
+      return 'パスワードは6文字以上にしてください';
     case 'auth/popup-closed-by-user':
       return 'ポップアップが閉じられました';
+
+    // 存在可否を悟らせる恐れのあるコード群は統一
+    case 'auth/email-already-in-use':
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+    case 'auth/invalid-login-credentials':
+    case 'auth/invalid-credential':
+    case 'auth/too-many-requests': // レート制限も詳細非表示
+      return '認証に失敗しました';
     default:
-      return `エラー: ${code}`;
+      return '認証に失敗しました';
   }
 }
 
@@ -71,7 +78,7 @@ export default function LoginPage() {
       }
       router.push('/');
     } catch (err: any) {
-      setError(mapAuthError(err.code || 'unknown'));
+  setError(mapAuthError(err.code || 'unknown'));
     } finally {
       setLoading(false);
     }
@@ -88,73 +95,69 @@ export default function LoginPage() {
       setInfo('Google ログイン成功');
       router.push('/');
     } catch (err: any) {
-      setError(mapAuthError(err.code || 'unknown'));
+  setError(mapAuthError(err.code || 'unknown'));
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="max-w-md mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">{mode === 'login' ? 'ログイン' : '新規登録'}</h1>
+    <div className="fixed inset-0 flex items-center justify-center overflow-hidden">
+      <div className="max-w-md w-full mx-auto p-6">
+      <h1 className="text-4xl font-bold my-8 text-teal-500 text-center">instaVRam</h1>
       <div className="flex gap-2 mb-4">
         <button
-          className={`${mode === 'login' ? 'btn-accent' : 'px-3 py-1 rounded border'} transition-colors`}
-          onClick={() => setMode('login')}
-          disabled={loading}
+        className={`${mode === 'login' ? 'btn-accent' : 'px-3 py-1 rounded border'} transition-colors`}
+        onClick={() => setMode('login')}
+        disabled={loading}
         >ログイン</button>
         <button
-          className={`${mode === 'register' ? 'btn-accent' : 'px-3 py-1 rounded border'} transition-colors`}
-          onClick={() => setMode('register')}
-          disabled={loading}
+        className={`${mode === 'register' ? 'btn-accent' : 'px-3 py-1 rounded border'} transition-colors`}
+        onClick={() => setMode('register')}
+        disabled={loading}
         >新規登録</button>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4" aria-live="polite">
         <div>
-          <label className="block text-sm font-medium mb-1">メールアドレス</label>
-          <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            className="w-full border rounded px-3 py-2"
-            required
-            autoComplete="email"
-            disabled={loading}
-          />
+        <label className="block text-sm font-medium mb-1">メールアドレス</label>
+        <input
+          type="email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          className="w-full border rounded px-3 py-2"
+          required
+          autoComplete="email"
+          disabled={loading}
+        />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">パスワード</label>
-          <input
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            className="w-full border rounded px-3 py-2"
-            required
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            disabled={loading}
-          />
+        <label className="block text-sm font-medium mb-1">パスワード</label>
+        <input
+          type="password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          className="w-full border rounded px-3 py-2"
+          required
+          autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+          disabled={loading}
+        />
         </div>
         {error && <p className="text-red-600 text-sm">{error}</p>}
         {info && <p className="text-green-600 text-sm">{info}</p>}
         <button
-          type="submit"
-          className="w-full btn-accent justify-center disabled:opacity-50"
-          disabled={loading}
+        type="submit"
+        className="w-full btn-accent justify-center disabled:opacity-50"
+        disabled={loading}
         >{loading ? '処理中...' : (mode === 'login' ? 'ログイン' : '登録')}</button>
       </form>
       <div className="mt-6 space-y-2">
         <button
-          onClick={handleGoogle}
-          className="w-full bg-gray-800 text-white rounded py-2 disabled:opacity-50"
-          disabled={loading}
+        onClick={handleGoogle}
+        className="w-full bg-gray-800 text-white rounded py-2 disabled:opacity-50"
+        disabled={loading}
         >{loading ? '...' : 'Google で続行'}</button>
-        <button
-          onClick={() => router.push('/')}
-          className="w-full border rounded py-2 link-accent"
-          disabled={loading}
-        >TOPへ戻る</button>
       </div>
-      <p className="mt-4 text-xs text-gray-500">開発用簡易フォーム: 本番では reCAPTCHA / MFA 追加予定</p>
+      </div>
     </div>
   );
 }
