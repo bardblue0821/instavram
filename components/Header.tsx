@@ -4,12 +4,14 @@ import { useRouter } from 'next/navigation';
 import { useAuthUser } from '../lib/hooks/useAuthUser';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 export default function Header() {
   const { user, loading } = useAuthUser();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
   const [theme, setTheme] = useState<'light'|'dark'>(() => {
     if (typeof window === 'undefined') return 'light';
     const stored = window.localStorage.getItem('theme');
@@ -37,17 +39,36 @@ export default function Header() {
     setOpen(false);
   }
 
-  function toggleMenu() {
-    setOpen(o => !o);
-  }
+  function toggleMenu() { setOpen(o => !o); }
 
   function closeMenu() { setOpen(false); }
+
+  // メニュー外クリック & Escape で閉じる
+  useEffect(() => {
+    if (!open) return; // 開いている時のみリスナ登録
+    function handleMouseDown(e: MouseEvent) {
+      const target = e.target as Node;
+      if (menuRef.current && !menuRef.current.contains(target) && buttonRef.current && !buttonRef.current.contains(target)) {
+        setOpen(false);
+      }
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    window.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, [open]);
 
   return (
     <nav className="sticky top-0 surface border-b border-base z-50 shadow-sm">
       <div className="max-w-5xl mx-auto h-14 flex items-center justify-center relative px-4">
         {/* ハンバーガー 左配置 */}
         <button
+          ref={buttonRef}
           aria-label="メニュー"
           aria-expanded={open}
           onClick={toggleMenu}
@@ -64,6 +85,7 @@ export default function Header() {
   <Link href="/" className="font-semibold text-lg link-accent" aria-label="トップへ">instaVRam</Link>
         {open && (
           <div
+            ref={menuRef}
             className="absolute top-14 left-4 w-56 surface-alt border border-base rounded shadow-lg py-2 animate-fadeIn"
             role="menu"
           >
@@ -72,6 +94,12 @@ export default function Header() {
             )}
             {!loading && user && (
               <>
+                <Link
+                  href="/timeline"
+                  onClick={closeMenu}
+                  className="block px-4 py-2 text-sm link-accent"
+                  role="menuitem"
+                >タイムライン</Link>
                 <Link
                   href="/album/new"
                   onClick={closeMenu}
