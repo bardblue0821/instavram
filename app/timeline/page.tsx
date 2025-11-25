@@ -31,7 +31,7 @@ export default function TimelinePage() {
       setLoading(true); setError(null);
       try {
         // 1. 最新アルバム取得
-  const raw: any[] = await getLatestAlbums(50);
+        const raw: any[] = await getLatestAlbums(50);
         // 2. フィルタ対象 ownerId セット作成
         let allowed: Set<string> | null = null;
         if (user) {
@@ -52,7 +52,7 @@ export default function TimelinePage() {
             allowed = null;
           }
         }
-  const filtered = allowed ? raw.filter(a => allowed!.has((a as any).ownerId)) : raw;
+        const filtered = allowed ? raw.filter(a => allowed!.has((a as any).ownerId)) : raw;
 
         // 3. 先頭画像を取得 (各 album ごとに 1件) 並列
         const enriched: TimelineAlbum[] = await Promise.all(filtered.map(async (a:any) => {
