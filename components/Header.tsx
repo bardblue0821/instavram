@@ -23,7 +23,7 @@ export default function Header() {
           {loading && <span className="text-sm text-gray-500">読み込み中...</span>}
           {!loading && user && (
             <>
-              <Link href={`/u/${user.uid}`} className="text-sm text-gray-700 hover:underline" aria-label="プロフィール">{user.displayName || 'ユーザー'}</Link>
+              <Link href={`/user/${user.uid}`} className="text-sm text-gray-700 hover:underline" aria-label="プロフィール">{user.displayName || 'ユーザー'}</Link>
               <Link
                 href="/album/new"
                 className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
