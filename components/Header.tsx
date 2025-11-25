@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthUser } from '../lib/hooks/useAuthUser';
+import { getUser } from '../lib/repos/userRepo';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import React, { useState, useEffect, useRef } from 'react';
@@ -31,6 +32,21 @@ export default function Header() {
     root.classList.add(theme === 'dark' ? 'theme-dark' : 'theme-light');
     window.localStorage.setItem('theme', theme);
   }, [theme]);
+
+  // user ドキュメント取得 (handle 用)
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!user) { if (active) setUserDoc(null); return; }
+      try {
+        const doc = await getUser(user.uid);
+        if (active) setUserDoc(doc);
+      } catch (e) {
+        if (active) setUserDoc(null);
+      }
+    })();
+    return () => { active = false; };
+  }, [user]);
 
   function toggleTheme() {
     setTheme(t => (t === 'dark' ? 'light' : 'dark'));
@@ -132,7 +148,7 @@ export default function Header() {
                   role="menuitem"
                 >アルバム作成</Link>
                 <Link
-                  href={`/user/${user.uid}`}
+                  href={userDoc?.handle ? `/user/${userDoc.handle}` : `/user/${user.uid}`}
                   onClick={closeMenu}
                   className="block px-4 py-2 text-sm link-accent"
                   role="menuitem"
