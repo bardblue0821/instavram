@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuthUser } from '../../../lib/hooks/useAuthUser';
-import { getUser, getUserByHandle } from '../../../lib/repos/userRepo';
+import { getUserByHandle } from '../../../lib/repos/userRepo';
 import { listAlbumsByOwner } from '../../../lib/repos/albumRepo';
 import { listAlbumIdsByUploader } from '../../../lib/repos/imageRepo';
 import { listCommentsByUser } from '../../../lib/repos/commentRepo';
@@ -13,7 +13,7 @@ import { translateError } from '../../../lib/errors';
 
 export default function ProfilePage() {
   const params = useParams();
-  const rawParam = params?.id as string | undefined; // /user/{handle} 優先。存在しなければ uid として解釈
+  const handleParam = params?.id as string | undefined; // /user/{handle} のみ許可
   const { user } = useAuthUser();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -31,13 +31,12 @@ export default function ProfilePage() {
   const [extraError, setExtraError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!rawParam) return;
+    if (!handleParam) return;
     let active = true;
     (async () => {
       setLoading(true); setError(null);
       try {
-        let p = await getUserByHandle(rawParam);
-        if (!p) p = await getUser(rawParam); // uid フォールバック
+        const p = await getUserByHandle(handleParam);
         if (active) setProfile(p);
         let watchedFlag = false;
         if (user && p && p.uid !== user.uid) {
@@ -60,7 +59,7 @@ export default function ProfilePage() {
       }
     })();
     return () => { active = false; };
-  }, [rawParam, user]);
+  }, [handleParam, user]);
 
   // 拡張情報ロード
   useEffect(() => {
@@ -150,7 +149,7 @@ export default function ProfilePage() {
   }
 
   if (loading) return <div className="p-4 text-sm text-gray-500">読み込み中...</div>;
-  if (!profile) return <div className="p-4 text-sm text-gray-600">ユーザーが見つかりません</div>;
+  if (!profile) return <div className="p-4 text-sm text-gray-600">ユーザーが見つかりません (handle)</div>;
 
   const isMe = user && profile && user.uid === profile.uid;
 

@@ -148,10 +148,11 @@ export default function Header() {
                   role="menuitem"
                 >アルバム作成</Link>
                 <Link
-                  href={userDoc?.handle ? `/user/${userDoc.handle}` : `/user/${user.uid}`}
+                  href={userDoc?.handle ? `/user/${userDoc.handle}` : '#'}
                   onClick={closeMenu}
-                  className="block px-4 py-2 text-sm link-accent"
+                  className="block px-4 py-2 text-sm link-accent disabled:opacity-50"
                   role="menuitem"
+                  aria-disabled={!userDoc?.handle}
                 >プロフィール</Link>
                 <button
                   onClick={openLogoutConfirm}
