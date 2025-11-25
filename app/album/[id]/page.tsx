@@ -469,7 +469,7 @@ export default function AlbumDetailPage() {
               <input
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
-                className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                className="mt-1 input-underline text-sm"
                 placeholder="タイトル"
               />
             </div>
@@ -478,7 +478,7 @@ export default function AlbumDetailPage() {
               <input
                 value={editPlaceUrl}
                 onChange={(e) => setEditPlaceUrl(e.target.value)}
-                className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                className="mt-1 input-underline text-sm"
                 placeholder="https://..."
               />
             </div>

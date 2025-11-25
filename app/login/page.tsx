@@ -124,7 +124,7 @@ export default function LoginPage() {
           type="email"
           value={email}
           onChange={e => setEmail(e.target.value)}
-          className="w-full border rounded px-3 py-2"
+          className="input-underline"
           required
           autoComplete="email"
           disabled={loading}
@@ -136,7 +136,7 @@ export default function LoginPage() {
           type="password"
           value={password}
           onChange={e => setPassword(e.target.value)}
-          className="w-full border rounded px-3 py-2"
+          className="input-underline"
           required
           autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
           disabled={loading}

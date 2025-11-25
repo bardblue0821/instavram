@@ -72,7 +72,7 @@ export default function AlbumCreateModal({ onCreated }: Props) {
           <input
             value={title}
             onChange={e => setTitle(e.target.value)}
-            className="w-full border rounded px-3 py-2"
+            className="input-underline"
             disabled={loading || !user}
             placeholder="なんのアルバム？"
           />
@@ -82,7 +82,7 @@ export default function AlbumCreateModal({ onCreated }: Props) {
           <input
             value={placeUrl}
             onChange={e => setPlaceUrl(e.target.value)}
-            className="w-full border rounded px-3 py-2"
+            className="input-underline"
             disabled={loading || !user}
 
             placeholder="https://vrchat.com/..."
@@ -93,7 +93,7 @@ export default function AlbumCreateModal({ onCreated }: Props) {
           <textarea
             value={comment}
             onChange={e => setComment(e.target.value)}
-            className="w-full border rounded px-3 py-2 text-sm"
+            className="input-underline text-sm"
             disabled={loading || !user}
             maxLength={200}
             rows={3}

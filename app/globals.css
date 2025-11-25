@@ -123,3 +123,42 @@ body {
 .accent-ring:focus-visible {
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
+
+/* --------------------------------------
+   Underline input style
+   目的: 四角枠ではなく下線のみのミニマルな入力UI。
+   利点: テーマ変数によりライト/ダーク自動適合。
+--------------------------------------- */
+.input-underline {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0.75rem 0.4rem; /* 下線との距離を若干詰める */
+  font-size: 0.95rem;
+  line-height: 1.4;
+  transition: border-color .15s, box-shadow .15s, background-color .15s;
+}
+.input-underline:focus-visible {
+  outline: none;
+  border-bottom-color: var(--accent);
+  box-shadow: 0 1px 0 0 var(--accent);
+}
+.input-underline::placeholder {
+  color: var(--subtle);
+  opacity: 0.7;
+}
+.input-underline:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+/* エラー表示用バリアント（必要時に className へ追加） */
+.input-underline.error {
+  border-bottom-color: #dc2626; /* red-600 */
+  box-shadow: 0 1px 0 0 #dc2626;
+}
+.input-underline.error:focus-visible {
+  border-bottom-color: #dc2626;
+  box-shadow: 0 1px 0 0 #dc2626;
+}
+
