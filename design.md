@@ -9,7 +9,7 @@
 - TypeScript
 
 ## 手順: スプリント１
-### 初心者向け全体手順
+### 手順
 1. 開発環境準備  
    - Node.js と VS Code をインストール  
    - npx create-next-app@latest instavram （TypeScript / Tailwind 有効）  
@@ -878,6 +878,81 @@
     - タイムライン取得最適化 (複合インデックス / サーバ側フィルタ)  
     - コメント編集履歴 / 通知  
     - フレンド承認ワークフロー UI 整備
+
+## 手順: スプリント２
+
+### アクセス権限
+- ログインしていない場合は、ルート以外にアクセスしようとした場合は、ログイン画面に遷移するようにする。
+
+### GUI
+#### ヘッダー
+- instaVRam の文字列を左右中央に
+- ログイン・ログアウトボタンと、ユーザーボタンと、アルバム作成ボタンは、ハンバーガーメニューに入れる。
+
+#### ダークモードとライトモード
+- 目的: OS の自動判定に加えてユーザーが任意にテーマ (ライト/ダーク) を切り替え可能にし、UI の一貫性と操作感を向上させる。
+- 実装方針: CSS 変数を `.theme-light` / `.theme-dark` クラスで上書きし、`localStorage` に保存された選択を優先。未選択時は `prefers-color-scheme` を初期値として採用。
+- 追加CSS: `app/globals.css` に以下を追加
+    - `:root.theme-light { --background: #ffffff; --foreground: #171717; --accent: #0d9488; --accent-hover: #0f766e; --accent-fg: #ffffff; --accent-ring: rgba(13,148,136,.4); }`
+    - `:root.theme-dark { --background: #0a0a0a; --foreground: #ededed; --accent: #14b8a6; --accent-hover: #0d9488; --accent-fg: #ffffff; --accent-ring: rgba(20,184,166,.5); }`
+    - 既存の `@media (prefers-color-scheme: dark)` は初期自動切替のフォールバックとして温存。
+- UI変更: ハンバーガーメニュー末尾にテーマ切替ボタンを追加。
+    - ラベル: 現在がダークなら「ライトモードへ」、ライトなら「ダークモードへ」。
+    - クラス: `.btn-accent` を利用しアクセント統一。
+- ロジック (Header.tsx):
+    1. 初期化: `localStorage.getItem('theme')` を読み取り `dark|light` を決定。無ければ `matchMedia('(prefers-color-scheme: dark)')`。
+    2. `useEffect` で `document.documentElement.classList` を操作し `theme-light` / `theme-dark` を付与 (既存クラス除去後)。
+    3. 切替: `setTheme(t => t === 'dark' ? 'light' : 'dark')`。保存後メニューを閉じる。
+- 永続化: `localStorage.setItem('theme', theme)`。
+- アクセシビリティ: 切替ボタンに `aria-label="テーマ切替"` を付与。視覚ラベルは日本語表示。
+- リスク/注意点:
+    - SSR 初回描画時はライトを暫定表示後にクライアントでダークへ反映する可能性 (FART: Flash After Render of Theme)。必要なら `_document` でインラインスクリプトを挿入し初期クラス付与する改善余地。
+    - `@media` とクラスの競合: クラス定義が後勝ちのため問題なしだが、追加のテーマ変種導入時は順序確認。
+- 拡張余地:
+    - システム設定に再同期する「自動」モード (third state)。
+    - `theme-[name]` を増やし将来ブランド別ダーク/ライト (例: high-contrast)。
+    - `prefers-reduced-motion` やコントラストモード連動。
+
+#### カラーパレット
+- 目的: アクセントカラーを 1 箇所（CSS 変数）で差し替え可能にし、将来ブランド色変更時の影響を最小化する。
+- 実装方針: `app/globals.css` の `:root` でアクセント系変数を宣言し、UI ではユーティリティクラス (`.btn-accent`, `.link-accent`) のみを使用する。色を変えたい場合は変数を書き換えるだけで再ビルド不要（HMR反映）。
+- 変数一覧:
+    - `--accent`: 基本ボタン/リンクの背景・文字色計算基点 (Light: `#0d9488` / Dark: `#14b8a6`)
+    - `--accent-hover`: ホバー時の濃い/暗い色 (Light: `#0f766e` / Dark: `#0d9488`)
+    - `--accent-fg`: アクセント上の前景色（通常白 `#ffffff`）
+    - `--accent-ring`: フォーカスリング用半透明色 (Light rgba(13,148,136,0.4), Dark rgba(20,184,166,0.5))
+- ユーティリティクラス:
+    - `.btn-accent`: アクセントボタン。padding/rounded/transition/disabled/focus-visible 標準化。
+    - `.link-accent`: テキストリンク色 + hover 下線。
+    - `.accent-ring`: Tailwind の ring を使わない場面向け focus-visible box-shadow。
+- 使い方ガイド:
+    1. 既存ボタンを Tailwind の色クラスから `.btn-accent` に差し替える。
+    2. リンク強調は `.link-accent` を付与（下線は hover 時のみ）。
+    3. 別サイズが必要ならラッパクラスで `padding` のみ上書きし、色関連クラスは再利用。
+- 将来色変更手順: `globals.css` の `--accent` / `--accent-hover` / `--accent-ring` を新しい HEX/RGBA に変更 → 保存。コンポーネント側修正不要。
+- ダークモード調整: `@media (prefers-color-scheme: dark)` 内でライト時より一段明るいトーンへ差し替え、コントラストを確保。
+- リスク/注意点:
+    - 直接 `bg-teal-...` などを使った古いコードが残っている場合は色変更時にズレが出る → 追って `.btn-accent` / `.link-accent` へ集約するリファクタ TODO。
+    - 多彩なバリアント（outline / subtle / destructive 等）が必要になったら `--accent` を中心にトークンセット拡張 (`--accent-subtle`, `--accent-outline` など) を検討。
+- 拡張余地: Tailwind の `theme.extend.colors` に `brand` を追加し `text-brand` / `bg-brand` で統一する案は後工程。初期は素の CSS 変数で十分。
+
+#### 入力欄
+- 枠ではなく、下線にした。
+
+#### 新規登録時に ID を設定可能に
+
+
+#### 新規登録時にパスワード入力を2回させる
+- 入力2回
+- 一致確認
+- 強度の表示
+- 表示非表示ボタン
+
+#### 新規登録時にメールアドレス認証を行う
+
+
+#### アルバムの公開範囲設定（TODO）
+- 鍵アカウント
 
 ## 機能
 - ユーザーは「アルバム」を作成できる。作成したユーザーはアルバムの「オーナー」と呼ばれる

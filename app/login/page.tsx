@@ -36,8 +36,13 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [showPwd, setShowPwd] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [pwdStrength, setPwdStrength] = useState<{score:number; label:string; percent:number; cls:string}>({score:0,label:'',percent:0,cls:''});
+  const [mismatch, setMismatch] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -48,6 +53,28 @@ export default function LoginPage() {
     return () => unsub();
   }, [router]);
 
+  function evaluateStrength(pw: string){
+    let score = 0;
+    if (pw.length >= 8) score++;
+    if (pw.length >= 12) score++;
+    if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) score++;
+    if (/\d/.test(pw)) score++;
+    if (/[^a-zA-Z0-9]/.test(pw)) score++;
+    // map
+    const levels = [
+      { min:0, label:'弱い', cls:'pw-strength-weak', percent:20 },
+      { min:2, label:'普通', cls:'pw-strength-fair', percent:40 },
+      { min:3, label:'良い', cls:'pw-strength-good', percent:70 },
+      { min:4, label:'強い', cls:'pw-strength-strong', percent:100 }
+    ];
+    let picked = levels[0];
+    for(const l of levels){ if(score >= l.min) picked = l; }
+    return { score, label: pw ? picked.label : '', percent: pw ? picked.percent : 0, cls: pw ? picked.cls : '' };
+  }
+
+  useEffect(()=>{ setPwdStrength(evaluateStrength(password)); }, [password]);
+  useEffect(()=>{ if(mode==='register'){ setMismatch(confirmPassword && password !== confirmPassword ? '確認用パスワードが一致しません' : null); } else { setMismatch(null); } }, [confirmPassword, password, mode]);
+
   function validate(): boolean {
     if (!/@.+\./.test(email)) {
       setError('メールアドレスが不正です');
@@ -56,6 +83,12 @@ export default function LoginPage() {
     if (password.length < 6) {
       setError('パスワードは6文字以上にしてください');
       return false;
+    }
+    if (mode === 'register') {
+      if (confirmPassword !== password) {
+        setError('確認用パスワードが一致しません');
+        return false;
+      }
     }
     return true;
   }
@@ -107,14 +140,14 @@ export default function LoginPage() {
       <h1 className="text-4xl font-bold my-8 text-teal-500 text-center">instaVRam</h1>
       <div className="flex gap-2 mb-4">
         <button
-        className={`${mode === 'login' ? 'btn-accent' : 'px-3 py-1 rounded border'} transition-colors`}
-        onClick={() => setMode('login')}
-        disabled={loading}
+          className={`${mode === 'login' ? 'btn-accent' : 'px-3 py-1 rounded border'} transition-colors`}
+          onClick={() => { setMode('login'); setConfirmPassword(''); setError(null); }}
+          disabled={loading}
         >ログイン</button>
         <button
-        className={`${mode === 'register' ? 'btn-accent' : 'px-3 py-1 rounded border'} transition-colors`}
-        onClick={() => setMode('register')}
-        disabled={loading}
+          className={`${mode === 'register' ? 'btn-accent' : 'px-3 py-1 rounded border'} transition-colors`}
+          onClick={() => { setMode('register'); setConfirmPassword(''); setError(null); }}
+          disabled={loading}
         >新規登録</button>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4" aria-live="polite">
@@ -131,17 +164,45 @@ export default function LoginPage() {
         />
         </div>
         <div>
-        <label className="block text-sm font-medium mb-1">パスワード</label>
-        <input
-          type="password"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          className="input-underline"
-          required
-          autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-          disabled={loading}
-        />
+          <label className="block text-sm font-medium mb-1">パスワード</label>
+          <div className="flex items-center gap-2">
+            <input
+              type={showPwd ? 'text':'password'}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="input-underline flex-1"
+              required
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              disabled={loading}
+            />
+            <button type="button" onClick={()=>setShowPwd(s=>!s)} className="text-xs link-accent w-16" aria-label="パスワード表示切替">{showPwd?'隠す':'表示'}</button>
+          </div>
+          {mode==='register' && (
+            <div className="mt-2 pw-strength-wrapper" aria-live="polite">
+              <div className={`pw-strength-bar ${pwdStrength.cls}`}> <span style={{width: pwdStrength.percent+'%'}}></span> </div>
+              {pwdStrength.label && <p className="pw-strength-label">強度: {pwdStrength.label}</p>}
+            </div>
+          )}
         </div>
+        {mode === 'register' && (
+          <div>
+            <label className="block text-sm font-medium mb-1">パスワード（確認）</label>
+            <div className="flex items-center gap-2">
+              <input
+                type={showConfirm ? 'text':'password'}
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                className={`input-underline flex-1 ${mismatch ? 'error':''}`}
+                required
+                autoComplete="new-password"
+                disabled={loading}
+                aria-invalid={!!mismatch}
+              />
+              <button type="button" onClick={()=>setShowConfirm(s=>!s)} className="text-xs link-accent w-16" aria-label="確認パスワード表示切替">{showConfirm?'隠す':'表示'}</button>
+            </div>
+            {mismatch && <p className="text-xs text-red-600 mt-1" role="alert">{mismatch}</p>}
+          </div>
+        )}
         {error && <p className="text-red-600 text-sm">{error}</p>}
         {info && <p className="text-green-600 text-sm">{info}</p>}
         <button

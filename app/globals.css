@@ -162,3 +162,26 @@ body {
   box-shadow: 0 1px 0 0 #dc2626;
 }
 
+/* Password strength meter */
+.pw-strength-wrapper { display:flex; flex-direction:column; gap:0.25rem; }
+.pw-strength-bar {
+  position: relative;
+  height: 6px;
+  width: 100%;
+  background: var(--surface-alt);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.pw-strength-bar span {
+  display:block;
+  height:100%;
+  background: var(--accent);
+  width:0%;
+  transition: width .25s ease, background-color .25s ease;
+}
+.pw-strength-label { font-size: 0.65rem; letter-spacing: .5px; color: var(--muted); }
+.pw-strength-weak span { background:#dc2626; }
+.pw-strength-fair span { background:#f59e0b; }
+.pw-strength-good span { background:#0d9488; }
+.pw-strength-strong span { background:#2563eb; }
+
