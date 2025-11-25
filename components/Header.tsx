@@ -12,6 +12,9 @@ export default function Header() {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const confirmBtnRef = useRef<HTMLButtonElement | null>(null);
+  const [userDoc, setUserDoc] = useState<any>(null);
   const [theme, setTheme] = useState<'light'|'dark'>(() => {
     if (typeof window === 'undefined') return 'light';
     const stored = window.localStorage.getItem('theme');
@@ -37,6 +40,7 @@ export default function Header() {
     await signOut(auth);
     router.push('/login');
     setOpen(false);
+    setConfirmLogout(false);
   }
 
   function toggleMenu() { setOpen(o => !o); }
@@ -62,6 +66,27 @@ export default function Header() {
       window.removeEventListener('keydown', handleKey);
     };
   }, [open]);
+
+  // Logout確認モーダル: Escape で閉じる & 初期フォーカス
+  useEffect(() => {
+    if (!confirmLogout) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setConfirmLogout(false);
+    }
+    window.addEventListener('keydown', handleKey);
+    // 初期フォーカス
+    confirmBtnRef.current?.focus();
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, [confirmLogout]);
+
+  function openLogoutConfirm() {
+    setConfirmLogout(true);
+  }
+  function cancelLogout() {
+    setConfirmLogout(false);
+  }
 
   return (
     <nav className="sticky top-0 surface border-b border-base z-50 shadow-sm">
@@ -113,7 +138,7 @@ export default function Header() {
                   role="menuitem"
                 >プロフィール</Link>
                 <button
-                  onClick={handleLogout}
+                  onClick={openLogoutConfirm}
                   className="w-full text-left px-4 py-2 text-sm link-accent"
                   role="menuitem"
                 >ログアウト</button>
@@ -138,6 +163,35 @@ export default function Header() {
           </div>
         )}
       </div>
+      {confirmLogout && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center"
+          aria-labelledby="logout-dialog-title"
+          role="dialog"
+          aria-modal="true"
+        >
+          {/* オーバーレイ */}
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={cancelLogout}
+          />
+          <div className="relative surface-alt border border-base rounded shadow-lg max-w-sm w-[90%] p-5 animate-fadeIn">
+            <h2 id="logout-dialog-title" className="font-semibold mb-2">ログアウトしますか？</h2>
+            <p className="text-sm mb-4 text-muted">現在のセッションが終了し、再度ログインが必要になります。</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={cancelLogout}
+                className="px-3 py-2 text-sm rounded border border-base hover-surface-alt"
+              >キャンセル</button>
+              <button
+                ref={confirmBtnRef}
+                onClick={handleLogout}
+                className="px-3 py-2 text-sm rounded btn-accent"
+              >ログアウト</button>
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
