@@ -463,9 +463,9 @@ export default function AlbumDetailPage() {
           >撮影場所</a>
         )}
         {isOwner && (
-          <div className="mt-2 space-y-3 rounded border bg-gray-50 p-3">
+          <div className="mt-2 space-y-3 rounded border border-base surface-alt p-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600">タイトル</label>
+              <label className="block text-xs font-medium fg-muted">タイトル</label>
               <input
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
@@ -474,7 +474,7 @@ export default function AlbumDetailPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600">撮影場所URL</label>
+              <label className="block text-xs font-medium fg-muted">撮影場所URL</label>
               <input
                 value={editPlaceUrl}
                 onChange={(e) => setEditPlaceUrl(e.target.value)}
