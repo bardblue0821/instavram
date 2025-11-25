@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth } from '../../lib/firebase';
 import { ensureUser } from '../../lib/authUser';
+import { isHandleTaken } from '../../lib/repos/userRepo';
+import { getHandleBlockReason, getDisplayNameBlockReason, isHandleBlocked } from '../../lib/constants/userFilters';
 import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 
 // セキュリティ方針: アカウント存在可否を推測されないため、認証失敗は統一メッセージにまとめる。
@@ -43,6 +45,10 @@ export default function LoginPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [pwdStrength, setPwdStrength] = useState<{score:number; label:string; percent:number; cls:string}>({score:0,label:'',percent:0,cls:''});
   const [mismatch, setMismatch] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState('');
+  const [handle, setHandle] = useState('');
+  const [handleStatus, setHandleStatus] = useState<'idle'|'checking'|'ok'|'taken'|'invalid'>('idle');
+  const [handleError, setHandleError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -75,6 +81,8 @@ export default function LoginPage() {
   useEffect(()=>{ setPwdStrength(evaluateStrength(password)); }, [password]);
   useEffect(()=>{ if(mode==='register'){ setMismatch(confirmPassword && password !== confirmPassword ? '確認用パスワードが一致しません' : null); } else { setMismatch(null); } }, [confirmPassword, password, mode]);
 
+  function basicHandleValid(h:string){ return /^[a-z0-9_]{3,20}$/i.test(h); }
+
   function validate(): boolean {
     if (!/@.+\./.test(email)) {
       setError('メールアドレスが不正です');
@@ -85,6 +93,13 @@ export default function LoginPage() {
       return false;
     }
     if (mode === 'register') {
+      if (!displayName.trim()) { setError('ユーザー名を入力してください'); return false; }
+      const dnReason = getDisplayNameBlockReason(displayName);
+      if (dnReason) { setError(dnReason); return false; }
+      if (!basicHandleValid(handle)) { setError('ユーザーIDは英数字と_で3〜20文字'); return false; }
+      if (handleStatus === 'taken') { setError('このユーザーIDは既に使用されています'); return false; }
+      const hReason = getHandleBlockReason(handle);
+      if (hReason) { setError(hReason); return false; }
       if (confirmPassword !== password) {
         setError('確認用パスワードが一致しません');
         return false;
@@ -102,7 +117,7 @@ export default function LoginPage() {
     try {
       if (mode === 'register') {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await ensureUser(cred.user.uid, cred.user.displayName, cred.user.email);
+        await ensureUser(cred.user.uid, displayName, cred.user.email, handle);
         setInfo('登録完了しました');
       } else {
         const cred = await signInWithEmailAndPassword(auth, email, password);
@@ -134,6 +149,31 @@ export default function LoginPage() {
     }
   }
 
+  // Handle 重複リアルタイムチェック (debounce)
+  useEffect(()=>{
+    if (mode !== 'register') return;
+    setHandleError(null);
+    if (!handle) { setHandleStatus('idle'); return; }
+  if (!basicHandleValid(handle)) { setHandleStatus('invalid'); setHandleError('形式: 英数字と_ 3〜20文字'); return; }
+  const blockedReason = getHandleBlockReason(handle);
+  if (blockedReason) { setHandleStatus('invalid'); setHandleError(blockedReason); return; }
+    let active = true;
+    setHandleStatus('checking');
+    const t = setTimeout(async ()=>{
+      try {
+        const taken = await isHandleTaken(handle);
+        if (!active) return;
+        setHandleStatus(taken ? 'taken':'ok');
+        setHandleError(taken ? '既に使われています':'');
+      } catch (e:any){
+        if (!active) return;
+        setHandleStatus('invalid');
+        setHandleError('チェック失敗');
+      }
+    }, 450);
+    return ()=>{ active=false; clearTimeout(t); };
+  }, [handle, mode]);
+
   return (
     <div className="fixed inset-0 flex items-center justify-center overflow-hidden">
       <div className="max-w-md w-full mx-auto p-6">
@@ -141,16 +181,54 @@ export default function LoginPage() {
       <div className="flex gap-2 mb-4">
         <button
           className={`${mode === 'login' ? 'btn-accent' : 'px-3 py-1 rounded border'} transition-colors`}
-          onClick={() => { setMode('login'); setConfirmPassword(''); setError(null); }}
+          onClick={() => { setMode('login'); setConfirmPassword(''); setError(null); setDisplayName(''); setHandle(''); setHandleStatus('idle'); setHandleError(null); }}
           disabled={loading}
         >ログイン</button>
         <button
           className={`${mode === 'register' ? 'btn-accent' : 'px-3 py-1 rounded border'} transition-colors`}
-          onClick={() => { setMode('register'); setConfirmPassword(''); setError(null); }}
+          onClick={() => { setMode('register'); setConfirmPassword(''); setError(null); setDisplayName(''); setHandle(''); setHandleStatus('idle'); setHandleError(null); }}
           disabled={loading}
         >新規登録</button>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4" aria-live="polite">
+        {mode==='register' && (
+          <div>
+            <label className="block text-sm font-medium mb-1">ユーザー名 (表示名 / 重複可)</label>
+            <input
+              type="text"
+              value={displayName}
+              onChange={e=>setDisplayName(e.target.value.slice(0,40))}
+              className="input-underline"
+              disabled={loading}
+              placeholder="例: VR太郎"
+            />
+            {getDisplayNameBlockReason(displayName) && <p className="text-xs text-red-600 mt-1" role="alert">{getDisplayNameBlockReason(displayName)}</p>}
+          </div>
+        )}
+        {mode==='register' && (
+          <div>
+            <label className="block text-sm font-medium mb-1">ユーザーID (@無し / 一意)</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={handle}
+                onChange={e=>setHandle(e.target.value.toLowerCase())}
+                className={`input-underline flex-1 ${(handleStatus==='taken'||handleStatus==='invalid')?'error':''}`}
+                disabled={loading}
+                placeholder="例: taro_vr"
+                aria-invalid={handleStatus==='taken'||handleStatus==='invalid'}
+              />
+              <span className="text-xs text-gray-600 w-16">
+                {handleStatus==='idle' && ''}
+                {handleStatus==='checking' && '確認中'}
+                {handleStatus==='ok' && '利用可'}
+                {handleStatus==='taken' && '使用不可'}
+                {handleStatus==='invalid' && '形式'}
+              </span>
+            </div>
+            {handleError && <p className="text-xs text-red-600 mt-1" role="alert">{handleError}</p>}
+          </div>
+        )}
         <div>
         <label className="block text-sm font-medium mb-1">メールアドレス</label>
         <input
