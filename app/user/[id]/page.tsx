@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuthUser } from '../../../lib/hooks/useAuthUser';
-import { getUser } from '../../../lib/repos/userRepo';
+import { getUser, getUserByHandle } from '../../../lib/repos/userRepo';
 import { listAlbumsByOwner } from '../../../lib/repos/albumRepo';
 import { listAlbumIdsByUploader } from '../../../lib/repos/imageRepo';
 import { listCommentsByUser } from '../../../lib/repos/commentRepo';
@@ -13,7 +13,7 @@ import { translateError } from '../../../lib/errors';
 
 export default function ProfilePage() {
   const params = useParams();
-  const profileUid = params?.id as string | undefined;
+  const rawParam = params?.id as string | undefined; // /user/{handle} 優先。存在しなければ uid として解釈
   const { user } = useAuthUser();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -31,23 +31,24 @@ export default function ProfilePage() {
   const [extraError, setExtraError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!profileUid) return;
+    if (!rawParam) return;
     let active = true;
     (async () => {
       setLoading(true); setError(null);
       try {
-        const p = await getUser(profileUid);
+        let p = await getUserByHandle(rawParam);
+        if (!p) p = await getUser(rawParam); // uid フォールバック
         if (active) setProfile(p);
         let watchedFlag = false;
-        if (user && profileUid !== user.uid) {
-          const forward = await getFriendStatus(user.uid, profileUid); // 自分 -> 相手
-          const backward = await getFriendStatus(profileUid, user.uid); // 相手 -> 自分
+        if (user && p && p.uid !== user.uid) {
+          const forward = await getFriendStatus(user.uid, p.uid);
+          const backward = await getFriendStatus(p.uid, user.uid);
           let st: 'none'|'sent'|'received'|'accepted' = 'none';
           if (forward === 'accepted' || backward === 'accepted') st = 'accepted';
           else if (forward === 'pending') st = 'sent';
           else if (backward === 'pending') st = 'received';
           if (active) setFriendState(st);
-          watchedFlag = await isWatched(user.uid, profileUid);
+          watchedFlag = await isWatched(user.uid, p.uid);
         } else {
           if (active) setFriendState('none');
         }
@@ -59,23 +60,20 @@ export default function ProfilePage() {
       }
     })();
     return () => { active = false; };
-  }, [profileUid, user]);
+  }, [rawParam, user]);
 
   // 拡張情報ロード
   useEffect(() => {
-    if (!profileUid) return;
+    if (!profile?.uid) return;
     let active = true;
     (async () => {
       setLoadingExtra(true); setExtraError(null);
       try {
-        // 作成アルバム
-        const own = await listAlbumsByOwner(profileUid);
-        // 参加アルバムID → アルバム取得（自分が作成したものは除外）
-        const joinedIds = await listAlbumIdsByUploader(profileUid);
+        const own = await listAlbumsByOwner(profile.uid);
+        const joinedIds = await listAlbumIdsByUploader(profile.uid);
         const filteredIds = joinedIds.filter(id => !own.some(a => a.id === id));
         const joined = await Promise.all(filteredIds.map(id => getAlbum(id)));
-        // コメント一覧
-        const comments = await listCommentsByUser(profileUid, 50);
+        const comments = await listCommentsByUser(profile.uid, 50);
         if (active) {
           setOwnAlbums(own);
           setJoinedAlbums(joined.filter(a => !!a));
@@ -93,55 +91,55 @@ export default function ProfilePage() {
       }
     })();
     return () => { active = false; };
-  }, [profileUid]);
+  }, [profile?.uid]);
 
   async function doSend() {
-    if (!user || !profileUid) return;
+    if (!user || !profile?.uid) return;
     setBusy(true); setError(null);
     try {
-      await sendFriendRequest(user.uid, profileUid);
+      await sendFriendRequest(user.uid, profile.uid);
       setFriendState('sent');
     } catch (e:any) { setError(translateError(e)); }
     finally { setBusy(false); }
   }
   async function doAccept() {
-    if (!user || !profileUid) return;
+    if (!user || !profile?.uid) return;
     setBusy(true); setError(null);
     try {
-      await acceptFriend(profileUid, user.uid); // 申請者=profileUid, 受信者=user.uid
+      await acceptFriend(profile.uid, user.uid);
       setFriendState('accepted');
     } catch (e:any) { setError(translateError(e)); }
     finally { setBusy(false); }
   }
   async function doCancel() {
-    if (!user || !profileUid) return;
+    if (!user || !profile?.uid) return;
     setBusy(true); setError(null);
     try {
-      await cancelFriendRequest(user.uid, profileUid);
+      await cancelFriendRequest(user.uid, profile.uid);
       setFriendState('none');
     } catch (e:any) { setError(translateError(e)); }
     finally { setBusy(false); }
   }
   async function doRemove() {
-    if (!user || !profileUid) return;
+    if (!user || !profile?.uid) return;
     if (!confirm('フレンドを解除しますか？')) return;
     setBusy(true); setError(null);
     try {
-      await removeFriend(user.uid, profileUid);
+      await removeFriend(user.uid, profile.uid);
       setFriendState('none');
     } catch (e:any) { setError(translateError(e)); }
     finally { setBusy(false); }
   }
 
   async function doWatchToggle() {
-    if (!user || !profileUid || user.uid === profileUid) return;
+    if (!user || !profile?.uid || user.uid === profile.uid) return;
     setWatchBusy(true); setError(null);
     try {
       if (watching) {
-        await removeWatch(user.uid, profileUid);
+        await removeWatch(user.uid, profile.uid);
         setWatching(false);
       } else {
-        await addWatch(user.uid, profileUid);
+        await addWatch(user.uid, profile.uid);
         setWatching(true);
       }
     } catch (e:any) {
@@ -154,14 +152,15 @@ export default function ProfilePage() {
   if (loading) return <div className="p-4 text-sm text-gray-500">読み込み中...</div>;
   if (!profile) return <div className="p-4 text-sm text-gray-600">ユーザーが見つかりません</div>;
 
-  const isMe = user && user.uid === profileUid;
+  const isMe = user && profile && user.uid === profile.uid;
 
   return (
     <div className="max-w-xl mx-auto p-4 space-y-6">
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold">プロフィール</h1>
-        <p className="text-sm text-gray-700">UID: {profile.uid}</p>
-        {profile.displayName && <p className="text-lg">{profile.displayName}</p>}
+    <p className="text-sm text-gray-700">UID: {profile.uid}</p>
+    {profile.handle && <p className="text-sm text-gray-600">@{profile.handle}</p>}
+    {profile.displayName && <p className="text-lg">{profile.displayName}</p>}
         {profile.bio && <p className="text-sm whitespace-pre-line">{profile.bio}</p>}
       </header>
       {!isMe && user && (
