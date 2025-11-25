@@ -41,7 +41,7 @@ export default function Header() {
           </svg>
         </button>
         {/* ブランド中央配置 */}
-        <Link href="/" className="font-semibold text-lg" aria-label="トップへ">Instavram</Link>
+  <Link href="/" className="font-semibold text-lg link-accent" aria-label="トップへ">Instavram</Link>
         {open && (
           <div
             className="absolute top-14 left-4 w-56 bg-white border border-gray-200 rounded shadow-lg py-2 animate-fadeIn"
@@ -55,18 +55,18 @@ export default function Header() {
                 <Link
                   href="/album/new"
                   onClick={closeMenu}
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  className="block px-4 py-2 text-sm link-accent"
                   role="menuitem"
                 >アルバム作成</Link>
                 <Link
                   href={`/user/${user.uid}`}
                   onClick={closeMenu}
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  className="block px-4 py-2 text-sm link-accent"
                   role="menuitem"
                 >プロフィール</Link>
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  className="w-full text-left px-4 py-2 text-sm link-accent"
                   role="menuitem"
                 >ログアウト</button>
               </>
@@ -75,7 +75,7 @@ export default function Header() {
               <Link
                 href="/login"
                 onClick={closeMenu}
-                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                className="block px-4 py-2 text-sm link-accent"
                 role="menuitem"
               >ログイン</Link>
             )}

@@ -99,12 +99,12 @@ export default function LoginPage() {
       <h1 className="text-2xl font-bold mb-4">{mode === 'login' ? 'ログイン' : '新規登録'}</h1>
       <div className="flex gap-2 mb-4">
         <button
-          className={`px-3 py-1 rounded border ${mode === 'login' ? 'bg-blue-600 text-white' : ''}`}
+          className={`${mode === 'login' ? 'btn-accent' : 'px-3 py-1 rounded border'} transition-colors`}
           onClick={() => setMode('login')}
           disabled={loading}
         >ログイン</button>
         <button
-          className={`px-3 py-1 rounded border ${mode === 'register' ? 'bg-blue-600 text-white' : ''}`}
+          className={`${mode === 'register' ? 'btn-accent' : 'px-3 py-1 rounded border'} transition-colors`}
           onClick={() => setMode('register')}
           disabled={loading}
         >新規登録</button>
@@ -138,7 +138,7 @@ export default function LoginPage() {
         {info && <p className="text-green-600 text-sm">{info}</p>}
         <button
           type="submit"
-          className="w-full bg-blue-600 text-white rounded py-2 disabled:opacity-50"
+          className="w-full btn-accent justify-center disabled:opacity-50"
           disabled={loading}
         >{loading ? '処理中...' : (mode === 'login' ? 'ログイン' : '登録')}</button>
       </form>
@@ -150,7 +150,7 @@ export default function LoginPage() {
         >{loading ? '...' : 'Google で続行'}</button>
         <button
           onClick={() => router.push('/')}
-          className="w-full border rounded py-2"
+          className="w-full border rounded py-2 link-accent"
           disabled={loading}
         >TOPへ戻る</button>
       </div>

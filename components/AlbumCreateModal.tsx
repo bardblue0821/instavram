@@ -119,7 +119,7 @@ export default function AlbumCreateModal({ onCreated }: Props) {
         {error && <p className="text-red-600 text-sm">{error}</p>}
         {loading && (
           <div role="status" className="space-y-2">
-            <p className="text-sm text-blue-600">アップロード中... {progress}%</p>
+            <p className="text-sm" style={{ color: 'var(--accent)' }}>アップロード中... {progress}%</p>
             <ul className="text-xs text-gray-600 space-y-1">
               {fileProgress.map((fp,i)=>(
                 <li key={i}>
@@ -131,7 +131,7 @@ export default function AlbumCreateModal({ onCreated }: Props) {
         )}
         <button
           type="submit"
-            className="bg-blue-600 text-white rounded px-4 py-2 disabled:opacity-50"
+          className="btn-accent disabled:opacity-50"
           disabled={loading || !user}
         >{loading ? '処理中...' : '作成'}</button>
       </form>
