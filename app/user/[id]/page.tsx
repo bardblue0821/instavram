@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuthUser } from '../../../lib/hooks/useAuthUser';
-import { getUserByHandle } from '../../../lib/repos/userRepo';
+import { getUserByHandle, updateUser, isHandleTaken } from '../../../lib/repos/userRepo';
 import { listAlbumsByOwner } from '../../../lib/repos/albumRepo';
 import { listAlbumIdsByUploader } from '../../../lib/repos/imageRepo';
 import { listCommentsByUser } from '../../../lib/repos/commentRepo';
@@ -29,6 +29,16 @@ export default function ProfilePage() {
   const [stats, setStats] = useState<{ ownCount: number; joinedCount: number; commentCount: number } | null>(null);
   const [loadingExtra, setLoadingExtra] = useState(false);
   const [extraError, setExtraError] = useState<string | null>(null);
+  // 個別フィールドインライン編集用ステート
+  const [editingField, setEditingField] = useState<string | null>(null); // displayName, handle, bio, vrchatUrl, link, language, gender, age, location, birthDate
+  const [editingValue, setEditingValue] = useState('');
+  const [editingLinkIndex, setEditingLinkIndex] = useState<number | null>(null);
+  const [editingOriginalValue, setEditingOriginalValue] = useState<string>('');
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false); // 詳細折りたたみ状態
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false); // 破棄確認モーダル
+  const [skipDiscardNextBlur, setSkipDiscardNextBlur] = useState(false); // 保存ボタン押下で blur を無視
 
   useEffect(() => {
     if (!handleParam) return;
@@ -153,14 +163,161 @@ export default function ProfilePage() {
 
   const isMe = user && profile && user.uid === profile.uid;
 
+  function beginEdit(field: string, current: any, linkIndex?: number) {
+    if (!isMe) return;
+    setSaveMsg(null);
+    setEditingField(field);
+    setEditingOriginalValue(current || '');
+    if (field === 'link') {
+      setEditingLinkIndex(linkIndex ?? 0);
+      setEditingValue(current || '');
+    } else if (field === 'age') {
+      setEditingValue(typeof current === 'number' ? String(current) : '');
+    } else {
+      setEditingValue(current || '');
+    }
+  }
+
+  async function commitEdit() {
+    if (!editingField || !profile || !isMe) { cancelEdit(); return; }
+    const raw = editingValue.trim();
+    const patch: any = {};
+    try {
+      if (editingField === 'displayName') {
+        if (!raw) throw new Error('表示名は必須');
+        if (raw.length > 50) throw new Error('表示名は最大50文字');
+        patch.displayName = raw;
+      } else if (editingField === 'handle') {
+        const h = raw.toLowerCase();
+        if (!/^[a-z0-9_]{3,20}$/.test(h)) throw new Error('ハンドルは英数字と_ 3〜20文字');
+        if (profile.handle !== h) {
+          const taken = await isHandleTaken(h);
+          if (taken) throw new Error('そのハンドルは既に使用されています');
+        }
+        patch.handle = h;
+    } else if (editingField === 'bio') {
+      // bio: URL禁止 / 不適切語禁止 / 100文字上限 / 改行除去 / 全角スペース除去 / 連続半角スペース縮約
+      const banned = ['禁止語']; // 具体的な不適切語は後で拡張 (例: 'badword')
+      if (/(https?:\/\/|www\.)/i.test(raw)) throw new Error('bio に URL は含められません');
+      if (banned.some(w => raw.toLowerCase().includes(w))) throw new Error('不適切な語句が含まれています');
+      let b = raw
+        .replace(/[\r\n]+/g, ' ')
+        .replace(/[\u3000]+/g, '')
+        .replace(/ {2,}/g, ' ')
+        .trim();
+      if (b.length > 100) throw new Error('bio は最大100文字です');
+      patch.bio = b || null;
+      } else if (editingField === 'vrchatUrl') {
+        if (raw) {
+          if (!/^https?:\/\//.test(raw) || !/vrchat/i.test(raw)) throw new Error('VRChat URL 不正');
+          patch.vrchatUrl = raw;
+        } else patch.vrchatUrl = null;
+      } else if (editingField === 'language') {
+        patch.language = raw || null;
+      } else if (editingField === 'gender') {
+        patch.gender = raw || null;
+      } else if (editingField === 'age') {
+        if (raw) {
+          const n = Number(raw);
+          if (Number.isNaN(n) || n < 0 || n > 150) throw new Error('年齢は0〜150');
+          patch.age = n;
+        } else patch.age = null;
+      } else if (editingField === 'location') {
+        patch.location = raw || null;
+      } else if (editingField === 'birthDate') {
+        if (raw && !/^\d{4}-\d{2}-\d{2}$/.test(raw)) throw new Error('誕生日はYYYY-MM-DD');
+        patch.birthDate = raw || null;
+      } else if (editingField === 'link') {
+        const links: string[] = (profile.links || []).slice(0,3);
+        const idx = editingLinkIndex ?? 0;
+        if (!raw) { links.splice(idx,1); }
+        else {
+          if (!/^https?:\/\//.test(raw)) throw new Error('URLはhttp/httpsのみ');
+          if (idx < links.length) links[idx] = raw; else links.push(raw);
+        }
+        patch.links = links;
+      }
+    } catch (e:any) {
+      setError(e.message || String(e));
+      return;
+    }
+    setSaving(true); setError(null);
+    try {
+      await updateUser(profile.uid, patch);
+      const updated = { ...profile, ...patch };
+      setProfile(updated);
+      setSaveMsg('保存しました');
+      cancelEdit();
+    } catch (e:any) {
+      setError(translateError(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function cancelEdit() {
+    setEditingField(null);
+    setEditingValue('');
+    setEditingLinkIndex(null);
+    setEditingOriginalValue('');
+    setShowDiscardConfirm(false);
+  }
+
+  function onKey(e: React.KeyboardEvent) {
+    if (e.key === 'Enter' && editingField !== 'bio') { e.preventDefault(); commitEdit(); }
+    if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+  }
+
+  function handleBlur() {
+    // 入力コンポーネント外へフォーカス移動した時: 保存せず離脱しようとしている
+    if (!editingField) return;
+    if (skipDiscardNextBlur) { setSkipDiscardNextBlur(false); return; }
+    // 既にモーダルが出ている場合は何もしない
+    if (!showDiscardConfirm) setShowDiscardConfirm(true);
+  }
+
+  function discardChanges() {
+    // 破棄: 元値保持しているが profile は未更新なので cancelEdit で OK
+    cancelEdit();
+  }
+  function keepEditing() {
+    // 編集続行: モーダル閉じて再フォーカスは任意 (ユーザが再クリック可)
+    setShowDiscardConfirm(false);
+  }
+  function saveFromModal() {
+    commitEdit();
+    setShowDiscardConfirm(false);
+  }
+
   return (
     <div className="max-w-xl mx-auto p-4 space-y-6">
-      <header className="space-y-2">
+      <header className="space-y-3">
         <h1 className="text-2xl font-semibold">プロフィール</h1>
-    <p className="text-sm text-gray-700">UID: {profile.uid}</p>
-    {profile.handle && <p className="text-sm text-gray-600">@{profile.handle}</p>}
-    {profile.displayName && <p className="text-lg">{profile.displayName}</p>}
-        {profile.bio && <p className="text-sm whitespace-pre-line">{profile.bio}</p>}
+        <p className="text-sm text-gray-700">UID: {profile.uid}</p>
+  <FieldText label="表示名" value={profile.displayName || ''} placeholder="（表示名未設定）" field="displayName" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
+  <FieldText prefix="@" label="ハンドル" value={profile.handle || ''} placeholder="（ハンドル未設定）" field="handle" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
+  <FieldTextarea label="自己紹介" value={profile.bio || ''} placeholder="未設定" field="bio" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
+        {!detailsOpen && (
+          <button type="button" onClick={()=> setDetailsOpen(true)} className="text-xs text-blue-600 underline">
+            詳細を表示
+          </button>
+        )}
+        {detailsOpen && (
+          <div className="space-y-2">
+            <FieldText label="VRChat URL" value={profile.vrchatUrl || ''} placeholder="未設定" field="vrchatUrl" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} isLink onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
+            <LinksField profile={profile} editingField={editingField} editingValue={editingValue} editingLinkIndex={editingLinkIndex} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
+            <FieldText label="言語" value={profile.language || ''} placeholder="未設定" field="language" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
+            <FieldText label="性別" value={profile.gender || ''} placeholder="未設定" field="gender" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
+            <FieldText label="年齢" value={typeof profile.age === 'number' ? String(profile.age) : ''} placeholder="未設定" field="age" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} numeric onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
+            <FieldText label="場所" value={profile.location || ''} placeholder="未設定" field="location" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
+            <FieldText label="生年月日" value={profile.birthDate || ''} placeholder="未設定" field="birthDate" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} date onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
+            <button type="button" onClick={()=> setDetailsOpen(false)} className="text-xs text-gray-600 underline">
+              詳細を隠す
+            </button>
+          </div>
+        )}
+        {saveMsg && <p className="text-xs text-green-700">{saveMsg}</p>}
+        {error && <p className="text-xs text-red-600">{error}</p>}
       </header>
       {!isMe && user && (
         <section className="space-y-2">
@@ -263,6 +420,141 @@ export default function ProfilePage() {
           </div>
         </div>
       </section>
+      {showDiscardConfirm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded shadow-lg p-4 w-80 space-y-4">
+            <h3 className="text-sm font-semibold">変更を破棄しますか？</h3>
+            <p className="text-xs text-gray-600">保存せずに編集を終了すると内容は元に戻ります。保存しますか、それとも破棄しますか？</p>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="px-2 py-1 text-xs rounded bg-gray-200" onClick={keepEditing}>編集を続ける</button>
+              <button type="button" className="px-2 py-1 text-xs rounded bg-blue-600 text-white" onClick={saveFromModal}>保存</button>
+              <button type="button" className="px-2 py-1 text-xs rounded bg-red-600 text-white" onClick={discardChanges}>破棄</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 共通フィールド型
+interface CommonFieldProps {
+  label: string;
+  value: string;
+  placeholder: string;
+  field: string;
+  editingField: string | null;
+  editingValue: string;
+  beginEdit: (f:string, cur:string)=>void;
+  onChange: (v:string)=>void;
+  onBlur: ()=>void;
+  onKey?: (e:React.KeyboardEvent)=>void;
+  isMe: boolean;
+  saving: boolean;
+  prefix?: string;
+  isLink?: boolean;
+  numeric?: boolean;
+  date?: boolean;
+  onSave: ()=>void;
+  setSkipDiscard: (v:boolean)=>void;
+}
+
+function FieldText(p: CommonFieldProps) {
+  const { label, value, placeholder, field, editingField, editingValue, beginEdit, onChange, onBlur, onKey, isMe, saving, prefix, isLink, numeric, date, onSave, setSkipDiscard } = p;
+  const active = editingField === field;
+  if (active) return (
+    <div className="text-sm space-y-1">
+      <label className="text-xs text-gray-500">{label}</label>
+      <div className="flex items-start gap-2">
+        <input autoFocus type={numeric ? 'number' : date ? 'date' : 'text'} className="flex-1 border-b-2 border-blue-500 bg-transparent p-1 text-sm focus:outline-none" value={editingValue} disabled={saving} onChange={e=>onChange(e.target.value)} onBlur={onBlur} onKeyDown={onKey} />
+        <button type="button" disabled={saving} className="text-xs px-2 py-1 bg-blue-600 text-white rounded disabled:opacity-50"
+          onMouseDown={()=> setSkipDiscard(true)}
+          onClick={onSave}>保存</button>
+      </div>
+    </div>
+  );
+  const shown = value ? (prefix ? prefix + value : value) : placeholder;
+  return (
+    <p className={isMe ? 'cursor-pointer text-sm' : 'text-sm'} onClick={()=> isMe && beginEdit(field, value)}>
+      <span className="font-semibold text-gray-700">{label}:</span>{' '}{value && isLink ? <a className="link-accent" href={value} target="_blank" rel="noreferrer">{shown}</a> : shown}
+    </p>
+  );
+}
+
+function FieldTextarea(p: Omit<CommonFieldProps,'onKey'|'prefix'|'isLink'|'numeric'|'date'> & { onSave: ()=>void; setSkipDiscard:(v:boolean)=>void }) {
+  const { label, value, placeholder, field, editingField, editingValue, beginEdit, onChange, onBlur, isMe, saving, onSave, setSkipDiscard } = p;
+  const active = editingField === field;
+  if (active) return (
+    <div className="text-sm space-y-1">
+      <label className="text-xs text-gray-500">{label}</label>
+      <div className="flex items-start gap-2">
+        <div className="flex-1">
+          <textarea autoFocus rows={5} className="w-full border-b-2 border-blue-500 bg-transparent p-1 text-sm focus:outline-none" value={editingValue} disabled={saving} onChange={e=>onChange(e.target.value)} onBlur={onBlur} />
+          <p className="text-[10px] text-gray-500">{editingValue.replace(/[\r\n]+/g,' ').replace(/[\u3000]+/g,'').replace(/ {2,}/g,' ').trim().length}/100</p>
+        </div>
+        <button type="button" disabled={saving} className="text-xs h-8 px-2 py-1 bg-blue-600 text-white rounded disabled:opacity-50 mt-1"
+          onMouseDown={()=> setSkipDiscard(true)}
+          onClick={onSave}>保存</button>
+      </div>
+    </div>
+  );
+  return (
+    <p className={isMe ? 'cursor-pointer text-sm whitespace-pre-line' : 'text-sm whitespace-pre-line'} onClick={()=> isMe && beginEdit(field, value)}>
+      <span className="font-semibold text-gray-700">{label}:</span>{' '}{value ? value : placeholder}
+    </p>
+  );
+}
+
+interface LinksFieldProps {
+  profile: any;
+  editingField: string | null;
+  editingValue: string;
+  editingLinkIndex: number | null;
+  beginEdit: (f:string, cur:string, idx?:number)=>void;
+  onChange: (v:string)=>void;
+  onBlur: ()=>void;
+  onKey: (e:React.KeyboardEvent)=>void;
+  isMe: boolean;
+  saving: boolean;
+  onSave: ()=>void;
+  setSkipDiscard: (v:boolean)=>void;
+}
+
+function LinksField(p: LinksFieldProps) {
+  const { profile, editingField, editingValue, editingLinkIndex, beginEdit, onChange, onBlur, onKey, isMe, saving, onSave, setSkipDiscard } = p;
+  const links: string[] = (profile.links || []).slice(0,3);
+  const active = editingField === 'link';
+  return (
+    <div className="text-sm space-y-1">
+      <span className="font-semibold text-gray-700">その他URL:</span>
+      <ul className="list-disc ml-5 space-y-1">
+        {links.map((l,i)=>(
+          <li key={i} className={isMe ? 'cursor-pointer' : ''} onClick={()=> isMe && beginEdit('link', l, i)}>
+            {active && editingLinkIndex===i ? (
+              <div className="flex items-center gap-2">
+                <input autoFocus className="flex-1 border-b-2 border-blue-500 bg-transparent p-1 text-xs focus:outline-none" value={editingValue} disabled={saving} onChange={e=>onChange(e.target.value)} onBlur={onBlur} onKeyDown={onKey} />
+                <button type="button" disabled={saving} className="text-[10px] px-2 py-1 bg-blue-600 text-white rounded disabled:opacity-50"
+                  onMouseDown={()=> setSkipDiscard(true)}
+                  onClick={onSave}>保存</button>
+              </div>
+            ) : <a href={l} className="link-accent" target="_blank" rel="noreferrer">{l}</a>}
+          </li>
+        ))}
+        {links.length === 0 && <li className="text-gray-500">未設定</li>}
+        {isMe && links.length < 3 && !active && (
+          <li><button type="button" className="text-xs text-blue-600 underline" onClick={()=> beginEdit('link','',links.length)}>+ 追加</button></li>
+        )}
+        {active && editingLinkIndex === links.length && (
+          <li>
+            <div className="flex items-center gap-2">
+              <input autoFocus className="flex-1 border-b-2 border-blue-500 bg-transparent p-1 text-xs focus:outline-none" value={editingValue} disabled={saving} onChange={e=>onChange(e.target.value)} onBlur={onBlur} onKeyDown={onKey} />
+              <button type="button" disabled={saving} className="text-[10px] px-2 py-1 bg-blue-600 text-white rounded disabled:opacity-50"
+                onMouseDown={()=> setSkipDiscard(true)}
+                onClick={onSave}>保存</button>
+            </div>
+          </li>
+        )}
+      </ul>
     </div>
   );
 }
