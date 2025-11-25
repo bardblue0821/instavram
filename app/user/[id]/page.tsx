@@ -168,7 +168,7 @@ export default function ProfilePage() {
         <section className="space-y-2">
           <h2 className="text-lg font-medium">フレンド</h2>
           {friendState === 'none' && (
-            <button disabled={busy} onClick={doSend} className="bg-blue-600 text-white text-sm px-3 py-1 rounded disabled:opacity-50">フレンド申請</button>
+            <button disabled={busy} onClick={doSend} className="btn-accent text-sm disabled:opacity-50">フレンド申請</button>
           )}
           {friendState === 'sent' && (
             <div className="flex gap-2 items-center">
@@ -178,20 +178,20 @@ export default function ProfilePage() {
           )}
           {friendState === 'received' && (
             <div className="flex gap-2">
-              <button disabled={busy} onClick={doAccept} className="bg-green-600 text-white text-sm px-3 py-1 rounded disabled:opacity-50">承認</button>
-              <button disabled={busy} onClick={doCancel} className="bg-red-600 text-white text-sm px-3 py-1 rounded disabled:opacity-50">拒否</button>
+              <button disabled={busy} onClick={doAccept} className="btn-accent text-sm disabled:opacity-50">承認</button>
+              <button disabled={busy} onClick={doCancel} className="rounded bg-red-600 px-3 py-1 text-sm text-white disabled:opacity-50">拒否</button>
             </div>
           )}
           {friendState === 'accepted' && (
             <div className="flex gap-3 items-center">
               <span className="text-sm text-green-700">フレンドです</span>
-              <button disabled={busy} onClick={doRemove} className="bg-red-600 text-white text-xs px-2 py-1 rounded disabled:opacity-50">解除</button>
+              <button disabled={busy} onClick={doRemove} className="rounded bg-red-600 px-2 py-1 text-xs text-white disabled:opacity-50">解除</button>
             </div>
           )}
           <div className="pt-2 border-t mt-3">
             <h3 className="text-sm font-medium mb-1">ウォッチ</h3>
             {!watching && (
-              <button disabled={watchBusy} onClick={doWatchToggle} className="bg-indigo-600 text-white text-xs px-2 py-1 rounded disabled:opacity-50">ウォッチ</button>
+              <button disabled={watchBusy} onClick={doWatchToggle} className="btn-accent text-xs disabled:opacity-50">ウォッチ</button>
             )}
             {watching && (
               <button disabled={watchBusy} onClick={doWatchToggle} className="bg-gray-600 text-white text-xs px-2 py-1 rounded disabled:opacity-50">ウォッチ解除</button>
@@ -230,7 +230,7 @@ export default function ProfilePage() {
             <ul className="space-y-2">
               {ownAlbums && ownAlbums.map(a => (
                 <li key={a.id} className="p-2 border rounded">
-                  <a href={`/album/${a.id}`} className="text-blue-600 text-sm font-medium hover:underline">{a.title || '無題'}</a>
+                  <a href={`/album/${a.id}`} className="link-accent text-sm font-medium">{a.title || '無題'}</a>
                   <p className="text-xs text-gray-500">{a.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
                 </li>
               ))}
@@ -243,7 +243,7 @@ export default function ProfilePage() {
             <ul className="space-y-2">
               {joinedAlbums && joinedAlbums.map((a: any, i: number) => (
                 <li key={i} className="p-2 border rounded">
-                  <a href={`/album/${a.id}`} className="text-blue-600 text-sm font-medium hover:underline">{a.title || '無題'}</a>
+                  <a href={`/album/${a.id}`} className="link-accent text-sm font-medium">{a.title || '無題'}</a>
                   <p className="text-xs text-gray-500">{a.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
                 </li>
               ))}
@@ -257,7 +257,7 @@ export default function ProfilePage() {
               {userComments && userComments.map(c => (
                 <li key={c.id} className="p-2 border rounded text-sm">
                   <p className="whitespace-pre-line">{c.body}</p>
-                  <a href={`/album/${c.albumId}`} className="text-xs text-blue-600 hover:underline">アルバムへ</a>
+                  <a href={`/album/${c.albumId}`} className="text-xs link-accent">アルバムへ</a>
                   <p className="text-[10px] text-gray-500">{c.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
                 </li>
               ))}

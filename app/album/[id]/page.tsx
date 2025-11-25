@@ -418,7 +418,7 @@ export default function AlbumDetailPage() {
       <div className="space-y-3 p-4">
         <h1 className="text-lg font-semibold">アルバム</h1>
         <p className="text-sm text-gray-600">ログインが必要です。</p>
-        <a href="/login" className="inline-block rounded bg-blue-600 px-3 py-1 text-sm text-white">ログインへ</a>
+  <a href="/login" className="inline-block btn-accent text-sm">ログインへ</a>
       </div>
     );
   }
@@ -459,7 +459,7 @@ export default function AlbumDetailPage() {
             href={album.placeUrl}
             target="_blank"
             rel="noreferrer"
-            className="mt-1 inline-block text-sm text-blue-600 underline"
+            className="mt-1 inline-block text-sm link-accent"
           >撮影場所</a>
         )}
         {isOwner && (
@@ -485,7 +485,7 @@ export default function AlbumDetailPage() {
             <button
               disabled={savingAlbum}
               onClick={handleSaveAlbum}
-              className="rounded bg-green-600 px-3 py-1 text-sm text-white disabled:opacity-50"
+              className="btn-accent text-sm disabled:opacity-50"
             >{savingAlbum ? "保存中..." : "変更を保存"}</button>
             {albumSavedMsg && <p className="text-xs text-green-600">{albumSavedMsg}</p>}
           </div>
@@ -523,7 +523,7 @@ export default function AlbumDetailPage() {
             <button
               onClick={handleAddImage}
               disabled={!file || uploading || remaining <= 0}
-              className="rounded bg-blue-600 px-3 py-1 text-sm text-white disabled:opacity-50"
+              className="btn-accent text-sm disabled:opacity-50"
             >{uploading ? "アップロード中..." : "追加"}</button>
           </div>
         )}

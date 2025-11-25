@@ -54,7 +54,7 @@ export function AlbumCard({ id, title, ownerId, createdAt, firstImageUrl, placeU
             {formattedDate && <p className="text-[11px] text-gray-400">{formattedDate}</p>}
           </header>
           {placeUrl && (
-            <p className="truncate text-xs text-blue-600">
+            <p className="truncate text-xs link-accent">
               撮影場所: <span className="underline">{placeUrl}</span>
             </p>
           )}

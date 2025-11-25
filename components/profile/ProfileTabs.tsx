@@ -26,7 +26,7 @@ export function ProfileTabs({ tabs }: ProfileTabsProps) {
               role="tab"
               aria-selected={isActive}
               aria-controls={`panel-${tab.key}`}
-              className={`min-w-[120px] rounded px-3 py-2 text-sm transition ${isActive ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100"}`}
+              className={`min-w-[120px] rounded px-3 py-2 text-sm transition ${isActive ? "btn-accent" : "text-gray-600 hover:bg-gray-100"}`}
               onClick={() => setActive(tab.key)}
             >
               <span>{tab.label}</span>

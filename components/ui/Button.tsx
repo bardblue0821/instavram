@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 
-type Variant = "primary" | "secondary" | "ghost";
+type Variant = "primary" | "secondary" | "ghost" | "accent";
 type Size = "sm" | "md" | "lg";
 
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -18,7 +18,8 @@ function cn(...values: Array<string | false | null | undefined>) {
 }
 
 const variantClass: Record<Variant, string> = {
-  primary: "bg-blue-600 text-white hover:bg-blue-700 focus-visible:ring-blue-400",
+  primary: "btn-accent", // legacy primary -> accent
+  accent: "btn-accent",
   secondary: "bg-gray-900 text-white hover:bg-gray-800 focus-visible:ring-gray-500",
   ghost: "border border-gray-300 text-gray-700 hover:bg-gray-100 focus-visible:ring-gray-300",
 };
