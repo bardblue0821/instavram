@@ -55,7 +55,7 @@ export default function LoginPage() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       if (u && u.emailVerified) {
-        router.replace('/');
+        router.replace('/timeline');
       }
     });
     return () => unsub();
@@ -131,7 +131,7 @@ export default function LoginPage() {
         setInfo('ログイン成功');
       }
       if (mode !== 'register') {
-        router.push('/');
+        router.push('/timeline');
       }
     } catch (err: any) {
   setError(mapAuthError(err.code || 'unknown'));
@@ -149,7 +149,7 @@ export default function LoginPage() {
       const cred = await signInWithPopup(auth, provider);
       await ensureUser(cred.user.uid, cred.user.displayName, cred.user.email);
       setInfo('Google ログイン成功');
-      router.push('/');
+      router.push('/timeline');
     } catch (err: any) {
   setError(mapAuthError(err.code || 'unknown'));
     } finally {
