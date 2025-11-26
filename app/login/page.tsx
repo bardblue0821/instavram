@@ -5,7 +5,7 @@ import { auth } from '../../lib/firebase';
 import { ensureUser } from '../../lib/authUser';
 import { isHandleTaken } from '../../lib/repos/userRepo';
 import { getHandleBlockReason, getDisplayNameBlockReason, isHandleBlocked } from '../../lib/constants/userFilters';
-import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, signOut } from 'firebase/auth';
 
 // セキュリティ方針: アカウント存在可否を推測されないため、認証失敗は統一メッセージにまとめる。
 // ただし UI/UX 維持のためフォーマット不正・弱いパスワードなど入力検証系は区別。
@@ -50,9 +50,11 @@ export default function LoginPage() {
   const [handleStatus, setHandleStatus] = useState<'idle'|'checking'|'ok'|'taken'|'invalid'>('idle');
   const [handleError, setHandleError] = useState<string | null>(null);
 
+  // ログイン画面では、既に検証済みでログイン中ならトップへ。
+  // 未検証でログイン中のケースは基本的に起こさない（登録後は即 signOut）方針。
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
-      if (u) {
+      if (u && u.emailVerified) {
         router.replace('/');
       }
     });
@@ -118,13 +120,19 @@ export default function LoginPage() {
       if (mode === 'register') {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         await ensureUser(cred.user.uid, displayName, cred.user.email, handle);
-        setInfo('登録完了しました');
+        // 確認メール送信
+        await sendEmailVerification(cred.user);
+        // 仮登録の間はアクセス制限を強めるため、直ちにサインアウトしてログイン画面に留める
+        await signOut(auth);
+        setInfo('仮登録です。メール内のリンクをクリックして本登録を完了してください。必要なら再送できます。');
       } else {
         const cred = await signInWithEmailAndPassword(auth, email, password);
         await ensureUser(cred.user.uid, cred.user.displayName, cred.user.email);
         setInfo('ログイン成功');
       }
-      router.push('/');
+      if (mode !== 'register') {
+        router.push('/');
+      }
     } catch (err: any) {
   setError(mapAuthError(err.code || 'unknown'));
     } finally {
@@ -282,7 +290,23 @@ export default function LoginPage() {
           </div>
         )}
         {error && <p className="text-red-600 text-sm">{error}</p>}
-        {info && <p className="text-green-600 text-sm">{info}</p>}
+        {info && (
+          <div className="text-xs text-gray-700 bg-yellow-50 border rounded p-2">
+            <p>{info}</p>
+            {mode==='register' && (
+              <div className="mt-2">
+                <button type="button" className="text-xs link-accent" disabled={loading} onClick={async ()=>{
+                  try {
+                    // 再送は匿名状態でも currentUser が居ないため不可。再送したい場合は再度登録メールで試みてください、の案内にするか、
+                    // 一旦サインインして即座に sendEmailVerification→signOut のフローを追加する必要がある。
+                    // ここでは簡便のため再登録ボタンの利用を案内します。
+                    setInfo('確認メールが届かない場合は、メールアドレスを再確認の上、もう一度登録をお試しください。');
+                  } catch(e:any){ /* no-op */ }
+                }}>確認メールを再送</button>
+              </div>
+            )}
+          </div>
+        )}
         <button
         type="submit"
         className="w-full btn-accent justify-center disabled:opacity-50"

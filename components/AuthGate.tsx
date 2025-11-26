@@ -7,17 +7,19 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthUser();
   const pathname = usePathname();
   const router = useRouter();
-  const publicPaths = new Set<string>(['/', '/login']);
+  // 公開パスはログイン画面のみ（未確認ユーザーはトップも不可）
+  const publicPaths = new Set<string>(['/login']);
   const isPublic = publicPaths.has(pathname);
 
   useEffect(() => {
     if (loading) return;
-    if (!user && !isPublic) {
+    // 未ログイン または 未確認ユーザー は /login 以外へアクセス不可
+    if ((!user || (user && !user.emailVerified)) && !isPublic) {
       router.replace('/login');
     }
   }, [user, loading, isPublic, router]);
 
-  if ((loading && !isPublic) || (!loading && !user && !isPublic)) {
+  if ((loading && !isPublic) || (!loading && (!user || (user && !user.emailVerified)) && !isPublic)) {
     return null; 
   }
 
