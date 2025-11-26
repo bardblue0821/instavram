@@ -163,7 +163,7 @@ export default function Header() {
             )}
             {!loading && !user && (
               <Link
-                href="/login"
+                href="/"
                 onClick={closeMenu}
                 className="block px-4 py-2 text-sm link-accent"
                 role="menuitem"

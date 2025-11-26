@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Header from "../components/Header";
+import HeaderGate from "../components/HeaderGate";
 import AuthGate from "../components/AuthGate";
 
 const geistSans = Geist({
@@ -27,7 +27,7 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}>
-        <Header />
+        <HeaderGate />
         <AuthGate>
           <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-6">
             {children}
