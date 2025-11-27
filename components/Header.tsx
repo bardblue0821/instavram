@@ -138,6 +138,12 @@ export default function Header() {
             {!loading && user && (
               <>
                 <Link
+                  href="/search"
+                  onClick={closeMenu}
+                  className="block px-4 py-2 text-sm link-accent"
+                  role="menuitem"
+                >検索</Link>
+                <Link
                   href="/timeline"
                   onClick={closeMenu}
                   className="block px-4 py-2 text-sm link-accent"
@@ -171,12 +177,20 @@ export default function Header() {
               </>
             )}
             {!loading && !user && (
-              <Link
-                href="/"
-                onClick={closeMenu}
-                className="block px-4 py-2 text-sm link-accent"
-                role="menuitem"
-              >ログイン</Link>
+              <>
+                <Link
+                  href="/search"
+                  onClick={closeMenu}
+                  className="block px-4 py-2 text-sm link-accent"
+                  role="menuitem"
+                >検索</Link>
+                <Link
+                  href="/"
+                  onClick={closeMenu}
+                  className="block px-4 py-2 text-sm link-accent"
+                  role="menuitem"
+                >ログイン</Link>
+              </>
             )}
             <div className="mt-2 pt-2">
               <button
