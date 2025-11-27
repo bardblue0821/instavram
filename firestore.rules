@@ -1,0 +1,112 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isUser(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // users/{uid}
+    match /users/{uid} {
+      allow read: if true;
+      allow create: if isUser(uid);
+      allow update, delete: if isUser(uid);
+    }
+
+    // albums/{albumId}
+    match /albums/{albumId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if isSignedIn()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    // albumImages/{imageId}
+    match /albumImages/{imageId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasAll(['albumId','uploaderId','url'])
+        && request.resource.data.uploaderId == request.auth.uid;
+      allow delete: if isSignedIn()
+        && (
+          resource.data.uploaderId == request.auth.uid ||
+          get(/databases/$(database)/documents/albums/$(resource.data.albumId)).data.ownerId == request.auth.uid
+        );
+      // addImage 直後の updateDoc で "id" フィールドのみ追加を許可（その他の変更は不可）
+      allow update: if isSignedIn()
+        && resource.data.uploaderId == request.auth.uid
+        && request.resource.data.keys().hasAll(['albumId','uploaderId','url','id'])
+        && request.resource.data.keys().hasOnly(['albumId','uploaderId','url','id','createdAt'])
+        && request.resource.data.albumId == resource.data.albumId
+        && request.resource.data.uploaderId == resource.data.uploaderId
+        && request.resource.data.url == resource.data.url;
+    }
+
+    // comments/{commentId}
+    match /comments/{commentId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.body is string
+        && request.resource.data.body.size() <= 200
+        && request.resource.data.keys().hasAll(['albumId','userId','body','createdAt']);
+      allow update: if isSignedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasOnly(['albumId','userId','body','createdAt','id']);
+      allow delete: if isSignedIn()
+        && (
+          resource.data.userId == request.auth.uid ||
+          get(/databases/$(database)/documents/albums/$(resource.data.albumId)).data.ownerId == request.auth.uid
+        );
+    }
+
+    // likes/{likeId} （ID = albumId_userId）
+    match /likes/{likeId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && likeId == request.resource.data.albumId + '_' + request.resource.data.userId
+        && request.resource.data.keys().hasAll(['albumId','userId','createdAt']);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow update: if false;
+    }
+
+    // friends/{relationId} （ID = userId_targetId）
+    match /friends/{relationId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.targetId == request.auth.uid);
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && relationId == request.resource.data.userId + '_' + request.resource.data.targetId
+        && request.resource.data.status == 'pending'
+        && request.resource.data.keys().hasAll(['id','userId','targetId','status','createdAt']);
+      allow update: if isSignedIn()
+        && resource.data.targetId == request.auth.uid
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'accepted';
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.targetId == request.auth.uid);
+    }
+
+    // watches/{watchId} （ID = userId_ownerId）
+    match /watches/{watchId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.ownerId == request.auth.uid);
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && watchId == request.resource.data.userId + '_' + request.resource.data.ownerId
+        && request.resource.data.keys().hasAll(['id','userId','ownerId','createdAt']);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow update: if false;
+    }
+
+    // その他のパスは閉じる
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -39,6 +39,7 @@ export default function AlbumCreateModal({ onCreated }: Props) {
     setProgress(0);
     try {
       // 逐次進捗: files.length が0ならそのまま
+      console.log('[AlbumCreateModal] submit start', { uid: user.uid, files: files.map(f=>({name:f.name,size:f.size})) });
       const albumId = await createAlbumWithImages(
         user.uid,
         { title: title || undefined, placeUrl: placeUrl || undefined, firstComment: comment || undefined },
@@ -50,15 +51,21 @@ export default function AlbumCreateModal({ onCreated }: Props) {
             copy[p.fileIndex] = p;
             return copy;
           });
+          if (p.state === 'error') {
+            console.error('[AlbumCreateModal] file progress error', p);
+          }
         }
       );
       setProgress(100);
       if (onCreated) onCreated(albumId);
+      console.log('[AlbumCreateModal] success', { albumId });
       router.push(`/album/${albumId}`); // 詳細ページは後で
     } catch (err: any) {
+      console.error('[AlbumCreateModal] submit error', err);
       setError(translateError(err));
     } finally {
       setLoading(false);
+      console.log('[AlbumCreateModal] submit end');
     }
   }
 

@@ -25,6 +25,7 @@ export async function createAlbumWithImages(
   files: File[],
   onProgress?: (p: AlbumCreateProgress) => void,
 ): Promise<string> {
+  console.log('[album:create] start', { ownerId, files: files.map(f => ({ name: f.name, size: f.size })) , opts });
   if (files.length > 4) throw new Error('LIMIT_4_PER_USER');
   if (opts.firstComment && opts.firstComment.length > 200) throw new Error('TOO_LONG');
 
@@ -47,6 +48,7 @@ export async function createAlbumWithImages(
     const ext = extractExt(file.name);
     const path = `albums/${albumId}/${ownerId}/${Date.now()}_${i}.${ext}`;
     const storageRef = ref(storage, path);
+    console.log('[album:create] upload start', { index: i, name: file.name, size: file.size, path });
     const task = uploadBytesResumable(storageRef, file);
 
     await new Promise<void>((resolve, reject) => {
@@ -57,19 +59,26 @@ export async function createAlbumWithImages(
         const aggregateTransferred = perFileBytesTransferred.reduce((a, b) => a + b, 0);
         const overallPercent = totalBytes > 0 ? Math.min(100, Math.round((aggregateTransferred / totalBytes) * 100)) : percent;
         onProgress?.({ fileIndex: i, total: files.length, percent, overallPercent, state: 'uploading' });
+        if (i === 0 || percent % 25 === 0) {
+          console.log('[album:create] uploading', { index: i, percent, overallPercent, bytes: snap.bytesTransferred, totalBytes: snap.totalBytes });
+        }
       }, (err) => {
+        console.error('[album:create] upload error', { index: i, error: err });
         onProgress?.({ fileIndex: i, total: files.length, percent: 0, overallPercent: Math.round((completedBytes / totalBytes) * 100), state: 'error', error: err.code || err.message });
         reject(err);
       }, async () => {
         try {
           const url = await getDownloadURL(task.snapshot.ref);
+          console.log('[album:create] upload success', { index: i, url });
           await addImage(albumId, ownerId, url);
+          console.log('[album:create] image doc added', { index: i, albumId, ownerId });
           perFileBytesTransferred[i] = snapSafeBytes(task);
           completedBytes = perFileBytesTransferred.reduce((a, b) => a + b, 0);
           const overallPercent = totalBytes > 0 ? Math.min(100, Math.round((completedBytes / totalBytes) * 100)) : 100;
           onProgress?.({ fileIndex: i, total: files.length, percent: 100, overallPercent, state: 'success' });
           resolve();
         } catch (e: any) {
+          console.error('[album:create] post-upload processing error', { index: i, error: e });
           onProgress?.({ fileIndex: i, total: files.length, percent: 100, overallPercent: Math.round((completedBytes / totalBytes) * 100), state: 'error', error: e.message });
           reject(e);
         }
@@ -86,12 +95,16 @@ export async function createAlbumWithImages(
     createdAt: now,
     updatedAt: now,
   });
+  console.log('[album:create] album doc created', { albumId, ownerId });
 
   // 初回コメント
   if (opts.firstComment && opts.firstComment.trim()) {
+    console.log('[album:create] adding first comment');
     await addComment(albumId, ownerId, opts.firstComment.trim());
+    console.log('[album:create] first comment added');
   }
 
+  console.log('[album:create] done', { albumId });
   return albumId;
 }
 
