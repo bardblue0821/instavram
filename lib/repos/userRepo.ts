@@ -87,3 +87,25 @@ export async function getUserByHandle(handle: string): Promise<UserDoc | null> {
   if (snap.empty) return null
   return snap.docs[0].data() as UserDoc
 }
+
+// handle に一致するユーザー一覧（重複チェック用：通常は0件か1件）
+export async function listUsersByHandle(handle: string): Promise<UserDoc[]> {
+  const h = handle.trim().toLowerCase()
+  if (!h) return []
+  const q = query(collection(db, COL.users), where('handle', '==', h))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => d.data() as UserDoc)
+}
+
+// ensure ユーザーの作成/更新（displayName + handle）
+export async function ensureUserWithHandle(uid: string, displayName: string, handle: string) {
+  const now = new Date()
+  const h = (handle || '').trim().toLowerCase()
+  const ref = doc(db, COL.users, uid)
+  const snap = await getDoc(ref)
+  if (!snap.exists()) {
+    await setDoc(ref, { uid, displayName: displayName.trim(), handle: h || null, createdAt: now })
+  } else {
+    await updateDoc(ref, { displayName: displayName.trim(), handle: h || null, updatedAt: now })
+  }
+}
