@@ -15,6 +15,13 @@ export async function addWatch(userId: string, ownerId: string) {
   if (snap.exists()) return; // 既存なら何もしない
   const now = new Date();
   await setDoc(ref, { id, userId, ownerId, createdAt: now } satisfies WatchDoc);
+  // 通知: ウォッチされた側へ
+  try {
+    if (ownerId !== userId) {
+      const { addNotification } = await import('./notificationRepo');
+      await addNotification({ userId: ownerId, actorId: userId, type: 'watch', watchId: id });
+    }
+  } catch (e) { /* ignore */ }
 }
 
 export async function removeWatch(userId: string, ownerId: string) {
@@ -31,6 +38,12 @@ export async function toggleWatch(userId: string, ownerId: string) {
   } else {
     const now = new Date();
     await setDoc(ref, { id, userId, ownerId, createdAt: now } satisfies WatchDoc);
+    try {
+      if (ownerId !== userId) {
+        const { addNotification } = await import('./notificationRepo');
+        await addNotification({ userId: ownerId, actorId: userId, type: 'watch', watchId: id });
+      }
+    } catch {}
   }
 }
 

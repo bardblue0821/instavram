@@ -1,5 +1,5 @@
 import { db } from '../firebase'
-import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, orderBy, limit } from 'firebase/firestore'
+import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, orderBy, limit, getDoc } from 'firebase/firestore'
 import { COL } from '../paths'
 
 export async function addComment(albumId: string, userId: string, body: string) {
@@ -7,6 +7,15 @@ export async function addComment(albumId: string, userId: string, body: string) 
   if (body.length > 200) throw new Error('TOO_LONG')
   const ref = await addDoc(collection(db, COL.comments), { albumId, userId, body, createdAt: new Date() })
   await updateDoc(ref, { id: ref.id })
+  // 通知: アルバムオーナーとコメント投稿者が異なる場合
+  try {
+    const albumSnap = await getDoc(doc(db, COL.albums, albumId))
+    const ownerId = (albumSnap.data() as any)?.ownerId
+    if (ownerId && ownerId !== userId) {
+      const { addNotification } = await import('./notificationRepo')
+      await addNotification({ userId: ownerId, actorId: userId, type: 'comment', albumId, commentId: ref.id })
+    }
+  } catch (e) { /* 通知失敗は致命的でない */ }
 }
 
 export async function updateComment(commentId: string, body: string) {

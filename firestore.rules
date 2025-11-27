@@ -106,6 +106,31 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    // notifications/{nid}
+    // 本人のみ閲覧・作成・既読化（readAt 追加）。書込は userId == auth.uid に限定。
+    match /notifications/{nid} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // 作成は「行為者が自分であること（actorId == auth.uid）」を条件に許可し、
+      // 受信者 userId は他者でも可（通知先）。初期作成時は readAt は null 固定。
+      allow create: if isSignedIn()
+        && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.keys().hasAll(['userId','actorId','type','message','createdAt','readAt'])
+        && request.resource.data.readAt == null
+        && request.resource.data.type in ['comment','like','image','friend_request','watch','repost'];
+      allow update: if isSignedIn()
+        && resource.data.userId == request.auth.uid
+        // 既読化のみ許可: readAt を null→Timestamp に変更し他フィールド不変
+        && request.resource.data.keys().hasOnly(['userId','actorId','type','message','createdAt','readAt','albumId','imageId','commentId','friendRequestId','watchId','id'])
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.actorId == resource.data.actorId
+        && request.resource.data.type == resource.data.type
+        && request.resource.data.message == resource.data.message
+        && request.resource.data.createdAt == resource.data.createdAt
+        && resource.data.readAt == null
+        && request.resource.data.readAt != null; // null 以外（既読化）
+      allow delete: if false; // 履歴保持（必要なら本人のみ許可へ変更可）
+    }
+
     // その他のパスは閉じる
     match /{document=**} {
       allow read, write: if false;

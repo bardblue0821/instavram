@@ -7,4 +7,5 @@ export const COL = {
   likes: 'likes',
   friends: 'friends',
   watches: 'watches',
+  notifications: 'notifications',
 } as const

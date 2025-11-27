@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
+import { getFirestore, initializeFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 // import { getAnalytics } from 'firebase/analytics' // ブラウザ限定で使う場合のみ
 
@@ -18,6 +18,12 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
 
 export const auth = getAuth(app)
-export const db = getFirestore(app)
+let _db;
+try {
+    _db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+} catch {
+    _db = getFirestore(app);
+}
+export const db = _db
 export const storage = getStorage(app)
 // export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null

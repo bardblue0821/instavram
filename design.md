@@ -1187,6 +1187,150 @@
 ### アルバム詳細画面の UI
 - 左
 
+### 通知（ここ）
+- ハンバーガーメニューにリンク
+- 以下を通知
+  - 他ユーザーのコメント
+  - 他ユーザーのいいね
+  - 他ユーザーのリポスト
+  - 他ユーザーの写真追加
+  - 他ユーザーのフレンド申請
+  - 他ユーザーのウォッチ登録
+- 通知画面は、以上の通知を1列に発生時刻の新しい順に並べる
+- 未確認の通知は背景を少し色付けて
+- 確認済みの通知は背景は特にいじらず
+- 一度通知画面を開いたら、未確認の通知は確認済みに変更する
+- 通知を確認できるのは本人だけ
+- URL は /notification
+
+#### 実装手順
+1) コレクション定義
+        - Firestore コレクション名: `notifications`
+        - ドキュメント構造例:
+            ```jsonc
+            {
+                "id": "auto id (doc.id)",
+                "userId": "受信者ユーザーUID",          // 通知を受け取るユーザー
+                "type": "comment|like|repost|image|friend_request|watch", // 種別
+                "actorId": "行為者UID",                 // 誰が行ったか
+                "albumId": "関連アルバムID (任意)",
+                "imageId": "関連画像ID (任意)",
+                "commentId": "関連コメントID (任意)",
+                "friendRequestId": "フレンド申請ID (任意)",
+                "watchId": "ウォッチID (任意)",
+                "message": "UI表示用の短い文 (冗長ロジック回避)", 
+                "createdAt": "Timestamp",              // 作成時刻
+                "readAt": "Timestamp|null"             // 未読は null
+            }
+            ```
+        - 最低限: `userId`,`type`,`actorId`,`createdAt` があれば表示は可能。関連 ID は type に応じて付与。
+
+2) Firestore ルール追加（概念）
+        ```
+        match /notifications/{nid} {
+            allow read: if request.auth != null && resource.data.userId == request.auth.uid; // 本人のみ閲覧
+            allow create: if request.auth != null && request.resource.data.userId == request.auth.uid; // サーバレスでクライアントが直接書く場合
+            allow update: if request.auth != null && resource.data.userId == request.auth.uid; // 既読化
+            // delete: 原則不要 (履歴保持)。必要なら本人のみ許可。
+        }
+        ```
+        - 実際には通知生成はフロントイベント後にクライアントから直接 `addDoc` する方式で十分（信頼が必要なら Cloud Functions 移行可）。
+
+3) Repository レイヤー (`lib/repos/notificationRepo.ts` 新規)
+        - `addNotification(payload)` → 種別に応じて message を生成し `addDoc`。
+        - `listNotifications(limit = 100)` → `query(collection(db, COL.notifications), where('userId','==', uid), orderBy('createdAt','desc'), limit(limit))`。
+        - `markAllRead()` → 未読のクエリをまとめて batched write で `readAt = new Date()` 設定。
+        - `subscribeNotifications(onChange)` → 上記クエリに `onSnapshot` でリアルタイム購読し、ヘッダーの未読数バッジ更新。
+
+4) イベント発生地点への組み込み
+        - コメント追加 (`addComment`) 完了後: 対象アルバムの `ownerId != actorId` なら通知。
+        - いいね追加 (`likeRepo` create) 完了後: 同様にアルバムオーナーへ通知（既に通知済み判定は不要。重複許容）。
+        - リポスト（仕様に応じた処理後）: 原アルバムのオーナーへ。
+        - 画像追加 (`addImage`) 後: アルバムオーナーと画像追加者が異なる場合に通知。
+        - フレンド申請 (`friends` 作成) 後: 申請された側 (`targetId`) に通知。
+        - ウォッチ登録 (`watches` 作成) 後: ウォッチされた側に通知。
+        - これらをサービス層（例: `createAlbumWithImages` や各 UI ハンドラ）で非同期並列に実行。
+
+5) 通知メッセージ生成ポリシー
+        - シンプルな静的テンプレ: `actorHandle` を取得できる場合は利用。
+        - 例:
+            - コメント: `"@{actor} があなたのアルバムにコメントしました"`
+            - いいね: `"@{actor} がアルバムをいいねしました"`
+            - 画像追加: `"@{actor} がアルバムに画像を追加しました"`
+            - フレンド申請: `"@{actor} からフレンド申請"`
+            - ウォッチ: `"@{actor} があなたをウォッチしました"`
+        - メッセージを保存しておくことで、表示時に追加クエリが不要 ⇒ パフォーマンス向上。
+
+6) UI 実装 `/notification` ページ
+        - クライアントコンポーネント: `NotificationsPage`
+        - 初期ロード: `listNotifications()` で取得 → `useEffect` で `subscribeNotifications` を設定し差分反映。
+        - レンダリング: 1列リスト（flex / space-y）。未読は `bg-yellow-50 dark:bg-gray-800` など薄い背景。
+        - 各行クリックで関連画面へ遷移（アルバム/プロフィールなど）。
+        - ページ初回マウント時に `markAllRead()` 実行（未読をまとめて既読化）。
+        - 項目フォーマット: 時刻 + メッセージ + アイコン（typeごと）
+
+7) ヘッダーへのバッジ
+        - `useNotificationsBadge` フック新規: `subscribeNotifications` で未読件数を state に保持。
+        - ハンバーガーメニューの通知リンクにバッジ `<span class="badge">{count}</span>` を条件表示。
+        - 未読 0 件なら非表示。
+
+8) インデックス最適化
+        - 多頻度クエリ: `where('userId','==', uid) orderBy('createdAt','desc')` の複合インデックスを Firebase Console で確認し必要なら追加（自動提案に従う）。
+
+9) パフォーマンス/負荷
+        - 通知は多くても 1 日数十～数百と想定。古い通知はページ下部で「さらに読み込む」(次ページ) に切り替える余地あり。
+        - 大量化したら: Cloud Functions で集約・`readAt == null` の件数を別フィールドにキャッシュ（`unreadCount`）。現段階は不要。
+
+10) 将来拡張の余地
+        - 通知分類タブ（コメント / ソーシャル / システム）
+        - Web Push (FCM) 連携 → `type` 拡張 + トークン管理 + Functions トリガ。
+        - 既読/未読の手動切替ボタン、全削除機能。
+
+11) 実装順序推奨
+        1. コレクションとルール追加
+        2. `notificationRepo` 作成
+        3. 生成ポイント（コメント・いいね等）にフック挿入
+        4. `/notification` ページ UI
+        5. サブスク + ヘッダーバッジ
+        6. 既読化処理（ページ初回表示時）
+        7. インデックス確認 & 微調整
+
+12) エラーハンドリング指針
+        - 通知生成失敗は本体操作（コメント投稿など）を阻害しない: `catch` して `console.warn`。
+        - 未読化/既読化失敗時は再試行ボタン、あるいは次回ページアクセス時に再度試行。
+
+#### 最低限必要ファイル（案）
+```
+lib/repos/notificationRepo.ts
+app/notification/page.tsx
+lib/hooks/useNotificationsBadge.ts
+```
+
+#### notificationRepo.ts 関数案（擬似コード）
+```ts
+export async function addNotification(n: NotificationInput) { /* addDoc */ }
+export async function listNotifications(limit=100) { /* query */ }
+export async function markAllRead() { /* batch update readAt */ }
+export function subscribeNotifications(onChange) { /* onSnapshot */ }
+```
+
+#### 型案
+```ts
+export interface NotificationDoc {
+    id: string;
+    userId: string;
+    type: 'comment'|'like'|'repost'|'image'|'friend_request'|'watch';
+    actorId: string;
+    albumId?: string; imageId?: string; commentId?: string;
+    friendRequestId?: string; watchId?: string;
+    message: string;
+    createdAt: Date | any; // Firestore Timestamp
+    readAt: Date | null | any;
+}
+```
+
+---
+
 
 ## スプリント３：テストケースを考える・テストする
 ###

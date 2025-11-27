@@ -16,6 +16,13 @@ export async function sendFriendRequest(userId: string, targetId: string) {
   if (snap.exists()) return; // 既に存在→何もしない（再送抑止）
   const now = new Date();
   await setDoc(ref, { id, userId, targetId, status: 'pending', createdAt: now } satisfies FriendDoc);
+  // 通知: 申請された側へ
+  try {
+    if (targetId !== userId) {
+      const { addNotification } = await import('./notificationRepo');
+      await addNotification({ userId: targetId, actorId: userId, type: 'friend_request', friendRequestId: id });
+    }
+  } catch (e) { /* 通知失敗は無視 */ }
 }
 
 export async function acceptFriend(userId: string, targetId: string) {
@@ -27,6 +34,11 @@ export async function acceptFriend(userId: string, targetId: string) {
   const data = snap.data() as FriendDoc;
   if (data.status === 'accepted') return; // 既に承認済み
   await updateDoc(ref, { status: 'accepted' });
+  // 通知: 承認したことを申請元に知らせる（任意：ここでは送らない。必要なら下記コメント外）
+  // try {
+  //   const { addNotification } = await import('./notificationRepo');
+  //   await addNotification({ userId, actorId: targetId, type: 'friend_request', friendRequestId: id, message: 'フレンド申請が承認されました' });
+  // } catch {}
 }
 
 export async function getFriendStatus(userId: string, targetId: string) {

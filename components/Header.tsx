@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthUser } from '../lib/hooks/useAuthUser';
 import { getUser } from '../lib/repos/userRepo';
+import { useNotificationsBadge } from '../lib/hooks/useNotificationsBadge';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import React, { useState, useEffect, useRef } from 'react';
@@ -16,6 +17,7 @@ export default function Header() {
   const [confirmLogout, setConfirmLogout] = useState(false);
   const confirmBtnRef = useRef<HTMLButtonElement | null>(null);
   const [userDoc, setUserDoc] = useState<any>(null);
+  const unread = useNotificationsBadge();
   const [theme, setTheme] = useState<'light'|'dark'>(() => {
     if (typeof window === 'undefined') return 'light';
     const stored = window.localStorage.getItem('theme');
@@ -142,6 +144,13 @@ export default function Header() {
                   role="menuitem"
                 >タイムライン</Link>
                 <Link
+                  href="/notification"
+                  onClick={closeMenu}
+                  className="block px-4 py-2 text-sm link-accent relative"
+                  role="menuitem"
+                  aria-label="通知"
+                >通知{unread>0 && <span className="ml-2 inline-block min-w-5 text-center text-[10px] px-1 py-0.5 rounded bg-red-600 text-white" aria-label={`未読通知 ${unread} 件`}>{unread}</span>}</Link>
+                <Link
                   href="/album/new"
                   onClick={closeMenu}
                   className="block px-4 py-2 text-sm link-accent"
@@ -182,7 +191,7 @@ export default function Header() {
       </div>
       {confirmLogout && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center"
+          className="fixed inset-0 z-100 flex items-center justify-center"
           aria-labelledby="logout-dialog-title"
           role="dialog"
           aria-modal="true"

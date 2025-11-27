@@ -10,6 +10,17 @@ export async function toggleLike(albumId: string, userId: string) {
     await deleteDoc(ref)
   } else {
     await setDoc(ref, { albumId, userId, createdAt: new Date() })
+    // 通知: アルバムオーナーへ（自分自身へのいいねは通知不要）
+    try {
+      const albumSnap = await getDoc(doc(db, COL.albums, albumId))
+      const ownerId = (albumSnap.data() as any)?.ownerId
+      if (ownerId && ownerId !== userId) {
+        const { addNotification } = await import('./notificationRepo')
+        await addNotification({ userId: ownerId, actorId: userId, type: 'like', albumId })
+      }
+    } catch (e) {
+      console.warn('addNotification failed (like -> notification)', e)
+    }
   }
 }
 
