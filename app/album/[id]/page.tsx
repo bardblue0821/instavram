@@ -82,7 +82,7 @@ export default function AlbumDetailPage() {
   const [accessError, setAccessError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!albumId) return;
+  if (!albumId) return;
 
     let cancelled = false;
     let unsubComments: (() => void) | undefined;
@@ -235,10 +235,12 @@ export default function AlbumDetailPage() {
         if (!album) {
           return;
         }
+        // 未ログインでも閲覧は可能（権限チェックは投稿/参加操作に限定）
         if (!user) {
           setIsFriend(false);
           setIsWatcher(false);
-          setAccessError("ログインが必要です");
+          setAccessError(null);
+          setAccessLoading(false);
           return;
         }
         if (album.ownerId === user.uid) {
@@ -407,21 +409,14 @@ export default function AlbumDetailPage() {
   }
 
   const isOwner = !!(user && album.ownerId === user.uid);
-  const canView = isOwner || isFriend || isWatcher;
+  // 公開閲覧を許可（ルールが allow read: if true のため）
+  const canView = true;
   const myCount = images.filter((img) => img.uploaderId === user?.uid).length;
   const remaining = 4 - myCount;
   const canAddImages = isOwner || isFriend;
   const canPostComment = isOwner || isFriend;
 
-  if (!user) {
-    return (
-      <div className="space-y-3 p-4">
-        <h1 className="text-lg font-semibold">アルバム</h1>
-        <p className="text-sm text-gray-600">ログインが必要です。</p>
-  <a href="/login" className="inline-block btn-accent text-sm">ログインへ</a>
-      </div>
-    );
-  }
+  // 未ログインでも閲覧は許可。操作はボタン側で disable 済み。
 
   if (accessLoading) {
     return <div className="text-sm text-gray-500">権限確認中...</div>;
@@ -533,7 +528,7 @@ export default function AlbumDetailPage() {
         <h2 className="mb-2 text-lg font-medium">コメント ({comments.length})</h2>
         <CommentList
           comments={comments}
-          currentUserId={user.uid}
+          currentUserId={user?.uid ?? ''}
           albumOwnerId={album.ownerId}
           onEditRequest={beginEditComment}
           onEditChange={(_, value) => setEditingCommentBody(value)}
