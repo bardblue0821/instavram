@@ -1,144 +1,157 @@
 "use client";
-import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useAuthUser } from '../../lib/hooks/useAuthUser';
-import { getLatestAlbums } from '../../lib/repos/albumRepo';
-import { listAcceptedFriends } from '../../lib/repos/friendRepo';
-import { listWatchedOwnerIds } from '../../lib/repos/watchRepo';
-import { translateError } from '../../lib/errors';
-import { collection, query, where, limit } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
-import { COL } from '../../lib/paths';
+import React, { useEffect, useState } from "react";
+import { useAuthUser } from "../../lib/hooks/useAuthUser";
+import { TimelineItem } from "../../components/timeline/TimelineItem";
+import { getLatestAlbums } from "../../lib/repos/albumRepo";
+import { listImages } from "../../lib/repos/imageRepo";
+import { listComments, subscribeComments } from "../../lib/repos/commentRepo";
+import { countLikes, hasLiked, toggleLike, subscribeLikes } from "../../lib/repos/likeRepo";
+import { translateError } from "../../lib/errors";
 
-interface TimelineAlbum {
-  id: string;
-  ownerId: string;
-  title: string | null;
-  createdAt: any;
-  firstImageUrl?: string;
-}
+type AlbumRow = { id: string; ownerId: string; title?: string | null; createdAt?: any };
 
 export default function TimelinePage() {
   const { user } = useAuthUser();
-  const [albums, setAlbums] = useState<TimelineAlbum[]>([]);
+  const [unsubs, setUnsubs] = useState<(() => void)[]>([]);
+  const [rows, setRows] = useState<Array<{
+    album: AlbumRow;
+    images: { url: string; uploaderId?: string }[];
+    likeCount: number;
+    liked: boolean;
+    latestComment?: { body: string; userId: string };
+  }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
-    let active = true;
+    let cancelled = false;
     (async () => {
-      setLoading(true); setError(null);
+      setLoading(true);
+      setError(null);
       try {
-        // 1. 最新アルバム取得
-        const raw: any[] = await getLatestAlbums(50);
-        // 2. フィルタ対象 ownerId セット作成
-        let allowed: Set<string> | null = null;
-        if (user) {
-          try {
-            const friends = await listAcceptedFriends(user.uid);
-            const watched = await listWatchedOwnerIds(user.uid);
-            allowed = new Set<string>();
-            allowed.add(user.uid);
-            friends.forEach(f => {
-              // friendDoc は userId->targetId/逆方向の両面 accepted を含む
-              if (f.userId === user.uid) allowed!.add(f.targetId);
-              if (f.targetId === user.uid) allowed!.add(f.userId);
-            });
-            watched.forEach(o => allowed!.add(o));
-          } catch (e:any) {
-            // friends / watches 取得失敗時は allowed=null として全件表示
-            console.warn('friend/watch fetch failed, fallback to all', e);
-            allowed = null;
-          }
-        }
-        const filtered = allowed ? raw.filter(a => allowed!.has((a as any).ownerId)) : raw;
+        const albums = await getLatestAlbums(50);
+        const enriched = await Promise.all(
+          albums.map(async (album: any) => {
+            const [imgs, cmts, likeCnt, likedFlag] = await Promise.all([
+              listImages(album.id),
+              listComments(album.id),
+              countLikes(album.id),
+              user ? hasLiked(album.id, user.uid) : Promise.resolve(false),
+            ]);
+            const latest = [...cmts]
+              .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0))
+              .slice(-1)[0];
+            const imgRows = (imgs || []).map((x: any) => ({ url: x.url || x.downloadUrl || "", uploaderId: x.uploaderId })).filter((x: any) => x.url);
+            return {
+              album,
+              images: imgRows,
+              likeCount: likeCnt,
+              liked: likedFlag,
+              latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined,
+            };
+          })
+        );
+        if (!cancelled) setRows(enriched);
+        // コメント/いいねのリアルタイム購読をセット
+        if (!cancelled) {
+          const localUnsubs: (() => void)[] = [];
+          for (let i = 0; i < enriched.length; i++) {
+            const row = enriched[i];
+            // comments: 最新コメントのみ更新
+            const cUnsub = await subscribeComments(row.album.id, (list) => {
+              const latest = [...list]
+                .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0))
+                .slice(-1)[0];
+              setRows(prev => {
+                const next = [...prev];
+                if (!next[i]) return prev;
+                next[i] = { ...next[i], latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined };
+                return next;
+              });
+            }, (err) => console.warn("comments subscribe error", err));
+            localUnsubs.push(cUnsub);
 
-        // 3. 先頭画像を取得 (各 album ごとに 1件) 並列
-        const enriched: TimelineAlbum[] = await Promise.all(filtered.map(async (a:any) => {
-          let firstImageUrl: string | undefined;
-          try {
-            const q = query(collection(db, COL.albumImages), where('albumId', '==', a.id), limit(1));
-            const { getDocs } = await import('firebase/firestore');
-            const snap = await getDocs(q);
-            snap.forEach(d => { const data = d.data() as any; if (data.url) firstImageUrl = data.url; });
-          } catch (e) {
-            // 失敗時はプレースホルダー利用
-            firstImageUrl = undefined;
+            // likes: 件数と自分の liked を更新
+            const lUnsub = await subscribeLikes(row.album.id, (list) => {
+              const cnt = list.length;
+              const meLiked = !!(user && list.some(x => x.userId === user.uid));
+              setRows(prev => {
+                const next = [...prev];
+                if (!next[i]) return prev;
+                next[i] = { ...next[i], likeCount: cnt, liked: meLiked };
+                return next;
+              });
+            }, (err) => console.warn("likes subscribe error", err));
+            localUnsubs.push(lUnsub);
           }
-          return {
-            id: a.id,
-            ownerId: a.ownerId,
-            title: a.title ?? null,
-            createdAt: a.createdAt,
-            firstImageUrl,
-          };
-        }));
-        if (active) setAlbums(enriched);
-      } catch (e:any) {
-        if (active) setError(translateError(e));
+          setUnsubs(prev => {
+            // 既存購読を解放してから置き換え
+            prev.forEach(fn => { try { fn(); } catch {} });
+            return localUnsubs;
+          });
+        }
+      } catch (e: any) {
+        if (!cancelled) setError(translateError(e));
       } finally {
-        if (active) setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-    return () => { active = false; };
-  }, [user, retryKey]);
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
 
-  function retry() { setRetryKey(k => k + 1); }
+  async function handleToggleLike(albumId: string, index: number) {
+    if (!user) return;
+    setRows((prev) => {
+      const next = [...prev];
+      const row = next[index];
+      if (!row) return prev;
+      const likedPrev = row.liked;
+      row.liked = !likedPrev;
+      row.likeCount = likedPrev ? row.likeCount - 1 : row.likeCount + 1;
+      return next;
+    });
+    try {
+      await toggleLike(albumId, user.uid);
+    } catch (e) {
+      // rollback
+      setRows((prev) => {
+        const next = [...prev];
+        const row = next[index];
+        if (!row) return prev;
+        row.liked = !row.liked;
+        row.likeCount = row.liked ? row.likeCount + 1 : row.likeCount - 1;
+        return next;
+      });
+    }
+  }
+
+  async function handleSubmitComment(albumId: string, text: string) {
+    if (!user) return;
+    const { addComment } = await import("../../lib/repos/commentRepo");
+    await addComment(albumId, user.uid, text);
+  }
+
+  if (loading) return <div className="text-sm text-gray-500">読み込み中...</div>;
+  if (error) return <div className="text-sm text-red-600">{error}</div>;
 
   return (
-    <div className="max-w-3xl mx-auto p-4 space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold">タイムライン</h1>
-        <p className="text-sm text-gray-600">最新アルバムを統合表示（フレンド/ウォッチ/自分）。</p>
-        {!user && <p className="text-xs text-gray-500">ログインすると絞り込みが有効になります。</p>}
-      </header>
-      {loading && (
-        <div className="text-sm text-gray-500">読み込み中...</div>
-      )}
-      {error && (
-        <div className="space-y-2">
-          <p className="text-sm text-red-600">{error}</p>
-          <button onClick={retry} className="text-xs px-2 py-1 rounded bg-red-600 text-white">再試行</button>
-        </div>
-      )}
-      {!loading && !error && albums.length === 0 && (
-        <p className="text-sm text-gray-700">対象アルバムがありません。</p>
-      )}
-      <ul className="grid gap-4 sm:grid-cols-2">
-        {albums.map(a => (
-          <li key={a.id} className="border rounded shadow-sm overflow-hidden bg-white dark:bg-gray-900">
-            <Link href={`/album/${a.id}`} aria-label={`アルバム: ${a.title || '無題'}`} className="block group">
-              <div className="aspect-video w-full bg-gray-100 flex items-center justify-center overflow-hidden">
-                {a.firstImageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={a.firstImageUrl} alt="thumbnail" className="w-full h-full object-cover group-hover:opacity-90 transition" />
-                ) : (
-                  <span className="text-xs text-gray-400">No Image</span>
-                )}
-              </div>
-              <div className="p-3 space-y-1">
-                <h2 className="text-sm font-medium truncate">{a.title || '無題'}</h2>
-                <p className="text-[11px] text-gray-500">owner: {a.ownerId}</p>
-                {a.createdAt && (
-                  <p className="text-[11px] text-gray-400">{formatDate(a.createdAt)}</p>
-                )}
-              </div>
-            </Link>
-          </li>
-        ))}
-      </ul>
+    <div className="max-w-2xl mx-auto space-y-6">
+      <h1 className="text-xl font-semibold">タイムライン</h1>
+      {rows.length === 0 && <p className="text-sm text-gray-500">対象アルバムがありません</p>}
+      {rows.map((row, i) => (
+        <TimelineItem
+          key={row.album.id}
+          album={row.album}
+          images={row.images}
+          likeCount={row.likeCount}
+          liked={row.liked}
+          onLike={() => handleToggleLike(row.album.id, i)}
+          latestComment={row.latestComment}
+          onCommentSubmit={user ? (text) => handleSubmitComment(row.album.id, text) : undefined}
+        />
+      ))}
     </div>
   );
 }
-
-function formatDate(v: any) {
-  try {
-    if (!v) return '';
-    // Firestore Timestamp なら toDate()
-    if (typeof v.toDate === 'function') v = v.toDate();
-    const d = v instanceof Date ? v : new Date(v);
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  } catch { return ''; }
-}
-function pad(n: number) { return n < 10 ? '0'+n : ''+n; }

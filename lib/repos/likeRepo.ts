@@ -27,3 +27,25 @@ export async function countLikes(albumId: string): Promise<number> {
   const snap = await getDocs(q)
   return snap.size
 }
+
+// タイムライン等でのリアルタイム更新用購読API
+export async function subscribeLikes(
+  albumId: string,
+  onNext: (rows: Array<{ userId?: string }>) => void,
+  onError?: (err: unknown) => void,
+): Promise<() => void> {
+  const { db } = await import('../firebase')
+  const { collection, onSnapshot, query, where } = await import('firebase/firestore')
+  const { COL } = await import('../paths')
+  const q = query(collection(db, COL.likes), where('albumId', '==', albumId))
+  const unsub = onSnapshot(
+    q,
+    (snapshot: any) => {
+      const list: Array<{ userId?: string }> = []
+      snapshot.forEach((docSnap: any) => list.push({ userId: (docSnap.data() as any).userId }))
+      onNext(list)
+    },
+    (err: unknown) => onError?.(err),
+  )
+  return () => unsub()
+}

@@ -1061,11 +1061,11 @@
 
 
 ### ユーザーの削除（TODO）
-
+- ハンバーガーメニューに作成する
 
 
 ### アルバムの削除（TODO）
-
+- 削除ボタンと、本当に？モーダルの実装
 
 
 
@@ -1079,6 +1079,68 @@
 ### ログイン画面の改修
 - /login ではなく / をログイン画面にする
 - ワンページで、左半分にそれっぽいワード、右半分に現状のログイン・新規登録の欄を
+
+
+### タイムラインをツイッターに似せる
+- タイムライン自体は1列の表示にする
+- アルバムに表示する画像サムネイルは、画像の枚数によって、表示を変える
+  - 1枚: 1枚だけ
+  - 2枚: 1行2列で表示
+  - 3枚: 2行に列だが、左1枚で右2枚
+  - 4枚: 2行2列(田んぼの田状)
+- 最新のコメントを下に表示
+- いいね数を表示、いいね可能
+- その場でコメント可能
+
+【実装手順】
+1) ページ構成
+    - ルート: `app/timeline/page.tsx`（client）。1カラムの縦並びでカードを列挙（Tailwind: `max-w-2xl mx-auto space-y-6`）。
+    - データ取得: `getLatestAlbums(50)` + 各アルバムの画像・コメント・likes を必要最小でまとめ取得。
+      - 画像: `imageRepo.listImages(albumId)` → 枚数と先頭〜最大4枚のURLを得る。
+      - 最新コメント: `commentRepo.listComments(albumId)` の末尾1件（昇順なら最後）または降順1件。
+      - いいね数: `likeRepo.countLikes(albumId)`。
+
+2) コンポーネント
+    - `components/timeline/TimelineItem.tsx`
+      - props: `{ album: AlbumDoc, images: { url:string; uploaderId:string }[], likeCount:number, latestComment?: { body:string; userId:string }, onLike:()=>void, liked:boolean, onCommentSubmit:(text:string)=>Promise<void>, submitting:boolean }`
+      - レイアウト: ヘッダー（タイトル/owner/日時）→ 画像グリッド → アクション行（♡ と件数）→ コメント入力 → 最新コメント表示。
+
+3) 画像グリッドレイアウト（枚数に応じた配置）
+    - 1枚: `grid-cols-1` で1枚全幅（ratioはオブジェクトカバー）。
+    - 2枚: `grid grid-cols-2 gap-1`。
+    - 3枚: 左1枚・右2枚構成（CSS: 親を `grid grid-cols-3 gap-1` にし、左 `col-span-2 row-span-2` で大きく、右側に上下2枚）。
+    - 4枚: `grid grid-cols-2 gap-1` を2行で均等（田状）。
+    - 実装: 枚数を判定しスロットを埋めるヘルパー `renderGrid(images)` を作成。`next/image` を利用し `sizes` を適切に指定。
+
+4) アクション & 状態
+    - いいね: ボタンは `aria-pressed` を設定。未ログインは disabled。押下時は楽観的更新→`likeRepo.toggleLike` 実行→失敗時ロールバック。
+    - コメント: 各アイテムに小さな入力欄を配置。enter送信 or ボタン押下で `commentRepo.addComment(album.id, user.uid, text)`。送信中は `submitting` 表示。
+    - 最新コメント: 最も新しい1件をカード下部に小さく表示（ユーザー名は後工程で解決）。
+
+5) スタイル指針（Tailwind）
+    - カード: `rounded border p-3 surface`。画像は `overflow-hidden rounded`。
+    - ボタン: `.btn-accent` を再利用。いいねは押下時ピンク系（独自クラスでも可）。
+    - アクセシビリティ: `aria-label` を画像群/ボタンに付与、コメント入力に `aria-label="コメント入力"`。
+
+6) 依存・ルール前提
+    - Read は公開（`allow read: if true`）を想定。Write は認証必須。未ログインはボタン disabled。
+    - 画像 URL は現状 DataURL、Storage 移行後は公開 read または署名URLで対応。
+
+7) 実装の最小ステップ（タスク）
+    - [A] `TimelineItem` を新規作成（ダミーデータで描画）
+    - [B] `app/timeline/page.tsx` で albums を取得 → 画像/最新コメント/いいね数取得を `Promise.all` で並列化
+    - [C] 画像グリッドヘルパーを導入し 1〜4 枚のパターンを実装
+    - [D] いいねボタン（楽観的 + エラー復元）、コメント入力（送信中状態）を接続
+    - [E] レスポンシブ確認（モバイル幅想定）と軽微な調整
+
+8) 後工程（任意）
+    - 画像の比率統一（サムネイル生成）
+    - 最新コメントのユーザー名表示（`getUser(userId)` 併用）
+    - likes のリアルタイム購読APIを `likeRepo.subscribeLikes(albumId)` で用意し件数の自動更新
+    - 無限スクロール / ページネーション
+
+### アルバム詳細画面の UI
+- 左
 
 
 ## スプリント３：テストケースを考える・テストする
