@@ -20,7 +20,8 @@ service cloud.firestore {
     // albums/{albumId}
     match /albums/{albumId} {
       allow read: if true;
-      allow create: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.ownerId == request.auth.uid;
       allow update: if isSignedIn()
         && resource.data.ownerId == request.auth.uid
         && request.resource.data.ownerId == resource.data.ownerId
@@ -39,7 +40,6 @@ service cloud.firestore {
           resource.data.uploaderId == request.auth.uid ||
           get(/databases/$(database)/documents/albums/$(resource.data.albumId)).data.ownerId == request.auth.uid
         );
-      // addImage 直後の updateDoc で "id" フィールドのみ追加を許可（その他の変更は不可）
       allow update: if isSignedIn()
         && resource.data.uploaderId == request.auth.uid
         && request.resource.data.keys().hasAll(['albumId','uploaderId','url','id'])
