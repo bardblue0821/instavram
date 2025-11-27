@@ -80,7 +80,10 @@ service cloud.firestore {
 
     // friends/{relationId} （ID = userId_targetId）
     match /friends/{relationId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.targetId == request.auth.uid);
+      allow read: if isSignedIn() && (
+        relationId.matches('^' + request.auth.uid + '_.*') ||
+        relationId.matches('^.*_' + request.auth.uid + '$')
+      );
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
         && relationId == request.resource.data.userId + '_' + request.resource.data.targetId
@@ -95,7 +98,11 @@ service cloud.firestore {
 
     // watches/{watchId} （ID = userId_ownerId）
     match /watches/{watchId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.ownerId == request.auth.uid);
+      // 読み取りは当事者のみ（存在しない doc の get でも判定可能なように、IDから判定）
+      allow read: if isSignedIn() && (
+        watchId.matches('^' + request.auth.uid + '_.*') ||
+        watchId.matches('^.*_' + request.auth.uid + '$')
+      );
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
         && watchId == request.resource.data.userId + '_' + request.resource.data.ownerId
