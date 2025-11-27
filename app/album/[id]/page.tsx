@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useAuthUser } from "../../../lib/hooks/useAuthUser";
 import {
   addImage,
@@ -13,7 +13,8 @@ import {
   updateComment,
   deleteComment,
 } from "../../../lib/repos/commentRepo";
-import { updateAlbum, getAlbumSafe } from "../../../lib/repos/albumRepo";
+import { updateAlbum, getAlbumSafe, deleteAlbum } from "../../../lib/repos/albumRepo";
+import { getUser } from "../../../lib/repos/userRepo";
 import {
   toggleLike,
   hasLiked,
@@ -45,6 +46,7 @@ export default function AlbumDetailPage() {
   const params = useParams();
   const albumId = params?.id as string | undefined;
   const { user } = useAuthUser();
+  const router = useRouter();
 
   const [album, setAlbum] = useState<AlbumRecord | null>(null);
   const [images, setImages] = useState<any[]>([]);
@@ -64,6 +66,8 @@ export default function AlbumDetailPage() {
   const [likeCount, setLikeCount] = useState(0);
   const [liked, setLiked] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!albumId) return;
@@ -255,6 +259,34 @@ export default function AlbumDetailPage() {
     }
   }
 
+  function askDeleteAlbum() {
+    setShowDeleteConfirm(true);
+  }
+
+  async function confirmDeleteAlbum() {
+    if (!albumId || !user) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteAlbum(albumId);
+      // 削除後の遷移（プロフィールへ）
+      try {
+        sessionStorage.setItem(
+          'app:toast',
+          JSON.stringify({ message: 'アルバムを削除しました', variant: 'success', duration: 3000 })
+        );
+      } catch {}
+      const profile = await getUser(user.uid);
+      const handle = profile?.handle || user.uid;
+      router.push(`/user/${handle}`);
+    } catch (e: any) {
+      setError(translateError(e));
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  }
+
   function beginEditComment(commentId: string) {
     const target = comments.find((c) => c.id === commentId);
     if (!target) return;
@@ -371,6 +403,13 @@ export default function AlbumDetailPage() {
               className="btn-accent text-sm disabled:opacity-50"
             >{savingAlbum ? "保存中..." : "変更を保存"}</button>
             {albumSavedMsg && <p className="text-xs text-green-600">{albumSavedMsg}</p>}
+            <div className="pt-3 border-t mt-2">
+              <button
+                type="button"
+                onClick={askDeleteAlbum}
+                className="rounded bg-red-600 px-3 py-1.5 text-sm text-white"
+              >アルバムを削除</button>
+            </div>
           </div>
         )}
       </div>
@@ -443,6 +482,29 @@ export default function AlbumDetailPage() {
         {!canAddImages && <p>※ 操作にはログインが必要です。</p>}
       </div>
       <p className="text-xs text-gray-500">※ 簡易版: 画像追加は DataURL 保存。本番は Firebase Storage 経由へ差し替え予定。</p>
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-80 rounded bg-white p-4 shadow-lg">
+            <h3 className="text-sm font-semibold">本当に削除しますか？</h3>
+            <p className="mt-2 text-xs text-gray-600">この操作は取り消せません。アルバムを削除します。</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded bg-gray-200 px-3 py-1 text-xs"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+              >キャンセル</button>
+              <button
+                type="button"
+                className="rounded bg-red-600 px-3 py-1 text-xs text-white disabled:opacity-50"
+                onClick={confirmDeleteAlbum}
+                disabled={deleting}
+              >{deleting ? "削除中..." : "削除"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

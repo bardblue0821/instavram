@@ -1,5 +1,5 @@
 import { db } from '../firebase'
-import { collection, addDoc, doc, getDoc, updateDoc, orderBy, limit, query, where } from 'firebase/firestore'
+import { collection, addDoc, doc, getDoc, updateDoc, orderBy, limit, query, where, deleteDoc } from 'firebase/firestore'
 import { COL } from '../paths'
 
 export async function createAlbum(ownerId: string, data: { title?: string; placeUrl?: string }) {
@@ -29,6 +29,11 @@ export async function updateAlbum(id: string, data: { title?: string; placeUrl?:
   if (data.placeUrl !== undefined) patch.placeUrl = data.placeUrl.trim() === '' ? null : data.placeUrl
   patch.updatedAt = new Date()
   await updateDoc(doc(db, COL.albums, id), patch)
+}
+
+// アルバム削除（オーナー本人のみルールで許可）
+export async function deleteAlbum(id: string) {
+  await deleteDoc(doc(db, COL.albums, id))
 }
 
 // Firebase 直接依存をページから排除するための薄いラッパー
