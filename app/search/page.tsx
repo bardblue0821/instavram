@@ -11,8 +11,35 @@ export default function SearchPage() {
   const [users, setUsers] = useState<UserHit[]>([]);
   const [albums, setAlbums] = useState<AlbumHit[]>([]);
   const [suggest, setSuggest] = useState<Array<{ type: "user" | "album"; label: string; href: string }>>([]);
+  const [history, setHistory] = useState<string[]>([]);
   const timer = useRef<number | null>(null);
   const normalized = useMemo(() => q.trim(), [q]);
+
+  useEffect(() => {
+    // 履歴ロード
+    try {
+      const raw = localStorage.getItem("app:search-history");
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) setHistory(arr.filter((x) => typeof x === "string"));
+      }
+    } catch {}
+  }, []);
+
+  function saveHistory(term: string) {
+    const base = term.trim();
+    if (!base) return;
+    const v = base.startsWith("@") ? base : base; // そのまま保存（表示/再検索に利用）
+    setHistory((prev) => {
+      const next = [v, ...prev.filter((x) => x !== v)].slice(0, 10);
+      try { localStorage.setItem("app:search-history", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }
+  function clearHistory() {
+    setHistory([]);
+    try { localStorage.removeItem("app:search-history"); } catch {}
+  }
 
   useEffect(() => {
     if (timer.current) window.clearTimeout(timer.current);
@@ -59,6 +86,13 @@ export default function SearchPage() {
     };
   }, [normalized]);
 
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      const base = normalized.startsWith("@") ? normalized : normalized; // 表示通り保存
+      if (base) saveHistory(base);
+    }
+  }
+
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-5">
       <h1 className="text-xl font-semibold">検索</h1>
@@ -68,14 +102,34 @@ export default function SearchPage() {
           autoFocus
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          onKeyDown={onKeyDown}
           placeholder="ユーザー名 / @ハンドル / アルバム名 / 説明 / コメント"
           className="w-full border-b-2 border-blue-500 bg-transparent p-2 text-sm focus:outline-none"
         />
+        {!normalized && history.length > 0 && (
+          <div className="mt-2">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs text-gray-600">最近の検索</p>
+              <button type="button" onClick={clearHistory} className="text-[11px] text-gray-500 underline">クリア</button>
+            </div>
+            <ul className="border rounded divide-y">
+              {history.map((h, i) => (
+                <li key={i} className="text-sm">
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-2 hover:bg-gray-50 truncate"
+                    onClick={() => setQ(h)}
+                  >{h}</button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {suggest.length > 0 && (
           <ul className="mt-2 border rounded divide-y">
             {suggest.map((s, i) => (
               <li key={i} className="text-sm">
-                <Link href={s.href} className="block px-3 py-2 hover:bg-gray-50">
+                <Link href={s.href} className="block px-3 py-2 hover:bg-gray-50" onClick={() => saveHistory(normalized)}>
                   {s.type === "user" ? "👤 " : "📁 "}{s.label}
                 </Link>
               </li>
