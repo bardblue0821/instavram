@@ -31,6 +31,21 @@ export async function updateAlbum(id: string, data: { title?: string; placeUrl?:
   await updateDoc(doc(db, COL.albums, id), patch)
 }
 
+// Firebase 直接依存をページから排除するための薄いラッパー
+export async function getAlbumSafe(albumId: string): Promise<{ id: string; [k: string]: any } | null> {
+  try {
+    const { db } = await import("../firebase");
+    const { doc, getDoc } = await import("firebase/firestore");
+    const { COL } = await import("../paths");
+    const ref = doc(db, COL.albums, albumId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...(snap.data() as any) };
+  } catch (e) {
+    throw e;
+  }
+}
+
 // タイムライン暫定取得（フィルタは呼び出し側で）
 export async function getLatestAlbums(limitCount = 50) {
   const q = query(collection(db, COL.albums), orderBy('createdAt', 'desc'), limit(limitCount))

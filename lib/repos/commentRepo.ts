@@ -51,3 +51,31 @@ export async function listCommentsByUser(userId: string, limitCount = 50) {
     throw e
   }
 }
+
+// アルバムのコメント一覧（ページでの初期表示用）
+export async function listComments(albumId: string): Promise<Array<{ id: string; [k: string]: any }>> {
+  const q = query(collection(db, COL.comments), where('albumId', '==', albumId))
+  const { getDocs } = await import('firebase/firestore')
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }))
+}
+
+// コメント購読（ページでのリアルタイム更新用）
+export async function subscribeComments(
+  albumId: string,
+  onNext: (rows: Array<{ id: string; [k: string]: any }>) => void,
+  onError?: (err: unknown) => void,
+): Promise<() => void> {
+  const { onSnapshot } = await import('firebase/firestore')
+  const q = query(collection(db, COL.comments), where('albumId', '==', albumId))
+  const unsub = onSnapshot(
+    q,
+    (snapshot: any) => {
+      const list: Array<{ id: string; [k: string]: any }> = []
+      snapshot.forEach((docSnap: any) => list.push({ id: docSnap.id, ...(docSnap.data() as any) }))
+      onNext(list)
+    },
+    (err: unknown) => onError?.(err),
+  )
+  return () => unsub()
+}

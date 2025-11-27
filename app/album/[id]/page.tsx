@@ -1,17 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  onSnapshot,
-  query,
-  where,
-} from "firebase/firestore";
-import { db } from "../../../lib/firebase";
-import { COL } from "../../../lib/paths";
 import { useAuthUser } from "../../../lib/hooks/useAuthUser";
 import {
   addImage,
@@ -24,16 +13,15 @@ import {
   updateComment,
   deleteComment,
 } from "../../../lib/repos/commentRepo";
-import { updateAlbum } from "../../../lib/repos/albumRepo";
+import { updateAlbum, getAlbumSafe } from "../../../lib/repos/albumRepo";
 import {
   toggleLike,
   hasLiked,
   countLikes,
 } from "../../../lib/repos/likeRepo";
-import { getFriendStatus } from "../../../lib/repos/friendRepo";
-import { isWatched } from "../../../lib/repos/watchRepo";
 import { translateError } from "../../../lib/errors";
 import { CommentList } from "../../../components/comments/CommentList";
+import { listComments, subscribeComments } from "../../../lib/repos/commentRepo";
 import { CommentForm } from "../../../components/comments/CommentForm";
 import { ERR } from "../../../types/models";
 
@@ -76,13 +64,9 @@ export default function AlbumDetailPage() {
   const [likeCount, setLikeCount] = useState(0);
   const [liked, setLiked] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
-  const [accessLoading, setAccessLoading] = useState(true);
-  const [isFriend, setIsFriend] = useState(false);
-  const [isWatcher, setIsWatcher] = useState(false);
-  const [accessError, setAccessError] = useState<string | null>(null);
 
   useEffect(() => {
-  if (!albumId) return;
+    if (!albumId) return;
 
     let cancelled = false;
     let unsubComments: (() => void) | undefined;
@@ -91,20 +75,17 @@ export default function AlbumDetailPage() {
       setLoading(true);
       setError(null);
       try {
-        const albumRef = doc(db, COL.albums, albumId);
-        const albumSnap = await getDoc(albumRef);
-        if (!albumSnap.exists()) {
+        const albumSnap = await getAlbumSafe(albumId);
+        if (!albumSnap) {
           if (!cancelled) {
             setAlbum(null);
             setImages([]);
             setComments([]);
-            setAccessLoading(false);
             setError("アルバムが見つかりません");
           }
           return;
         }
-
-        const albumData = { id: albumSnap.id, ...(albumSnap.data() as any) } as AlbumRecord;
+        const albumData = albumSnap as AlbumRecord;
         if (cancelled) return;
         setAlbum(albumData);
         setEditTitle(albumData.title ?? "");
@@ -119,41 +100,28 @@ export default function AlbumDetailPage() {
           );
           setImages(imgs);
         }
-
-        const initialComments = await getDocs(
-          query(collection(db, COL.comments), where("albumId", "==", albumId)),
-        );
+        const initialComments = await listComments(albumId);
         if (!cancelled) {
-          const list: CommentRecord[] = [];
-          initialComments.forEach((docSnap) => {
-            list.push({ id: docSnap.id, ...(docSnap.data() as any) });
-          });
-          list.sort(
+          const list = [...initialComments].sort(
             (a, b) =>
               (a.createdAt?.seconds || a.createdAt || 0) -
               (b.createdAt?.seconds || b.createdAt || 0),
           );
-          setComments(list);
+          setComments(list as CommentRecord[]);
         }
 
-        unsubComments = onSnapshot(
-          query(collection(db, COL.comments), where("albumId", "==", albumId)),
-          (snapshot) => {
+        unsubComments = await subscribeComments(
+          albumId,
+          (snapshotList) => {
             if (cancelled) return;
-            const list: CommentRecord[] = [];
-            snapshot.forEach((docSnap) => {
-              list.push({ id: docSnap.id, ...(docSnap.data() as any) });
-            });
-            list.sort(
+            const list = [...snapshotList].sort(
               (a, b) =>
                 (a.createdAt?.seconds || a.createdAt || 0) -
                 (b.createdAt?.seconds || b.createdAt || 0),
             );
-            setComments(list);
+            setComments(list as CommentRecord[]);
           },
-          (err) => {
-            console.warn("comments subscribe error", err);
-          },
+          (err) => console.warn("comments subscribe error", err),
         );
       } catch (e: any) {
         if (!cancelled) {
@@ -197,21 +165,6 @@ export default function AlbumDetailPage() {
           setLiked(likedFlag);
           setLikeCount(cnt);
         }
-
-        unsubLikes = onSnapshot(
-          query(collection(db, COL.likes), where("albumId", "==", albumId)),
-          (snap) => {
-            if (cancelled) return;
-            const likedUsers = new Set<string>();
-            snap.forEach((docSnap) => {
-              const data = docSnap.data() as any;
-              if (data.userId) likedUsers.add(data.userId);
-            });
-            setLikeCount(snap.size);
-            setLiked(likedUsers.has(user.uid));
-          },
-          (err) => console.warn("likes subscribe error", err),
-        );
       } catch (e: any) {
         if (!cancelled) setError(translateError(e));
       }
@@ -222,53 +175,6 @@ export default function AlbumDetailPage() {
       if (unsubLikes) unsubLikes();
     };
   }, [albumId, user?.uid]);
-
-  useEffect(() => {
-    if (!albumId) return;
-
-    let cancelled = false;
-
-    (async () => {
-      setAccessLoading(true);
-      setAccessError(null);
-      try {
-        if (!album) {
-          return;
-        }
-        // 未ログインでも閲覧は可能（権限チェックは投稿/参加操作に限定）
-        if (!user) {
-          setIsFriend(false);
-          setIsWatcher(false);
-          setAccessError(null);
-          setAccessLoading(false);
-          return;
-        }
-        if (album.ownerId === user.uid) {
-          setIsFriend(false);
-          setIsWatcher(false);
-          setAccessError(null);
-          return;
-        }
-
-        const [status, watched] = await Promise.all([
-          getFriendStatus(user.uid, album.ownerId),
-          isWatched(user.uid, album.ownerId),
-        ]);
-        if (cancelled) return;
-        setIsFriend(status === "accepted");
-        setIsWatcher(watched);
-        setAccessError(null);
-      } catch (e: any) {
-        if (!cancelled) setAccessError(translateError(e));
-      } finally {
-        if (!cancelled) setAccessLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [albumId, album, user]);
 
   async function handleAddImage() {
     if (!user || !albumId || !file) return;
@@ -339,8 +245,8 @@ export default function AlbumDetailPage() {
     try {
       await updateAlbum(albumId, { title: editTitle, placeUrl: editPlaceUrl });
       setAlbumSavedMsg("保存しました");
-      const albumSnap = await getDoc(doc(db, COL.albums, albumId));
-      if (albumSnap.exists()) setAlbum({ id: albumSnap.id, ...(albumSnap.data() as any) });
+      const updated = await getAlbumSafe(albumId);
+      if (updated) setAlbum(updated as AlbumRecord);
     } catch (e: any) {
       setError(translateError(e));
     } finally {
@@ -409,28 +315,10 @@ export default function AlbumDetailPage() {
   }
 
   const isOwner = !!(user && album.ownerId === user.uid);
-  // 公開閲覧を許可（ルールが allow read: if true のため）
-  const canView = true;
   const myCount = images.filter((img) => img.uploaderId === user?.uid).length;
   const remaining = 4 - myCount;
-  const canAddImages = isOwner || isFriend;
-  const canPostComment = isOwner || isFriend;
-
-  // 未ログインでも閲覧は許可。操作はボタン側で disable 済み。
-
-  if (accessLoading) {
-    return <div className="text-sm text-gray-500">権限確認中...</div>;
-  }
-
-  if (!canView) {
-    return (
-      <div className="space-y-2 p-4">
-        <h1 className="text-lg font-semibold">アルバム</h1>
-        <p className="text-sm text-red-600">閲覧権限がありません。</p>
-        {accessError && <p className="text-xs text-gray-500">{accessError}</p>}
-      </div>
-    );
-  }
+  const canAddImages = !!user;
+  const canPostComment = !!user;
 
   return (
     <div className="space-y-6">
@@ -552,9 +440,7 @@ export default function AlbumDetailPage() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="space-y-1 text-xs text-gray-500">
-        <p>権限: {isOwner ? "オーナー" : isFriend ? "フレンド" : isWatcher ? "ウォッチャー" : "その他"}</p>
-        {!canAddImages && <p>※ 画像追加はオーナーまたはフレンドのみ。</p>}
-        {!canPostComment && <p>※ コメント投稿はオーナーまたはフレンドのみ。</p>}
+        {!canAddImages && <p>※ 操作にはログインが必要です。</p>}
       </div>
       <p className="text-xs text-gray-500">※ 簡易版: 画像追加は DataURL 保存。本番は Firebase Storage 経由へ差し替え予定。</p>
     </div>
