@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuthUser } from '../../../lib/hooks/useAuthUser';
 import { getUserByHandle, updateUser, isHandleTaken } from '../../../lib/repos/userRepo';
@@ -10,6 +10,10 @@ import { getAlbum } from '../../../lib/repos/albumRepo';
 import { getFriendStatus, sendFriendRequest, acceptFriend, cancelFriendRequest, removeFriend } from '../../../lib/repos/friendRepo';
 import { isWatched, addWatch, removeWatch } from '../../../lib/repos/watchRepo';
 import { translateError } from '../../../lib/errors';
+import { useToast } from '../../../components/ui/Toast';
+import { deleteAccountData } from '../../../lib/services/deleteAccount';
+import { auth } from '../../../lib/firebase';
+import { deleteUser, reauthenticateWithCredential, EmailAuthProvider, reauthenticateWithPopup, GoogleAuthProvider } from 'firebase/auth';
 
 export default function ProfilePage() {
   const params = useParams();
@@ -39,6 +43,14 @@ export default function ProfilePage() {
   const [detailsOpen, setDetailsOpen] = useState(false); // 詳細折りたたみ状態
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false); // 破棄確認モーダル
   const [skipDiscardNextBlur, setSkipDiscardNextBlur] = useState(false); // 保存ボタン押下で blur を無視
+  // アカウント削除 UI
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [agreeDelete, setAgreeDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteStep, setDeleteStep] = useState<string>("");
+  const [pw, setPw] = useState('');
+  const { show } = useToast();
+  const authProvider = useMemo(() => (user?.providerData?.[0]?.providerId || 'password'), [user?.uid]);
 
   useEffect(() => {
     if (!handleParam) return;
@@ -156,6 +168,44 @@ export default function ProfilePage() {
     } finally {
       setWatchBusy(false);
     }
+  }
+
+  async function doDeleteAccount() {
+    if (!user) return;
+    try {
+      setDeleting(true);
+      setDeleteStep('再認証中...');
+      if (authProvider === 'password') {
+        const email = user.email || '';
+        const cred = EmailAuthProvider.credential(email, pw);
+        await reauthenticateWithCredential(user, cred);
+      } else if (authProvider === 'google.com') {
+        try {
+          const provider = new GoogleAuthProvider();
+          await reauthenticateWithPopup(user, provider);
+        } catch {}
+      }
+      setDeleteStep('データ削除中...');
+      await deleteAccountData(user.uid, (step) => setDeleteStep(`データ削除中: ${step}`));
+      setDeleteStep('アカウント削除中...');
+      await deleteUser(user);
+      try {
+        sessionStorage.setItem('app:toast', JSON.stringify({ message: 'アカウントを削除しました', variant: 'success' }));
+      } catch {}
+      window.location.href = '/';
+    } catch (e:any) {
+      const msg = translateError(e);
+      setError(msg);
+      try { show({ message: msg, variant: 'error' }); } catch {}
+      setDeleting(false);
+    }
+  }
+
+  async function reauthGoogle() {
+    try {
+      const provider = new GoogleAuthProvider();
+      await reauthenticateWithPopup(auth.currentUser!, provider);
+    } catch {}
   }
 
   if (loading) return <div className="p-4 text-sm text-gray-500">読み込み中...</div>;
@@ -319,6 +369,13 @@ export default function ProfilePage() {
         {saveMsg && <p className="text-xs text-green-700">{saveMsg}</p>}
         {error && <p className="text-xs text-red-600">{error}</p>}
       </header>
+      {isMe && (
+        <section className="space-y-2 pt-4 border-t">
+          <h2 className="text-lg font-medium text-red-700">危険区域</h2>
+          <p className="text-sm text-gray-700">アカウントと関連データを削除します。この操作は取り消せません。</p>
+          <button type="button" onClick={()=> setShowDeleteAccount(true)} className="rounded bg-red-600 px-3 py-1.5 text-sm text-white">アカウントを削除</button>
+        </section>
+      )}
       {!isMe && user && (
         <section className="space-y-2">
           <h2 className="text-lg font-medium">フレンド</h2>
@@ -420,6 +477,34 @@ export default function ProfilePage() {
           </div>
         </div>
       </section>
+      {showDeleteAccount && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded shadow-lg p-4 w-96 space-y-3">
+            <h3 className="text-sm font-semibold text-red-700">アカウント削除の確認</h3>
+            <p className="text-xs text-gray-700">この操作は元に戻せません。作成したアルバム/コメント/いいね/フレンド/ウォッチは削除されます（通知は残る場合があります）。</p>
+            <label className="flex items-center gap-2 text-xs text-gray-700">
+              <input type="checkbox" checked={agreeDelete} onChange={e=> setAgreeDelete(e.target.checked)} />
+              理解しました
+            </label>
+            {authProvider === 'password' && (
+              <div>
+                <label className="block text-xs text-gray-700 mb-1">パスワード（再認証）</label>
+                <input type="password" value={pw} onChange={e=> setPw(e.target.value)} className="w-full border-b-2 border-blue-500 bg-transparent p-1 text-sm focus:outline-none" placeholder="現在のパスワード" />
+              </div>
+            )}
+            {deleting && (
+              <p className="text-xs text-gray-600">処理中: {deleteStep || '...'}</p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button type="button" className="px-2 py-1 text-xs rounded bg-gray-200" disabled={deleting} onClick={()=> setShowDeleteAccount(false)}>キャンセル</button>
+              {authProvider === 'google.com' && (
+                <button type="button" className="px-2 py-1 text-xs rounded bg-gray-600 text-white" disabled={deleting} onClick={reauthGoogle}>Googleで再認証</button>
+              )}
+              <button type="button" className="px-2 py-1 text-xs rounded bg-red-600 text-white disabled:opacity-50" disabled={!agreeDelete || deleting || (authProvider==='password' && !pw)} onClick={doDeleteAccount}>削除</button>
+            </div>
+          </div>
+        </div>
+      )}
       {showDiscardConfirm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded shadow-lg p-4 w-80 space-y-4">

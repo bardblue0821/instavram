@@ -1106,12 +1106,112 @@
 
 
 ### ユーザーの削除（TODO）
-- ハンバーガーメニューに作成する
+- 目的: 本人が自分のアカウントと関連データを安全に削除できるようにする。
+- スコープ:
+  - Firebase Auth ユーザー本体
+  - Firestore: `users/{uid}`、当人が作成/関与したデータ（albums, albumImages, comments, likes, friends, watches, notifications など）
+  - Storage: （将来 Storage を使う場合）当人がアップロードしたファイル
+
+【設計方針】
+1) セーフティレイヤ
+    - 二重確認モーダル（「この操作は取り消せません」）。
+    - 直前の再認証（Re-auth）。パスワード/Google それぞれの再認証フローに対応。
+    - 進捗表示と部分失敗時のリトライ/再開可能性（ページ離脱の抑止）。
+
+2) 実装戦略（2択）
+    - A. クライアント主導削除（最小実装）
+      - 手順: Firestore で当人のドキュメント群をクエリ→分割削除→最後に Auth ユーザーを `deleteUser`。
+      - 前提: Firestore ルールが本人の削除を許可（本プロジェクトの現行ルールは概ね許容。`notifications` の delete は不可＝残置でOK）。
+      - 注意: 500 件/バッチ制限あり。コレクションごとにページングして削除。
+    - B. Cloud Functions（Admin）で一括削除（推奨）
+      - `functions:callable` or HTTPS で `deleteUserData` を実装。Admin SDK で横断削除 + Auth 削除まで行う。
+      - 利点: ルール制約を受けず確実・高速。クライアントのネットワーク/拡張機能の影響を受けにくい。
+      - 追加: App Check/ロール制御で濫用防止。再認証済みトークンの検証。
+
+【削除対象とクエリ】
+- users: `users/{uid}`（本人）
+- albums: `where('ownerId','==', uid)` → ドキュメント削除
+- albumImages: `where('uploaderId','==', uid)` → 削除
+- comments: `where('userId','==', uid)` → 削除
+- likes: `where('userId','==', uid)` → 削除
+- friends: 当人が `userId` の行、当人が `targetId` の行 → いずれも削除
+- watches: `where('userId','==', uid)` と `where('ownerId','==', uid)` → 双方向で削除
+- notifications:
+  - 当人宛（`where('userId','==', uid)`）は削除したいが、現行ルールは `delete:false`。方針:
+     - クライアント実装Aの場合: 残置（履歴として保持）。
+     - Functions実装Bの場合: Admin SDK で削除可（後述の関数で対応）。
+- Storage（将来）: パス設計に応じて `listAll`→`delete`。現状は DataURL 保存のため対象外。
+
+【クライアント主導の削除フロー（A）】
+1. UI
+    - 場所: プロフィール画面（`/user/{handle}`）または「設定」ページに「アカウントを削除」ボタン。
+    - クリック → 確認モーダル（チェックボックス「理解しました」+ 二重確認）
+2. 再認証
+    - Email/Password: `reauthenticateWithCredential`
+    - Google: `reauthenticateWithPopup`
+3. Firestore 削除（順序）
+    - likes → comments → watches → friends → albumImages → albums → users の順でページング削除（1回 max 300〜450 件単位で安全に）。
+    - 各コレクション: `query(..., limit(300))` → `getDocs` → `writeBatch` → `commit` をループ。
+4. Auth 削除
+    - `deleteUser(auth.currentUser)` を呼ぶ。
+5. 完了
+    - トースト「アカウントを削除しました」表示 → `/` へ遷移。
+6. エラー復旧
+    - 途中失敗は再試行可能。idempotent に設計（同じ削除を繰り返しても整合性が崩れない）。
+
+【Cloud Functions（B）の削除フロー】
+1. 関数
+    - `functions/src/index.ts` に `exports.deleteUserData = onCall(...)` を実装。
+    - サーバ側で以下を実施:
+      - 上記「削除対象とクエリ」を Admin SDK で並列/分割削除（バッチ上限に注意）。
+      - Admin Auth で `deleteUser(uid)`。
+    - セキュリティ: `context.auth.uid` が対象 uid と一致すること、App Check 検証、レート制限。
+2. クライアント
+    - 再認証後、`httpsCallable('deleteUserData')({})` を呼ぶ → 成功ならサインアウト＆リダイレクト。
+3. 進捗
+    - callable の返り値で件数サマリを返す or ログID を返して進捗ポーリング。
+
+【UI仕様（最小）】
+- ボタン文言: 「アカウントを削除」
+- モーダル本文: 「この操作は元に戻せません。作成したアルバム/コメント/いいね/フレンド/ウォッチは削除（通知は履歴として残る場合があります）。本当に削除しますか？」
+- 確認操作: チェックボックス + 「削除」ボタン（二重確認）
+- 完了後: トースト + `/` へ遷移
+
+【ルール/権限の確認】
+- comments/likes/watches/friends は本人なら delete 可（現行ルールでOK）。
+- albums は ownerId == auth.uid のみ delete 可（OK）。
+- users は `users/{uid}` を本人が delete 可（OK）。
+- notifications は delete: false（残置方針 or Functionsでのみ削除）。
+
+【擬似コード（A: クライアント）】
+```
+await reauthenticate();
+for (const spec of [likes, comments, watchesUser, watchesOwner, friendsUser, friendsTarget, images, albums]) {
+  while (true) {
+     const qs = await getDocs(query(spec.base, spec.where, limit(300)));
+     if (qs.empty) break;
+     const batch = writeBatch(db);
+     qs.forEach(d => batch.delete(d.ref));
+     await batch.commit();
+  }
+}
+await deleteDoc(doc(db, 'users', uid));
+await deleteUser(auth.currentUser);
+```
+
+【テスト観点】
+- データ件数 0/少量/大量での動作、途中失敗時の再実行、再認証必須フロー、ルール拒否が無いこと。
+- friends 双方向の削除、watches の双方向削除確認。
+- 通知が残る前提の文言整合（プライバシー方針）。
+
+【将来拡張】
+- 完全削除（notifications も含め Admin で完全抹消）。
+- Soft delete（`users.deletedAt` を先に立てて UI 非表示→バックグラウンドで物理削除）。
+- エクスポート機能（削除前にデータをダウンロード）。
 
 
-### アルバムの削除（TODO）
+### アルバムの削除
 - 削除ボタンと、本当に？モーダルの実装
-
 
 
 ### 不具合の報告（TODO）
@@ -1184,10 +1284,10 @@
     - likes のリアルタイム購読APIを `likeRepo.subscribeLikes(albumId)` で用意し件数の自動更新
     - 無限スクロール / ページネーション
 
-### アルバム詳細画面の UI
-- 左
+### アルバム詳細画面の UI (TODO)
+- 左半面が画像一覧、右に情報
 
-### 通知（ここ）
+### 通知
 - ハンバーガーメニューにリンク
 - 以下を通知
   - 他ユーザーのコメント
