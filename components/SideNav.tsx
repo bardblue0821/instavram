@@ -52,6 +52,14 @@ function IconKey() {
     </svg>
   );
 }
+function IconGear() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 0010 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 005.4 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 005.4 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 5.4a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09c0 .67.39 1.28 1 1.51a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0018.6 9c.67 0 1.28.39 1.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+    </svg>
+  );
+}
 
 function makeItems(authed: boolean): Item[] {
   const arr: Item[] = [
@@ -129,8 +137,10 @@ export default function SideNav() {
 
   if (!mounted || hide) return null;
 
+  const iconColorClass = currentTheme === 'dark' ? 'text-white' : 'text-black';
+
   return (
-    <nav aria-label="メインナビ" className="hidden sm:flex w-16 shrink-0 flex-col items-center gap-3 py-3 border-r border-base sticky top-0 h-dvh surface">
+    <nav aria-label="メインナビ" className="hidden sm:flex w-16 shrink-0 flex-col items-center gap-3 py-3 border-r border-base sticky top-0 h-dvh sidenav-bg">
       {/* Profile on top */}
       <div className="mt-1 mb-1">
         <Link
@@ -145,6 +155,7 @@ export default function SideNav() {
       {items.map((it) => {
         const active = path?.startsWith(it.href);
         const isNew = it.key === 'new';
+        const iconClass = isNew ? 'text-white' : iconColorClass;
         return (
           <Link
             key={it.key}
@@ -153,7 +164,7 @@ export default function SideNav() {
             aria-label={it.label}
             className={`relative flex items-center justify-center w-12 h-12 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent] ${isNew ? 'btn-accent-square' : 'hover-surface-alt'} ${!isNew && active ? 'surface-alt' : ''}`}
           >
-            <span className={`text-xl leading-none ${isNew ? 'text-(--accent-fg)' : 'text-gray-700 dark:text-gray-200'}`} aria-hidden>
+            <span className={`text-xl leading-none ${iconClass}`} aria-hidden>
               {it.icon}
             </span>
             {it.badge && unread > 0 && (
@@ -176,7 +187,7 @@ export default function SideNav() {
           title="設定"
           onClick={() => setMenuOpen(o => !o)}
         >
-          <span className="text-xl" aria-hidden>⚙️</span>
+          <span className={`text-xl ${iconColorClass}`} aria-hidden><IconGear /></span>
         </button>
         {menuOpen && (
           <div ref={menuRef} className="absolute bottom-14 left-0 z-50 surface border border-base rounded-md shadow-md min-w-40 p-2">

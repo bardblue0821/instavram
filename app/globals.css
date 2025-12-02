@@ -112,7 +112,6 @@ body {
 /* Square accent button for icon-only controls in nav */
 .btn-accent-square {
   background-color: var(--accent);
-  color: var(--accent-fg);
   border-radius: 0.5rem;
   display: inline-flex;
   align-items: center;
@@ -124,6 +123,10 @@ body {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* SideNav dark-specific background */
+.sidenav-bg { background-color: var(--surface); }
+:root.theme-dark .sidenav-bg { background-color: #000000; }
 
 .link-accent {
   color: var(--accent);
