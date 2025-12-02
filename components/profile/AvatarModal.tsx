@@ -1,0 +1,97 @@
+"use client";
+import React, { useRef, useState } from 'react';
+import { storage } from '../../lib/firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import AvatarCropper from './AvatarCropper';
+import { getCroppedBlob } from '../../lib/services/avatar';
+import { updateUserIcon } from '../../lib/repos/userRepo';
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  uid: string;
+  src?: string | null;
+  alt?: string;
+  editable?: boolean;
+  onUpdated?: (url: string) => void;
+}
+
+export default function AvatarModal({ open, onClose, uid, src, alt = 'ユーザーアイコン', editable, onUpdated }: Props) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [stage, setStage] = useState<'view'|'crop'>('view');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+
+  if (!open) return null;
+
+  const pickFile = () => inputRef.current?.click();
+
+  const onFile = (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setError('画像ファイルを選択してください'); return; }
+    if (file.size > 5 * 1024 * 1024) { setError('5MB 以下の画像を選択してください'); return; }
+    const url = URL.createObjectURL(file);
+    setPreviewSrc(url);
+    setStage('crop');
+  };
+
+  const onConfirmCrop = async (area: { x: number; y: number; width: number; height: number }, _zoom: number) => {
+    if (!previewSrc) return;
+    try {
+      setBusy(true); setError(null);
+      const blob = await getCroppedBlob(previewSrc, area, 512, 'image/jpeg', 0.9);
+      const path = `users/${uid}/icon/512.jpg`;
+      const ref = storageRef(storage, path);
+      await uploadBytes(ref, blob, { contentType: 'image/jpeg' });
+      const url = await getDownloadURL(ref);
+      await updateUserIcon(uid, url);
+      onUpdated?.(url);
+      onClose();
+    } catch (e: any) {
+      setError(e.message || '保存に失敗しました');
+    } finally {
+      setBusy(false);
+      setStage('view');
+      if (previewSrc) URL.revokeObjectURL(previewSrc);
+      setPreviewSrc(null);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+      <div className="bg-white rounded shadow-lg w-[min(96vw,600px)] p-4 relative" onClick={(e)=>e.stopPropagation()}>
+        <button className="absolute top-2 right-2 text-gray-600" onClick={onClose} aria-label="閉じる">✕</button>
+        {stage === 'view' && (
+          <div className="space-y-3">
+            <div className="mx-auto w-64 h-64 overflow-hidden border rounded-lg">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={src || ''} alt={alt} className="object-cover w-full h-full" />
+            </div>
+            {editable && (
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded bg-gray-800 text-white"
+                  onClick={pickFile}
+                  aria-label="アイコンを変更"
+                >
+                  ✎ アイコンを変更
+                </button>
+                <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e)=> onFile(e.target.files?.[0] || undefined)} />
+              </div>
+            )}
+            {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
+          </div>
+        )}
+        {stage === 'crop' && previewSrc && (
+          <div>
+            <AvatarCropper src={previewSrc} onCancel={()=>{ setStage('view'); setPreviewSrc(null); }} onConfirm={onConfirmCrop} />
+            {busy && <p className="text-xs text-gray-600 mt-2">保存中...</p>}
+            {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

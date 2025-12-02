@@ -14,6 +14,8 @@ import { useToast } from '../../../components/ui/Toast';
 import { deleteAccountData } from '../../../lib/services/deleteAccount';
 import { auth } from '../../../lib/firebase';
 import { deleteUser, reauthenticateWithCredential, EmailAuthProvider, reauthenticateWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import Avatar from '../../../components/profile/Avatar';
+import AvatarModal from '../../../components/profile/AvatarModal';
 
 export default function ProfilePage() {
   const params = useParams();
@@ -51,6 +53,7 @@ export default function ProfilePage() {
   const [pw, setPw] = useState('');
   const { show } = useToast();
   const authProvider = useMemo(() => (user?.providerData?.[0]?.providerId || 'password'), [user?.uid]);
+  const [avatarOpen, setAvatarOpen] = useState(false);
 
   useEffect(() => {
     if (!handleParam) return;
@@ -342,8 +345,13 @@ export default function ProfilePage() {
   return (
     <div className="max-w-xl mx-auto p-4 space-y-6">
       <header className="space-y-3">
-        <h1 className="text-2xl font-semibold">プロフィール</h1>
-        <p className="text-sm text-gray-700">UID: {profile.uid}</p>
+        <div className="flex items-center gap-4">
+          <Avatar src={profile.iconURL ? `${profile.iconURL}${profile.iconUpdatedAt ? `?v=${new Date(profile.iconUpdatedAt.seconds ? profile.iconUpdatedAt.toDate?.() : profile.iconUpdatedAt).getTime()}` : ''}` : undefined} size={72} onClick={()=> setAvatarOpen(true)} />
+          <div>
+            <h1 className="text-2xl font-semibold">プロフィール</h1>
+            <p className="text-sm text-gray-700">UID: {profile.uid}</p>
+          </div>
+        </div>
   <FieldText label="表示名" value={profile.displayName || ''} placeholder="（表示名未設定）" field="displayName" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
   <FieldText prefix="@" label="ハンドル" value={profile.handle || ''} placeholder="（ハンドル未設定）" field="handle" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
   <FieldTextarea label="自己紹介" value={profile.bio || ''} placeholder="未設定" field="bio" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
@@ -369,6 +377,15 @@ export default function ProfilePage() {
         {saveMsg && <p className="text-xs text-green-700">{saveMsg}</p>}
         {error && <p className="text-xs text-red-600">{error}</p>}
       </header>
+      <AvatarModal
+        open={avatarOpen}
+        onClose={()=> setAvatarOpen(false)}
+        uid={profile.uid}
+        src={profile.iconURL || undefined}
+        alt={(profile.displayName || profile.handle || 'ユーザー') + 'のアイコン'}
+        editable={!!isMe}
+        onUpdated={(url)=> setProfile((p:any)=> ({ ...p, iconURL: url, iconUpdatedAt: new Date() }))}
+      />
       {isMe && (
         <section className="space-y-2 pt-4 border-t">
           <h2 className="text-lg font-medium text-red-700">危険区域</h2>

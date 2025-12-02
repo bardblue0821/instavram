@@ -1180,7 +1180,127 @@
 ### ハンバーガーメニューではなく、端にアイコンで常時表示（TODO）
 
 
-### プロフィールアイコン設定（TODO）
+### プロフィールアイコン設定（ここ）
+- プロフィール画面でアイコンを設定できる
+- アイコンをプロフィール画面に表示する
+- そのアイコンをクリックすると、アイコンが拡大表示される
+- アイコン拡大表示時に鉛筆アイコンを表示する
+- 鉛筆アイコンをクリックすると、画像を選択できる
+- 選択した画像から、正方形にどこをくりぬくかを選択できる
+
+【実装手順（具体）】
+1) データモデル / 保存先
+     - users ドキュメントに `iconURL: string | null` と `iconUpdatedAt: Date` を追加。
+     - Storage パス設計（例）:
+         - オリジナル: `users/{uid}/icon/original.{ext}`
+         - 派生サムネ: `users/{uid}/icon/512.jpg`, `users/{uid}/icon/128.jpg`, `users/{uid}/icon/48.jpg`
+     - 形式: `image/jpeg` もしくは `image/webp`（初期は jpeg）。最大 5MB を上限（フロントで検証）。
+
+2) セキュリティルール
+     - Firestore（`users` 更新は本人のみ。iconURL のみ更新許可する最小案）
+         ```
+         match /users/{uid} {
+             allow read: if true;
+             allow update: if request.auth != null && uid == request.auth.uid;
+             // 厳格化するなら: keys 制限
+             // allow update: if request.auth != null && uid == request.auth.uid &&
+             //   request.resource.data.diff(resource.data).changedKeys().hasOnly(['iconURL','iconUpdatedAt']);
+         }
+         ```
+     - Storage（本人のみ自分の `users/{uid}/icon/**` に書き込み可能。読み取りは公開）
+         ```
+         service firebase.storage {
+             match /b/{bucket}/o {
+                 match /users/{uid}/icon/{allPaths=**} {
+                     allow read: if true;
+                     allow write: if request.auth != null && request.auth.uid == uid;
+                 }
+             }
+         }
+         ```
+
+3) 依存パッケージ（フロント）
+     - 画像トリミング: `react-easy-crop`
+     - インストール（開発環境）:
+         ```
+         npm i react-easy-crop
+         ```
+
+4) UI 構成 / ファイル
+     - `components/profile/Avatar.tsx`: 円形アバター（直径 40〜96px）。クリックで拡大モーダルを開く。
+     - `components/profile/AvatarModal.tsx`: 拡大表示 + 右下に鉛筆ボタン。鉛筆クリックでファイル選択（input type="file" hidden, accept="image/*"）。
+     - `components/profile/AvatarCropper.tsx`: 画像選択後に正方形トリミング UI（`react-easy-crop`、aspect=1）。ズーム/パン対応。確定/キャンセルボタン。
+     - `lib/services/avatar.ts`: クロップ結果を Canvas で生成するユーティリティ（`getCroppedImageBlob(image, crop, zoom, size)`）。サイズは 512px 正方形（必要に応じ 128/48 も生成）。
+     - 既存 `lib/repos/userRepo.ts` に `updateUserIcon(uid, iconURL)` を追加。
+
+5) 画面動線 / 状態管理
+     - プロフィールページにアバターを表示（`user.iconURL ?? プレースホルダー`）。
+     - 自分のプロフィール閲覧時のみアバターにホバーで鉛筆オーバーレイを表示（モバイルは拡大モーダル内の鉛筆ボタン）。
+     - フロー:
+         1. アバタークリック → 拡大モーダル表示。
+         2. モーダル右下の鉛筆クリック → ファイル選択ダイアログ。
+         3. ファイル選択後 → クロッパーモードに切替（正方形選択）。
+         4. 「切り抜いて保存」押下 → Canvas 生成 → Storage へアップロード → ダウンロードURL取得。
+         5. `users/{uid}.iconURL` を最新版 URL に更新（キャッシュバスター付与）。
+
+6) 画像処理（ブラウザ）
+     - `react-easy-crop` から得た `cropAreaPixels` を使い、Canvas でトリミング。
+     - 生成サイズは 512x512（`toBlob('image/jpeg', 0.9)` 推奨）。必要なら同時に 128/48 も生成。
+     - ファイルサイズ検証: 5MB を超える入力はエラー表示（「5MB 以下の画像を選択してください」）。
+
+7) アップロードと URL 更新
+     - パス: `users/{uid}/icon/512.jpg`（同名上書き）。
+     - アップロード: `uploadBytes(ref, blob, { contentType: 'image/jpeg' })` → `getDownloadURL(ref)`。
+     - キャッシュ破り: 表示側は `iconURL + '?v=' + Date.now()` を一度だけ付ける or Firestore に `iconUpdatedAt` を保存してクエリパラメータに使う。
+     - 更新: `await updateUserIcon(uid, url)`（`iconURL`,`iconUpdatedAt` を保存）。
+
+8) 表示（Next/Image と CORS）
+     - `next.config.ts` の `images.remotePatterns` に `firebasestorage.googleapis.com` を許可（既存設定が無ければ追加）。
+         例:
+         ```ts
+         images: {
+             remotePatterns: [
+                 { protocol: 'https', hostname: 'firebasestorage.googleapis.com' },
+             ],
+         },
+         ```
+     - 代替テキスト: `alt={displayName + 'のアイコン'}`。
+
+9) アクセシビリティ / UX
+     - モーダルは ESC/背景クリックで閉じる。タブフォーカスはモーダル内にトラップ。
+     - 鉛筆ボタンに `aria-label="アイコンを変更"`。
+     - エラー時は `role="alert"` エリアで表示。アップロード中はスピナーとボタン disabled。
+
+10) 擬似コード（要点）
+     ```ts
+     // AvatarModal 内の主要ロジック
+     const onFile = async (file: File) => {
+         if (!file.type.startsWith('image/')) return setError('画像ファイルを選択してください');
+         if (file.size > 5 * 1024 * 1024) return setError('5MB 以下の画像を選択してください');
+         setStage('crop'); setSrc(URL.createObjectURL(file));
+     };
+
+     const onCropConfirm = async () => {
+         setBusy(true);
+         const blob = await getCroppedBlob(src, cropAreaPixels, 512); // image/jpeg
+         const ref = storageRef(storage, `users/${uid}/icon/512.jpg`);
+         await uploadBytes(ref, blob, { contentType: 'image/jpeg' });
+         const url = await getDownloadURL(ref);
+         await updateUserIcon(uid, url);
+         setBusy(false); close();
+     };
+     ```
+
+11) テスト観点
+     - 未設定 → プレースホルダー表示 → 設定後に差し替わる。
+     - 画像選択 → クロップ → 保存でプロフィール/タイムライン双方のアバターが更新。
+     - 大きすぎる画像/非画像ファイルでエラーメッセージ表示。
+     - モバイル（ピンチズーム）でクロップ操作可能。
+
+12) 将来拡張
+     - Cloud Functions でサーバ側サムネイル自動生成（原本 1 つアップロード → 48/128/512 を生成）。
+     - 顔検出で自動トリミング初期位置提案。
+     - 透過 PNG/WebP の保持、ダーク背景での見え方微調整。
 
 
 ### ユーザーの削除

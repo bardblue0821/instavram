@@ -7,6 +7,8 @@ export interface UserDoc {
   uid: string;
   displayName: string;
   handle: string | null;
+  iconURL?: string | null;
+  iconUpdatedAt?: Date | null;
   bio?: string | null;            // 最大500文字 (保存時サニタイズ)
   vrchatUrl?: string | null;      // VRChat関連URL 1件 (http/https, "vrchat" を含む簡易チェック推奨)
   links?: string[];               // その他URL 最大3件 (http/https)
@@ -64,6 +66,8 @@ export async function updateUser(uid: string, patch: Partial<UserDoc>) {
     ...(birthDate !== undefined ? { birthDate: birthDate || null } : {}),
     ...(displayName !== undefined ? { displayName: displayName || '' } : {}),
     ...(handle !== undefined ? { handle: handle || null } : {}),
+    ...(patch.iconURL !== undefined ? { iconURL: patch.iconURL || null } : {}),
+    ...(patch.iconUpdatedAt !== undefined ? { iconUpdatedAt: patch.iconUpdatedAt || null } : {}),
     updatedAt: now
   })
 }
@@ -108,4 +112,11 @@ export async function ensureUserWithHandle(uid: string, displayName: string, han
   } else {
     await updateDoc(ref, { displayName: displayName.trim(), handle: h || null, updatedAt: now })
   }
+}
+
+// アイコンURLの更新専用（updatedAt と iconUpdatedAt を同時に更新）
+export async function updateUserIcon(uid: string, iconURL: string | null) {
+  const ref = doc(db, COL.users, uid)
+  const now = new Date()
+  await updateDoc(ref, { iconURL: iconURL || null, iconUpdatedAt: now, updatedAt: now })
 }
