@@ -122,7 +122,14 @@ export function TimelineItem(props: {
   return (
     <article className="rounded border p-3 space-y-3">
       <header className="space-y-1">
-        {album.title && <h3 className="text-base font-semibold">{album.title}</h3>}
+        {album.title && (
+          <h3 className="text-base font-semibold">
+            <a
+              href={`/album/${album.id}`}
+              className="hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+            >{album.title}</a>
+          </h3>
+        )}
         <p className="text-xs text-gray-500">owner: {album.ownerId}</p>
       </header>
 
