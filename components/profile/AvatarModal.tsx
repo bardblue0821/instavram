@@ -59,12 +59,12 @@ export default function AvatarModal({ open, onClose, uid, src, alt = 'ユーザ�
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
-      <div className="bg-white rounded shadow-lg w-[min(96vw,600px)] p-4 relative" onClick={(e)=>e.stopPropagation()}>
-        <button className="absolute top-2 right-2 text-gray-600" onClick={onClose} aria-label="閉じる">✕</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="surface-alt border border-base rounded shadow-lg w-[min(96vw,600px)] p-4 relative" onClick={(e)=>e.stopPropagation()}>
+        <button className="absolute top-2 right-2 fg-muted hover-surface-alt rounded px-2 py-1" onClick={onClose} aria-label="閉じる">✕</button>
         {stage === 'view' && (
           <div className="space-y-3">
-            <div className="mx-auto w-64 h-64 overflow-hidden border rounded-lg">
+            <div className="mx-auto w-64 h-64 overflow-hidden border border-base rounded-lg surface">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={src || ''} alt={alt} className="object-cover w-full h-full" />
             </div>
@@ -72,7 +72,7 @@ export default function AvatarModal({ open, onClose, uid, src, alt = 'ユーザ�
               <div className="flex justify-center">
                 <button
                   type="button"
-                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded bg-gray-800 text-white"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded btn-accent"
                   onClick={pickFile}
                   aria-label="アイコンを変更"
                 >
@@ -87,7 +87,7 @@ export default function AvatarModal({ open, onClose, uid, src, alt = 'ユーザ�
         {stage === 'crop' && previewSrc && (
           <div>
             <AvatarCropper src={previewSrc} onCancel={()=>{ setStage('view'); setPreviewSrc(null); }} onConfirm={onConfirmCrop} />
-            {busy && <p className="text-xs text-gray-600 mt-2">保存中...</p>}
+            {busy && <p className="text-xs fg-muted mt-2">保存中...</p>}
             {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
           </div>
         )}
