@@ -7,6 +7,7 @@ import { listImages } from "../../lib/repos/imageRepo";
 import { listComments, subscribeComments } from "../../lib/repos/commentRepo";
 import { countLikes, hasLiked, toggleLike, subscribeLikes } from "../../lib/repos/likeRepo";
 import { listReactionsByAlbum, toggleReaction } from "../../lib/repos/reactionRepo";
+import { addNotification } from "../../lib/repos/notificationRepo";
 import { translateError } from "../../lib/errors";
 
 type AlbumRow = { id: string; ownerId: string; title?: string | null; createdAt?: any };
@@ -152,7 +153,18 @@ export default function TimelinePage() {
       next[index] = { ...row };
       return next;
     });
-    toggleReaction(albumId, user.uid, emoji).catch(() => {
+    toggleReaction(albumId, user.uid, emoji).then(result => {
+      const row = rows[index];
+      if (result.added && row && row.album.ownerId !== user.uid) {
+        addNotification({
+          userId: row.album.ownerId,
+          actorId: user.uid,
+          type: 'reaction',
+          albumId,
+          message: 'アルバムにリアクション: ' + emoji,
+        }).catch(()=>{});
+      }
+    }).catch(() => {
       // 失敗時ロールバック: 再取得のコストを避け簡易ロールバック
       setRows((prev) => {
         const next = [...prev];

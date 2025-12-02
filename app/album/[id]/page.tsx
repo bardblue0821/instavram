@@ -26,6 +26,7 @@ import { listComments, subscribeComments } from "../../../lib/repos/commentRepo"
 import { CommentForm } from "../../../components/comments/CommentForm";
 import { ERR } from "../../../types/models";
 import { listReactionsByAlbum, toggleReaction, listReactorsByAlbumEmoji, Reactor } from "../../../lib/repos/reactionRepo";
+import { addNotification } from "../../../lib/repos/notificationRepo";
 import { REACTION_EMOJIS, REACTION_CATEGORIES, filterReactionEmojis } from "../../../lib/constants/reactions";
 
 type CommentRecord = {
@@ -281,7 +282,17 @@ export default function AlbumDetailPage() {
       }
     });
     try {
-      await toggleReaction(albumId, user.uid, emoji);
+      const result = await toggleReaction(albumId, user.uid, emoji);
+      if ((result as any).added && album && album.ownerId !== user.uid) {
+        // 通知作成（失敗しても UI には影響させない）
+        addNotification({
+          userId: album.ownerId,
+          actorId: user.uid,
+          type: 'reaction',
+          albumId,
+          message: 'アルバムにリアクション: ' + emoji,
+        }).catch(() => {});
+      }
     } catch (e:any) {
       // ロールバック
       setReactions(prev);

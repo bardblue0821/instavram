@@ -2,7 +2,7 @@ import { db } from '../firebase'
 import { COL } from '../paths'
 import { collection, addDoc, query, where, orderBy, limit, writeBatch, doc, setDoc } from 'firebase/firestore'
 
-export type NotificationType = 'comment'|'like'|'image'|'friend_request'|'watch'|'repost'
+export type NotificationType = 'comment'|'like'|'image'|'friend_request'|'watch'|'repost'|'reaction'
 
 export interface NotificationInput {
   userId: string          // 受信者
@@ -25,6 +25,7 @@ function buildMessage(p: NotificationInput): string {
     case 'friend_request': return 'フレンド申請が届きました'
     case 'watch': return 'あなたがウォッチされました'
     case 'repost': return 'あなたの投稿がリポストされました'
+    case 'reaction': return 'リアクションが付きました'
     default: return '新しい通知'
   }
 }

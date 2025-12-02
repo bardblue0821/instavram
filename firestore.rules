@@ -127,7 +127,7 @@ service cloud.firestore {
         && request.resource.data.actorId == request.auth.uid
         && request.resource.data.keys().hasAll(['userId','actorId','type','message','createdAt','readAt'])
         && request.resource.data.readAt == null
-        && request.resource.data.type in ['comment','like','image','friend_request','watch','repost'];
+        && request.resource.data.type in ['comment','like','image','friend_request','watch','repost','reaction'];
       allow update: if isSignedIn()
         && resource.data.userId == request.auth.uid
         // 既読化のみ許可: readAt を null→Timestamp に変更し他フィールド不変
