@@ -6,6 +6,7 @@ import { getLatestAlbums } from "../../lib/repos/albumRepo";
 import { listImages } from "../../lib/repos/imageRepo";
 import { listComments, subscribeComments } from "../../lib/repos/commentRepo";
 import { countLikes, hasLiked, toggleLike, subscribeLikes } from "../../lib/repos/likeRepo";
+import { listReactionsByAlbum, toggleReaction } from "../../lib/repos/reactionRepo";
 import { translateError } from "../../lib/errors";
 
 type AlbumRow = { id: string; ownerId: string; title?: string | null; createdAt?: any };
@@ -19,6 +20,7 @@ export default function TimelinePage() {
     likeCount: number;
     liked: boolean;
     latestComment?: { body: string; userId: string };
+    reactions: { emoji: string; count: number; mine: boolean }[];
   }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,11 +34,12 @@ export default function TimelinePage() {
         const albums = await getLatestAlbums(50);
         const enriched = await Promise.all(
           albums.map(async (album: any) => {
-            const [imgs, cmts, likeCnt, likedFlag] = await Promise.all([
+            const [imgs, cmts, likeCnt, likedFlag, reactions] = await Promise.all([
               listImages(album.id),
               listComments(album.id),
               countLikes(album.id),
               user ? hasLiked(album.id, user.uid) : Promise.resolve(false),
+              listReactionsByAlbum(album.id, user?.uid),
             ]);
             const latest = [...cmts]
               .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0))
@@ -48,6 +51,7 @@ export default function TimelinePage() {
               likeCount: likeCnt,
               liked: likedFlag,
               latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined,
+                reactions,
             };
           })
         );
@@ -127,6 +131,51 @@ export default function TimelinePage() {
     }
   }
 
+  function handleToggleReaction(albumId: string, index: number, emoji: string) {
+    if (!user) return;
+    // 楽観更新
+    setRows((prev) => {
+      const next = [...prev];
+      const row = next[index];
+      if (!row) return prev;
+      const list = row.reactions.slice();
+      const idx = list.findIndex((x) => x.emoji === emoji);
+      if (idx >= 0) {
+        const item = { ...list[idx] };
+        if (item.mine) { item.mine = false; item.count = Math.max(0, item.count - 1); }
+        else { item.mine = true; item.count += 1; }
+        list[idx] = item;
+      } else {
+        list.push({ emoji, count: 1, mine: true });
+      }
+      row.reactions = list;
+      next[index] = { ...row };
+      return next;
+    });
+    toggleReaction(albumId, user.uid, emoji).catch(() => {
+      // 失敗時ロールバック: 再取得のコストを避け簡易ロールバック
+      setRows((prev) => {
+        const next = [...prev];
+        const row = next[index];
+        if (!row) return prev;
+        const list = row.reactions.slice();
+        const idx = list.findIndex((x) => x.emoji === emoji);
+        if (idx >= 0) {
+          const item = { ...list[idx] };
+          if (item.mine) { // 失敗=前操作無効なので反転
+            item.mine = false; item.count = Math.max(0, item.count - 1);
+          } else {
+            item.mine = true; item.count += 1;
+          }
+          list[idx] = item;
+        }
+        row.reactions = list;
+        next[index] = { ...row };
+        return next;
+      });
+    });
+  }
+
   async function handleSubmitComment(albumId: string, text: string) {
     if (!user) return;
     const { addComment } = await import("../../lib/repos/commentRepo");
@@ -150,6 +199,8 @@ export default function TimelinePage() {
           onLike={() => handleToggleLike(row.album.id, i)}
           latestComment={row.latestComment}
           onCommentSubmit={user ? (text) => handleSubmitComment(row.album.id, text) : undefined}
+          reactions={row.reactions}
+          onToggleReaction={(emoji) => handleToggleReaction(row.album.id, i, emoji)}
         />
       ))}
     </div>

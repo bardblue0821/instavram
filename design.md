@@ -1507,7 +1507,62 @@ export interface NotificationDoc {
 }
 ```
 
----
+### プロフィールにハッシュタグをつけて検索できる
+- 検索の条件に増やせる
+
+### リアクション絵文字（ここ）
+- アルバムに対するいいねは、絵文字を選択することができます。
+- WindowsやiOSで標準に装備する絵文字をいいねできます。
+- DiscordやMiskyの機能が近いです。
+- ひとりで複数の絵文字をいいねすることができます
+
+実装手順（具体）
+1) データモデル/コレクション
+- `reactions` コレクションを追加（既存 `likes` はそのまま/将来統合）。
+    - フィールド: `id`, `albumId`, `userId`, `emoji`, `createdAt`
+    - 制約: 同一ユーザーは同一アルバムに対し同一絵文字を複数回は押せない（1件/emoji）。別絵文字は複数可。
+
+2) Firestore ルール
+- `reactions`:
+    - create: `request.auth.uid == userId` かつ `(album.owner が閲覧可能)` 前提（公開アルバムなら可）。
+    - delete: `request.auth.uid == userId` の本人のみ。update は不可（削除→再作成で対応）。
+    - 重複防止はクライアントでIDに `albumId:userId:emoji` を採用し、既存時はエラーに。
+
+3) リポジトリ `lib/repos/reactionRepo.ts`
+- `toggleReaction(albumId, userId, emoji)`:
+    - 事前に `docId = `${albumId}:${userId}:${emoji}`` を生成。
+    - `getDoc` で存在チェック → あれば `deleteDoc`、無ければ `setDoc`（`createdAt: new Date()`）。
+- `listReactionsByAlbum(albumId)`:
+    - 該当アルバムの全リアクションを取得し、`emoji` ごとに `count` 集計＋自分が押したかフラグを返す。
+
+4) UI（アルバム詳細 `app/album/[id]/page.tsx`）
+- 既存「いいね」周辺に絵文字ピッカーを追加。
+    - Webネイティブ絵文字の簡易ピッカー（例: よく使う数種をプリセット: 👍❤️🎉😆😮🙏⭐️ など）
+    - 押下時に `toggleReaction` 実行、楽観的更新（即時 UI 反映、失敗時ロールバック）。
+- 表示: 絵文字ごとのカウントバッジ + 自分が押した絵文字にはハイライト。
+
+5) アクセシビリティ/入力方法
+- PC: ボタン群クリック（ホバーでラベル表示）。
+- モバイル: タップで追加/削除。長押しでピッカー展開（任意実装）。
+- キーボード: Tab 移動＋Enterで反応可能。aria-label を付与。
+
+6) パフォーマンス
+- アルバム詳細表示時に `listReactionsByAlbum` を1回取得。
+- サブスクライブ（任意）: `onSnapshot` で同アルバムのリアクションを購読し、リアルタイム更新。
+- カウントはクライアント集計（上限問題が出たら Cloud Functions で集計キャッシュを検討）。
+
+7) テスト観点
+- 同一ユーザーが同一絵文字を二重に押せないこと（docId 衝突）。
+- 複数絵文字は押せること（docId が異なる）。
+- 削除でカウント減少＆ハイライト解除。
+- 未ログイン時は押下不可（ログイン誘導）。
+- 多端末で同時更新時に UI が正しく同期する。
+
+8) 実装タスク（最小）
+- `lib/repos/reactionRepo.ts` 追加（toggle/list）。
+- アルバム詳細UIにピッカーとカウント表示を追加。
+- Firestore ルールに `reactions` セクション追加。
+- 任意: よく使う絵文字セットの定義を `lib/constants/reactions.ts` に用意。
 
 
 ## スプリント３：テストケースを考える・テストする

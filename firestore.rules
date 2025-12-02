@@ -6,6 +6,17 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // reactions/{rid} （ID = albumId:userId:emoji）
+    match /reactions/{rid} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && rid == request.resource.data.albumId + ':' + request.resource.data.userId + ':' + request.resource.data.emoji
+        && request.resource.data.keys().hasAll(['albumId','userId','emoji','createdAt']);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow update: if false;
+    }
+
     function isUser(uid) {
       return isSignedIn() && request.auth.uid == uid;
     }

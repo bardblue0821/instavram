@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthUser } from "../../../lib/hooks/useAuthUser";
 import {
@@ -25,6 +25,8 @@ import { CommentList } from "../../../components/comments/CommentList";
 import { listComments, subscribeComments } from "../../../lib/repos/commentRepo";
 import { CommentForm } from "../../../components/comments/CommentForm";
 import { ERR } from "../../../types/models";
+import { listReactionsByAlbum, toggleReaction, listReactorsByAlbumEmoji, Reactor } from "../../../lib/repos/reactionRepo";
+import { REACTION_EMOJIS, REACTION_CATEGORIES, filterReactionEmojis } from "../../../lib/constants/reactions";
 
 type CommentRecord = {
   id: string;
@@ -68,6 +70,20 @@ export default function AlbumDetailPage() {
   const [likeBusy, setLikeBusy] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [reactions, setReactions] = useState<{ emoji: string; count: number; mine: boolean }[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [emojiQuery, setEmojiQuery] = useState("");
+  const [activeCat, setActiveCat] = useState(REACTION_CATEGORIES[0]?.key || 'faces');
+  const pickerRef = useRef<HTMLDivElement | null>(null);
+  const pickerBtnRef = useRef<HTMLButtonElement | null>(null);
+  const [hoveredEmoji, setHoveredEmoji] = useState<string | null>(null);
+  const [reactorMap, setReactorMap] = useState<Record<string, Reactor[] | undefined>>({});
+  const [reactorLoading, setReactorLoading] = useState<Record<string, boolean>>({});
+  const filteredEmojis = useMemo(() => filterReactionEmojis(emojiQuery), [emojiQuery]);
+  const categoryEmojis = useMemo(() => {
+    const cat = REACTION_CATEGORIES.find(c => c.key === activeCat);
+    return cat ? cat.emojis : [];
+  }, [activeCat]);
 
   useEffect(() => {
     if (!albumId) return;
@@ -127,6 +143,9 @@ export default function AlbumDetailPage() {
           },
           (err) => console.warn("comments subscribe error", err),
         );
+        // リアクション取得
+        const r = await listReactionsByAlbum(albumId, user?.uid);
+        if (!cancelled) setReactions(r);
       } catch (e: any) {
         if (!cancelled) {
           setError(translateError(e));
@@ -207,6 +226,27 @@ export default function AlbumDetailPage() {
     }
   }
 
+  // ピッカー外クリック/ESCで閉じる
+  useEffect(() => {
+    if (!pickerOpen) return;
+    function onMouseDown(e: MouseEvent) {
+      const t = e.target as Node;
+      if (pickerRef.current && !pickerRef.current.contains(t) && pickerBtnRef.current && !pickerBtnRef.current.contains(t)) {
+        setPickerOpen(false);
+      }
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setPickerOpen(false); }
+    window.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [pickerOpen]);
+
+  // 開くたびに検索語をクリア
+  useEffect(() => { if (pickerOpen) setEmojiQuery(""); }, [pickerOpen]);
+
   async function handleToggleLike() {
     if (!user || !albumId) return;
     setLikeBusy(true);
@@ -223,6 +263,45 @@ export default function AlbumDetailPage() {
     } finally {
       setLikeBusy(false);
     }
+  }
+
+  async function handleToggleReaction(emoji: string) {
+    if (!user || !albumId) return;
+    const prev = reactions.slice();
+    // 楽観更新
+    setReactions((cur) => {
+      const idx = cur.findIndex((x) => x.emoji === emoji);
+      if (idx >= 0) {
+        const item = { ...cur[idx] };
+        if (item.mine) { item.mine = false; item.count = Math.max(0, item.count - 1); }
+        else { item.mine = true; item.count += 1; }
+        const next = cur.slice(); next[idx] = item; return next;
+      } else {
+        return [...cur, { emoji, count: 1, mine: true }];
+      }
+    });
+    try {
+      await toggleReaction(albumId, user.uid, emoji);
+    } catch (e:any) {
+      // ロールバック
+      setReactions(prev);
+      setError(translateError(e));
+    }
+  }
+
+  function onChipEnter(emoji: string) {
+    if (!albumId) return;
+    setHoveredEmoji(emoji);
+    if (!reactorMap[emoji] && !reactorLoading[emoji]) {
+      setReactorLoading((s) => ({ ...s, [emoji]: true }));
+      listReactorsByAlbumEmoji(albumId, emoji, 20)
+        .then((list) => setReactorMap((m) => ({ ...m, [emoji]: list })))
+        .catch(() => {})
+        .finally(() => setReactorLoading((s) => ({ ...s, [emoji]: false })));
+    }
+  }
+  function onChipLeave() {
+    setHoveredEmoji(null);
   }
 
   async function handleDeleteImage(id: string) {
@@ -358,7 +437,7 @@ export default function AlbumDetailPage() {
         <h1 className="mb-2 text-2xl font-semibold">アルバム詳細</h1>
         <p className="text-sm text-gray-700">ID: {album.id}</p>
         {!isOwner && album.title && <p className="mt-1 text-lg">{album.title}</p>}
-        <div className="mt-2 flex items-center gap-3">
+        <div className="mt-2 relative flex items-center gap-3">
           <div className="flex items-center gap-1">
             <button
               aria-pressed={liked}
@@ -367,6 +446,107 @@ export default function AlbumDetailPage() {
               className={`rounded border px-2 py-1 text-sm ${liked ? "border-pink-600 bg-pink-600 text-white" : "border-gray-300 bg-white text-gray-700"} disabled:opacity-50`}
             >{liked ? "♥ いいね済み" : "♡ いいね"}</button>
             <span className="text-xs text-gray-600">{likeCount}</span>
+          </div>
+          {/* リアクション絵文字（ピッカー） */}
+          <div className="ml-4 flex items-center gap-2 flex-wrap">
+            {/* 現在の集計をチップ表示（1以上のみ表示、クリックでトグル） */}
+            {reactions.filter(r => r.count > 0).map((r) => {
+              const mine = r.mine;
+              const count = r.count;
+              return (
+                <div key={r.emoji} className="relative" onMouseEnter={() => onChipEnter(r.emoji)} onMouseLeave={onChipLeave}>
+                  <button
+                    type="button"
+                    aria-label={`リアクション ${r.emoji}`}
+                    aria-pressed={mine}
+                    onClick={() => handleToggleReaction(r.emoji)}
+                    className={`rounded border px-2 py-1 text-sm ${mine ? "border-blue-600 bg-blue-50 text-blue-700" : "border-gray-300 bg-white text-gray-700"}`}
+                  >{r.emoji} <span className="text-xs">{count}</span></button>
+                  {hoveredEmoji === r.emoji && (
+                    <div className="absolute left-0 top-full mt-1 w-64 rounded border border-gray-300 bg-white text-gray-800 shadow-lg z-50">
+                      <div className="p-2">
+                        <p className="text-[11px] text-gray-500 mb-1">このリアクションをした人</p>
+                        {reactorLoading[r.emoji] && <p className="text-xs text-gray-500">読み込み中...</p>}
+                        {!reactorLoading[r.emoji] && (
+                          (reactorMap[r.emoji] && reactorMap[r.emoji]!.length > 0) ? (
+                            <ul className="max-h-64 overflow-auto divide-y divide-gray-100">
+                              {reactorMap[r.emoji]!.map((u) => (
+                                <li key={u.uid}>
+                                  <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50">
+                                    {u.iconURL ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img src={u.iconURL} alt="" className="h-5 w-5 rounded-full object-cover" />
+                                    ) : (
+                                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-[10px] text-gray-600">{u.displayName?.[0] || '?'}</span>
+                                    )}
+                                    <span className="text-sm font-medium">{u.displayName}</span>
+                                    <span className="text-[11px] text-gray-500">@{u.handle || u.uid.slice(0,6)}</span>
+                                  </a>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-xs text-gray-500">まだいません</p>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            <button
+              ref={pickerBtnRef}
+              type="button"
+              disabled={!user}
+              onClick={() => setPickerOpen((o) => !o)}
+              className="rounded border px-2 py-1 text-sm border-gray-300 bg-white text-gray-700 disabled:opacity-50"
+            >＋リアクション</button>
+            {pickerOpen && (
+              <div ref={pickerRef} className="absolute top-full left-0 mt-2 w-80 surface-alt border border-base rounded shadow-lg p-2 z-50">
+                <p className="text-xs text-gray-600 mb-2">絵文字を選択してください（再選択で解除）</p>
+                <input
+                  autoFocus
+                  value={emojiQuery}
+                  onChange={(e)=> setEmojiQuery(e.target.value)}
+                  placeholder="検索（例: ハート / fire / 👍 を貼付）"
+                  className="mb-2 w-full border-b-2 border-blue-500 bg-transparent p-1 text-sm focus:outline-none"
+                />
+                {/* カテゴリタブ（検索時は非表示） */}
+                {!emojiQuery && (
+                  <div className="mb-2 flex flex-wrap gap-1">
+                    {REACTION_CATEGORIES.map(cat => (
+                      <button
+                        key={cat.key}
+                        type="button"
+                        aria-label={cat.label}
+                        title={cat.label}
+                        onClick={() => setActiveCat(cat.key)}
+                        className={`flex items-center justify-center w-9 h-9 text-lg rounded border ${activeCat===cat.key ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300'}`}
+                      >{cat.icon}</button>
+                    ))}
+                  </div>
+                )}
+                <div className="max-h-64 overflow-auto">
+                  <div className="grid grid-cols-6 gap-2">
+                  {(emojiQuery ? filteredEmojis : categoryEmojis).map((e) => {
+                    const rec = reactions.find((x) => x.emoji === e);
+                    const mine = !!rec?.mine;
+                    return (
+                      <button
+                        key={e}
+                        type="button"
+                        aria-label={`リアクション ${e}`}
+                        aria-pressed={mine}
+                        onClick={() => { handleToggleReaction(e); setPickerOpen(false); }}
+                        className={`rounded border px-2 py-1 text-sm ${mine ? "border-blue-600 bg-blue-600 text-white" : "border-gray-300 bg-white text-gray-700"}`}
+                      >{e}</button>
+                    );
+                  })}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         {!isOwner && album.placeUrl && (
