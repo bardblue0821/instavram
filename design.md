@@ -1177,10 +1177,97 @@
 - 追加（任意）: 既存データ移行スクリプト（小文字フィールド投入）。
 
 
-### ハンバーガーメニューではなく、端にアイコンで常時表示（TODO）
+### ハンバーガーメニューではなく、端にアイコンで常時表示
+- ハンバーガーメニューの全内容を、左側に縦列に常駐させる
+
+【実装手順（具体）】
+1) コンポーネント新規: `components/SideNav.tsx`
+     - 目的: 左端に常設する縦レールのナビゲーション。
+     - 構成: アイテム配列を map してアイコンボタンを縦配置（依存追加なし。まずは絵文字/inline SVG で開始）。
+     - 状態: `useAuthUser()` でログイン状態に応じた項目切替（プロフィール or ログイン）。`useNotificationsBadge()` で未読バッジ。
+     - 現在ページ: `usePathname()` で active 判定し、背景 or 左ボーダーで強調。
+     - 雛形:
+         ```tsx
+         "use client";
+         import Link from 'next/link';
+         import { usePathname } from 'next/navigation';
+         import { useAuthUser } from '@/lib/hooks/useAuthUser';
+         import { useNotificationsBadge } from '@/lib/hooks/useNotificationsBadge';
+
+         const makeItems = (authed:boolean, handle?:string) => [
+             { key:'home', href:'/timeline', label:'タイムライン', icon:'🏠' },
+             { key:'search', href:'/search', label:'検索', icon:'🔍' },
+             { key:'notification', href:'/notification', label:'通知', icon:'🔔', badge:true },
+             { key:'new', href:'/album/new', label:'作成', icon:'➕' },
+             authed ? { key:'me', href:`/user/${handle}`, label:'プロフィール', icon:'👤' } : { key:'login', href:'/login', label:'ログイン', icon:'🔑' },
+         ] as const;
+
+         export default function SideNav(){
+             const path = usePathname();
+             const { user } = useAuthUser();
+             const { unread } = useNotificationsBadge?.() || { unread:0 };
+             const items = makeItems(!!user, (user as any)?.handle);
+             return (
+                 <nav aria-label="メインナビ" className="hidden sm:flex w-16 shrink-0 flex-col items-center gap-3 py-3 border-r sticky top-0 h-dvh bg-white">
+                     {items.map(it => {
+                         const active = path?.startsWith(it.href);
+                         return (
+                             <Link key={it.key} href={it.href} title={it.label} aria-label={it.label}
+                                 className={`relative flex items-center justify-center w-12 h-12 rounded-lg hover:bg-gray-100 ${active ? 'bg-gray-100 border-l-2 border-[--accent]' : ''}`}>
+                                 <span className="text-xl" aria-hidden>{it.icon}</span>
+                                 {it.badge && unread>0 && (
+                                     <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] rounded-full px-1.5 py-0.5">{unread}</span>
+                                 )}
+                             </Link>
+                         );
+                     })}
+                 </nav>
+             );
+         }
+         ```
+
+2) レイアウト更新: `app/layout.tsx`
+     - ルートを 2 カラム化し SideNav を常設。
+         ```tsx
+         <div className="flex min-h-dvh">
+             <SideNav />
+             <main className="flex-1 min-w-0 ml-16 sm:ml-16">{children}</main>
+         </div>
+         ```
+     - 既存 `Header` は任意（残すなら `main` 内上部へ配置）。ハンバーガーは撤去。
+
+3) スタイル/配置
+     - SideNav: `w-16 sticky top-0 h-dvh bg-white border-r`。アイコンボタン: `w-12 h-12 rounded-lg`。
+     - 本文余白: `main` に `ml-16` を与え、レール幅を確保。
+     - アクティブ表示: `bg-gray-100` + `border-l-2 border-[--accent]`。
+
+4) 項目とリンク
+     - タイムライン `/timeline`、検索 `/search`、通知 `/notification`、作成 `/album/new`、プロフィール `/user/{handle}`（未ログイン時は `/login`）。
+     - 項目の順序は共通固定。`aria-label`/`title` を各リンクに付与。
+
+5) 通知バッジ
+     - `useNotificationsBadge` を利用し未読件数を購読。0 件ならバッジ非表示。
+
+6) アクセシビリティ
+     - `nav[aria-label="メインナビ"]`。各リンクに `aria-label` と `title`。
+     - フォーカスリングは `.accent-ring` または `focus-visible:ring`。
+
+7) レスポンシブ（任意）
+     - モバイルでは `SideNav` を非表示（`sm:flex`）にし、`components/BottomNav.tsx` を導入。
+     - BottomNav: `sm:hidden fixed bottom-0 inset-x-0 h-14 bg-white border-t pb-[env(safe-area-inset-bottom)]`。項目は SideNav と共通。
+
+8) 移行/撤去
+     - `Header.tsx` のハンバーガーメニュー/ドロワーを撤去。必要要素（テーマ切替など）は SideNav 末尾へ移動。
+
+9) テスト観点
+     - すべてのページで SideNav が常設される。
+     - アクティブ強調が正しく切り替わる。
+     - 未読バッジが期待通りに増減。
+     - 未ログインでプロフィール項目がログインに置換。
+     - モバイル（導入した場合）で BottomNav が機能。
 
 
-### プロフィールアイコン設定（ここ）
+### プロフィールアイコン設定
 - プロフィール画面でアイコンを設定できる
 - アイコンをプロフィール画面に表示する
 - そのアイコンをクリックすると、アイコンが拡大表示される

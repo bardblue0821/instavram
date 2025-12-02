@@ -109,6 +109,22 @@ body {
   outline-offset: 2px;
 }
 
+/* Square accent button for icon-only controls in nav */
+.btn-accent-square {
+  background-color: var(--accent);
+  color: var(--accent-fg);
+  border-radius: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color .15s, box-shadow .15s;
+}
+.btn-accent-square:hover { background-color: var(--accent-hover); }
+.btn-accent-square:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .link-accent {
   color: var(--accent);
   font-weight: 500;
