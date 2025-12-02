@@ -86,7 +86,7 @@ export function TimelineItem(props: {
     if (n === 1) {
       return (
         <div className="grid grid-cols-1 gap-1">
-          <img src={list[0].url} alt="image" className="w-full h-auto object-cover rounded" />
+              <img src={list[0].url} alt="image" className="w-full h-auto object-cover" />
         </div>
       );
     }
@@ -94,7 +94,7 @@ export function TimelineItem(props: {
       return (
         <div className="grid grid-cols-2 gap-1">
           {list.map((img, i) => (
-            <img key={i} src={img.url} alt={`image-${i}`} className="w-full h-auto object-cover rounded" />
+                <img key={i} src={img.url} alt={`image-${i}`} className="w-full h-auto object-cover" />
           ))}
         </div>
       );
@@ -103,9 +103,9 @@ export function TimelineItem(props: {
       // 左大1枚、右に上下2枚
       return (
         <div className="grid grid-cols-3 gap-1">
-          <img src={list[0].url} alt="image-0" className="col-span-2 row-span-2 w-full h-full object-cover rounded" />
-          <img src={list[1].url} alt="image-1" className="w-full h-auto object-cover rounded" />
-          <img src={list[2].url} alt="image-2" className="w-full h-auto object-cover rounded" />
+              <img src={list[0].url} alt="image-0" className="col-span-2 row-span-2 w-full h-full object-cover" />
+              <img src={list[1].url} alt="image-1" className="w-full h-auto object-cover" />
+              <img src={list[2].url} alt="image-2" className="w-full h-auto object-cover" />
         </div>
       );
     }
@@ -113,7 +113,7 @@ export function TimelineItem(props: {
     return (
       <div className="grid grid-cols-2 gap-1">
         {list.map((img, i) => (
-          <img key={i} src={img.url} alt={`image-${i}`} className="w-full h-auto object-cover rounded" />
+              <img key={i} src={img.url} alt={`image-${i}`} className="w-full h-auto object-cover" />
         ))}
       </div>
     );

@@ -154,7 +154,7 @@ body {
   border: none;
   border-bottom: 1px solid var(--border);
   padding: 0.5rem 0.75rem 0.4rem; /* 下線との距離を若干詰める */
-  font-size: 0.95rem;
+  /* font-size: 0.95rem;*/
   line-height: 1.4;
   transition: border-color .15s, box-shadow .15s, background-color .15s;
 }

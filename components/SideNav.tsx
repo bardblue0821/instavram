@@ -140,16 +140,16 @@ export default function SideNav() {
   const iconColorClass = currentTheme === 'dark' ? 'text-white' : 'text-black';
 
   return (
-    <nav aria-label="メインナビ" className="hidden sm:flex w-16 shrink-0 flex-col items-center gap-3 py-3 border-r border-base sticky top-0 h-dvh sidenav-bg">
+    <nav aria-label="メインナビ" className="hidden sm:flex w-20 shrink-0 flex-col items-center gap-3 py-3 border-r border-base sticky top-0 h-dvh sidenav-bg">
       {/* Profile on top */}
       <div className="mt-1 mb-1">
         <Link
           href={user && handle ? `/user/${handle}` : (user ? `/user/${user.uid}` : '/login')}
           title="プロフィール"
           aria-label="プロフィール"
-          className="flex items-center justify-center w-12 h-12 rounded-lg hover-surface-alt focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]"
+          className="flex items-center justify-center w-20 h-20 rounded-lg hover-surface-alt focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]"
         >
-          <Avatar size={40} src={profileDoc?.iconURL || undefined} alt="プロフィール" interactive={false} withBorder={false} />
+          <Avatar size={56} src={profileDoc?.iconURL || undefined} alt="プロフィール" interactive={false} withBorder={false} />
         </Link>
       </div>
       {items.map((it) => {

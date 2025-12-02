@@ -349,6 +349,54 @@ export default function AlbumDetailPage() {
     }
   }
 
+  // 入力フィールドのオートセーブ（フォーカスアウトで保存）
+  async function saveTitleIfChanged() {
+    if (!albumId) return;
+    const current = (album?.title ?? "");
+    const next = (editTitle ?? "").trim();
+    if (next === current) return;
+    setSavingAlbum(true);
+    setAlbumSavedMsg("");
+    setError(null);
+    try {
+      await updateAlbum(albumId, { title: next });
+      setAlbum((prev) => (prev ? { ...prev, title: next } : prev));
+      setAlbumSavedMsg("保存しました");
+      setTimeout(() => setAlbumSavedMsg(""), 2500);
+    } catch (e: any) {
+      setError(translateError(e));
+    } finally {
+      setSavingAlbum(false);
+    }
+  }
+
+  async function savePlaceUrlIfChanged() {
+    if (!albumId) return;
+    const current = (album?.placeUrl ?? "");
+    const next = (editPlaceUrl ?? "").trim();
+    if (next === current) return;
+    setSavingAlbum(true);
+    setAlbumSavedMsg("");
+    setError(null);
+    try {
+      await updateAlbum(albumId, { placeUrl: next });
+      setAlbum((prev) => (prev ? { ...prev, placeUrl: next } : prev));
+      setAlbumSavedMsg("保存しました");
+      setTimeout(() => setAlbumSavedMsg(""), 2500);
+    } catch (e: any) {
+      setError(translateError(e));
+    } finally {
+      setSavingAlbum(false);
+    }
+  }
+
+  function handleInputKeyDownBlurOnEnter(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      (e.currentTarget as HTMLInputElement).blur();
+    }
+  }
+
   function askDeleteAlbum() {
     setShowDeleteConfirm(true);
   }
@@ -445,9 +493,33 @@ export default function AlbumDetailPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="mb-2 text-2xl font-semibold">アルバム詳細</h1>
-        <p className="text-sm text-gray-700">ID: {album.id}</p>
-        {!isOwner && album.title && <p className="mt-1 text-lg">{album.title}</p>}
+
+        {isOwner && (
+          <div className="mt-2 space-y-3">
+            <div>
+              <input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                onBlur={saveTitleIfChanged}
+                onKeyDown={handleInputKeyDownBlurOnEnter}
+                className="mt-1 input-underline font-bold text-2xl"
+                placeholder="タイトル"
+              />
+            </div>
+            <div>
+              <input
+                value={editPlaceUrl}
+                onChange={(e) => setEditPlaceUrl(e.target.value)}
+                onBlur={savePlaceUrlIfChanged}
+                onKeyDown={handleInputKeyDownBlurOnEnter}
+                className="mt-1 input-underline text-sm"
+                placeholder="https://vrchat.com/..."
+              />
+            </div>
+            
+            {albumSavedMsg && <p className="text-xs text-green-600">{albumSavedMsg}</p>}
+          </div>
+        )}
         <div className="mt-2 relative flex items-center gap-3">
           <div className="flex items-center gap-1">
             <button
@@ -455,7 +527,7 @@ export default function AlbumDetailPage() {
               disabled={!user || likeBusy}
               onClick={handleToggleLike}
               className={`rounded border px-2 py-1 text-sm ${liked ? "border-pink-600 bg-pink-600 text-white" : "border-gray-300 bg-white text-gray-700"} disabled:opacity-50`}
-            >{liked ? "♥ いいね済み" : "♡ いいね"}</button>
+            >{liked ? "♥" : "♡"}</button>
             <span className="text-xs text-gray-600">{likeCount}</span>
           </div>
           {/* リアクション絵文字（ピッカー） */}
@@ -568,55 +640,22 @@ export default function AlbumDetailPage() {
             className="mt-1 inline-block text-sm link-accent"
           >撮影場所</a>
         )}
-        {isOwner && (
-          <div className="mt-2 space-y-3 rounded border border-base surface-alt p-3">
-            <div>
-              <label className="block text-xs font-medium fg-muted">タイトル</label>
-              <input
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                className="mt-1 input-underline text-sm"
-                placeholder="タイトル"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium fg-muted">撮影場所URL</label>
-              <input
-                value={editPlaceUrl}
-                onChange={(e) => setEditPlaceUrl(e.target.value)}
-                className="mt-1 input-underline text-sm"
-                placeholder="https://..."
-              />
-            </div>
-            <button
-              disabled={savingAlbum}
-              onClick={handleSaveAlbum}
-              className="btn-accent text-sm disabled:opacity-50"
-            >{savingAlbum ? "保存中..." : "変更を保存"}</button>
-            {albumSavedMsg && <p className="text-xs text-green-600">{albumSavedMsg}</p>}
-            <div className="pt-3 border-t mt-2">
-              <button
-                type="button"
-                onClick={askDeleteAlbum}
-                className="rounded bg-red-600 px-3 py-1.5 text-sm text-white"
-              >アルバムを削除</button>
-            </div>
-          </div>
-        )}
       </div>
 
       <section>
-        <h2 className="mb-2 text-lg font-medium">画像一覧 ({images.length})</h2>
+        {/*<h2 className="mb-2 text-lg font-medium">画像一覧 ({images.length})</h2>*/}
         {images.length === 0 && <p className="text-sm text-gray-500">まだ画像がありません</p>}
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
           {images.map((img) => (
-            <figure key={img.id || img.url} className="relative rounded border p-1">
-              <img src={img.url} alt={img.id || "image"} className="h-auto w-full object-cover" />
-              <figcaption className="mt-1 text-[10px] text-gray-500">uploader: {img.uploaderId}</figcaption>
+            <figure key={img.id || img.url} className="relative group shadow-sm hover:shadow-md transition-shadow">
+              <div className="relative w-full pt-[100%] overflow-hidden">
+                <img src={img.url} alt={img.id || "image"} className="absolute inset-0 h-full w-full object-cover" />
+              </div>
+              {/*<figcaption className="mt-1 text-[10px] fg-muted">uploader: {img.uploaderId}</figcaption>*/}
               {(isOwner || img.uploaderId === user?.uid) && (
                 <button
                   onClick={() => handleDeleteImage(img.id)}
-                  className="absolute right-1 top-1 rounded bg-red-600 px-2 py-0.5 text-[10px] text-white opacity-80 hover:opacity-100"
+                  className="absolute right-1 top-1 rounded bg-red-600 px-2 py-0.5 text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity"
                 >削除</button>
               )}
             </figure>
@@ -624,7 +663,7 @@ export default function AlbumDetailPage() {
         </div>
         {user && canAddImages && (
           <div className="mt-4">
-            <h3 className="mb-1 text-sm font-medium">画像追加 (残り {remaining} 枚)</h3>
+            <h3 className="mb-1 text-xl font-medium">画像追加 (残り {remaining} 枚)</h3>
             {remaining <= 0 && <p className="text-xs text-red-600">これ以上追加できません</p>}
             <input
               type="file"
@@ -642,8 +681,8 @@ export default function AlbumDetailPage() {
         )}
       </section>
 
-      <section>
-        <h2 className="mb-2 text-lg font-medium">コメント ({comments.length})</h2>
+      <section className="">
+        {/*<h2 className="mb-2 text-xl font-medium">コメント ({comments.length})</h2>*/}
         <CommentList
           comments={comments}
           currentUserId={user?.uid ?? ''}
@@ -668,11 +707,20 @@ export default function AlbumDetailPage() {
         )}
       </section>
 
+      <section>
+        <div className="pt-3 mt-2">
+          <button
+            type="button"
+            onClick={askDeleteAlbum}
+            className="rounded bg-red-600 px-3 py-1.5 text-sm text-white"
+          >アルバムを削除</button>
+        </div>
+      </section>
+
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="space-y-1 text-xs text-gray-500">
         {!canAddImages && <p>※ 操作にはログインが必要です。</p>}
       </div>
-      <p className="text-xs text-gray-500">※ 簡易版: 画像追加は DataURL 保存。本番は Firebase Storage 経由へ差し替え予定。</p>
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
