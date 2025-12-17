@@ -1,4 +1,8 @@
 @import "tailwindcss";
+/* lightGallery core and optional plugins */
+@import "lightgallery/css/lightgallery.css";
+@import "lightgallery/css/lg-zoom.css";
+@import "lightgallery/css/lg-thumbnail.css";
 
 :root {
   --background: #ffffff;

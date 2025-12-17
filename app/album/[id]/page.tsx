@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import GalleryGrid, { type PhotoItem } from "@/components/gallery/GalleryGrid";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthUser } from "../../../lib/hooks/useAuthUser";
 import {
@@ -470,6 +471,18 @@ export default function AlbumDetailPage() {
     }
   }
 
+  // ギャラリー表示用データ（フックはトップレベルで常に実行し、早期returnの前に置く）
+  const photos: PhotoItem[] = useMemo(() => {
+    return images.map((img) => ({
+      id: img.id,
+      src: img.url,
+      width: 1200,
+      height: 1200,
+      alt: img.id || "image",
+      uploaderId: img.uploaderId,
+    }));
+  }, [images]);
+
   if (!albumId) {
     return <div className="text-sm text-gray-500">アルバムIDが指定されていません。</div>;
   }
@@ -645,22 +658,15 @@ export default function AlbumDetailPage() {
       <section>
         {/*<h2 className="mb-2 text-lg font-medium">画像一覧 ({images.length})</h2>*/}
         {images.length === 0 && <p className="text-sm text-gray-500">まだ画像がありません</p>}
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
-          {images.map((img) => (
-            <figure key={img.id || img.url} className="relative group shadow-sm hover:shadow-md transition-shadow">
-              <div className="relative w-full pt-[100%] overflow-hidden">
-                <img src={img.url} alt={img.id || "image"} className="absolute inset-0 h-full w-full object-cover" />
-              </div>
-              {/*<figcaption className="mt-1 text-[10px] fg-muted">uploader: {img.uploaderId}</figcaption>*/}
-              {(isOwner || img.uploaderId === user?.uid) && (
-                <button
-                  onClick={() => handleDeleteImage(img.id)}
-                  className="absolute right-1 top-1 rounded bg-red-600 px-2 py-0.5 text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                >削除</button>
-              )}
-            </figure>
-          ))}
-        </div>
+        {images.length > 0 && (
+          <GalleryGrid
+            photos={photos}
+            rowHeight={240}
+            margin={6}
+            canDelete={(p) => isOwner || p.uploaderId === user?.uid}
+            onDelete={(p) => { if (p.id) handleDeleteImage(p.id); }}
+          />
+        )}
         {user && canAddImages && (
           <div className="mt-4">
             <h3 className="mb-1 text-xl font-medium">画像追加 (残り {remaining} 枚)</h3>
