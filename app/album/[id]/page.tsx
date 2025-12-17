@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import AlbumImageUploader from "@/components/upload/AlbumImageUploader";
 import GalleryGrid, { type PhotoItem } from "@/components/gallery/GalleryGrid";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthUser } from "../../../lib/hooks/useAuthUser";
@@ -669,20 +670,20 @@ export default function AlbumDetailPage() {
         )}
         {user && canAddImages && (
           <div className="mt-4">
-            <h3 className="mb-1 text-xl font-medium">画像追加 (残り {remaining} 枚)</h3>
-            {remaining <= 0 && <p className="text-xs text-red-600">これ以上追加できません</p>}
-            <input
-              type="file"
-              accept="image/*"
-              disabled={uploading || remaining <= 0}
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="mb-2"
+            <AlbumImageUploader
+              albumId={albumId}
+              userId={user.uid}
+              remaining={remaining}
+              onUploaded={async () => {
+                const imgs = await listImages(albumId);
+                imgs.sort(
+                  (a: any, b: any) =>
+                    (b.createdAt?.seconds || b.createdAt || 0) -
+                    (a.createdAt?.seconds || a.createdAt || 0),
+                );
+                setImages(imgs);
+              }}
             />
-            <button
-              onClick={handleAddImage}
-              disabled={!file || uploading || remaining <= 0}
-              className="btn-accent text-sm disabled:opacity-50"
-            >{uploading ? "アップロード中..." : "追加"}</button>
           </div>
         )}
       </section>

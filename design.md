@@ -1806,6 +1806,29 @@ export interface NotificationDoc {
 
 ### UI を整える
 - ライブラリを導入
+    - コンポーネント基盤（アクセシビリティ/土台）
+        - Radix UI（Dialog/Popover/Tooltip/Dropdownなどのプリミティブ）
+        - もしくは shadcn/ui（Tailwind前提のコンポーネント集、実体はプロジェクトに生成）
+    - フォーム/バリデーション
+        - React Hook Form + Zod（+ @hookform/resolvers）
+        - 画像投稿フォーム、プロフィール編集などで型安全に検証
+    - アップロードUI
+        - react-dropzone（軽量、Firebase Storageと相性◎、進捗は自前UI）
+        - もしくは Uppy（複数・並列・リトライなどが必要な場合）
+    - フィードバック/モーダル
+        - sonner（トースト/進捗表示）
+        - Dialog/AlertDialog は Radix UI または shadcn/ui を使用
+    - アニメーション
+        - Framer Motion（モーダルの出入り、ギャラリーの微アニメ）
+    - アイコン
+        - lucide-react（クリアなラインアイコン）
+    - データ取得/キャッシュ
+        - @tanstack/react-query（Firestore連携のローディング/エラー/キャッシュ統一）
+    - バーチャライゼーション
+        - @tanstack/react-virtual または react-virtuoso（タイムライン/通知一覧が大量化したとき）
+    - 入力補助
+        - emoji-mart（コメント/リアクションの絵文字入力）
+        - react-day-picker（撮影日/公開期限などの日付入力）
 
 
 ### モバイル対応

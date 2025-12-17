@@ -38,7 +38,18 @@ function PhotoRenderer({ photo, imageProps, wrapperStyle, canDelete, onDelete, o
   const isRemote = /^https?:\/\//i.test(src);
 
   return (
-    <button type="button" style={style} onClick={onOpen}>
+    <div
+      role="button"
+      tabIndex={0}
+      style={style}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+    >
       {src.startsWith("data:") ? (
         // data URL は next/image が制限するためネイティブ img を使用
         // eslint-disable-next-line @next/next/no-img-element
@@ -69,7 +80,7 @@ function PhotoRenderer({ photo, imageProps, wrapperStyle, canDelete, onDelete, o
           className="absolute right-1 top-1 rounded bg-red-600 px-2 py-0.5 text-[10px] text-white opacity-80 hover:opacity-100"
         >削除</button>
       )}
-    </button>
+    </div>
   );
 }
 
