@@ -1780,8 +1780,38 @@ export interface NotificationDoc {
 ### フレンドじゃない人のアルバム詳細には、画像追加欄を表示しない
 
 
-## スプリント３：テストケースを考える・テストする
-###
+### テストケースを考える
+
+### ログインを考えなおす
+
+### 画像表示方法を考え、実装
+- ライブラリを導入
+    - next/image
+        - 目的: 画像最適化（自動WebP/AVIF、lazy、DPR対応）とレスポンシブ。
+        - 実装: `Image`コンポーネントを採用。`sizes`/`fill`を適切に指定。外部画像は `next.config.js` の `images.remotePatterns` を設定。
+        - 注意: 画像CDN（Cloudinary/ImageKit/Imgix等）を併用する場合は二重最適化を避けるため `unoptimized` かカスタム`loader`を使用。
+    - lightGallery（lightgallery/react）
+        - 目的: ライトボックス表示（拡大、スワイプ、サムネイル、キャプション）。
+        - 実装: 一覧は`next/image`でサムネイル表示し、クリックでlightGalleryを起動。必要に応じてプラグイン（thumbnail/zoom/captions）を追加。
+        - SSR: エラー回避のため、問題があれば動的import（クライアント側のみ）を検討。
+        - React Photo Album（採用）
+            - 目的: きれいなレスポンシブグリッド（rows/masonry/columns）。React 19 互換。
+            - 実装: 画像メタ（width/height）を持つ配列を用意してレイアウト計算を最適化。サムネイルは`next/image`で最適化。
+            - 連携: サムネイル→クリックでlightGalleryを起動して拡大表示するフローを採用。
+
+    補足:
+        - 画像の原本保管先（S3/Cloudinary等）に応じて`next/image`のloader設計を決定。
+        - 備考: `react-photo-gallery` は `react@19` と peer 依存が衝突するため、`react-photo-album` に置換。
+    - レイアウトシフト防止のため、表示領域のアスペクト比（width/height または `sizes`）を必ず指定。
+
+### UI を整える
+- ライブラリを導入
+
+
+### モバイル対応
+
+## 手順: スプリント４
+
 
 
 ## 機能
