@@ -124,7 +124,7 @@ export default function NotificationsPage(){
       {loading && <p className="text-sm text-gray-500">読み込み中...</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
       {!loading && rows.length === 0 && <p className="text-sm text-gray-500">通知はありません。</p>}
-      <ul className="space-y-2">
+      <ul className="divide-y divide-base">
         {rows.map(r => {
           const isUnread = !r.readAt;
           const targetHref = r.albumId ? `/album/${r.albumId}` : undefined;
@@ -132,7 +132,7 @@ export default function NotificationsPage(){
           const fState = r.type === 'friend_request' ? friendState[r.actorId] : undefined;
           const canActOnFriend = r.type === 'friend_request' && fState === 'pending';
           return (
-            <li key={r.id} className={`border rounded p-3 text-sm bg-white dark:bg-gray-900 ${isUnread ? 'bg-yellow-50 dark:bg-gray-800' : ''}`}>
+            <li key={r.id} className={`py-3 text-sm ${isUnread ? 'bg-yellow-50 dark:bg-gray-800' : ''}`}>
               <div className="flex items-start justify-between gap-2">
                 <div className="space-y-1">
                   <p>{r.message}</p>
