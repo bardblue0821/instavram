@@ -162,9 +162,9 @@ export function TimelineItem(props: {
   return (
     <article className="py-4 space-y-3">
       <header className="space-y-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <a href={`/user/${owner?.handle || album.ownerId}`} className="shrink-0" aria-label="プロフィールへ">
-            <Avatar src={owner?.iconURL || undefined} size={32} interactive={false} withBorder={false} className="rounded-full" />
+            <Avatar src={owner?.iconURL || undefined} size={48} interactive={false} withBorder={false} className="rounded-full" />
           </a>
           <div className="min-w-0">
             <a
@@ -172,8 +172,8 @@ export function TimelineItem(props: {
               className="hover:underline flex items-baseline gap-2 truncate"
               title={`${owner?.displayName || '名前未設定'} ${owner?.handle ? `@${owner.handle}` : ''}`.trim()}
             >
-              <span className="text-sm font-semibold truncate">{owner?.displayName || '名前未設定'}</span>
-              <span className="text-xs text-gray-500 shrink-0">{owner?.handle ? `@${owner.handle}` : 'ハンドル未設定'}</span>
+              <span className="text-base font-semibold truncate">{owner?.displayName || '名前未設定'}</span>
+              <span className="text-sm text-gray-500 shrink-0">{owner?.handle ? `@${owner.handle}` : 'ハンドル未設定'}</span>
             </a>
           </div>
         </div>
