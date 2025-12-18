@@ -87,10 +87,17 @@ export function TimelineItem(props: {
     if (n === 0) return null;
 
     // 共通: アスペクト比ボックス（cover トリミング）
-    const Box = ({ ratioW, ratioH, src, alt }: { ratioW: number; ratioH: number; src: string; alt: string }) => (
+    const Box = ({ ratioW, ratioH, src, alt, href }: { ratioW: number; ratioH: number; src: string; alt: string; href?: string }) => (
       <div style={{ position: 'relative', width: '100%', aspectRatio: `${ratioW} / ${ratioH}`, overflow: 'hidden', borderRadius: 6 }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={alt} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        {href ? (
+          <a href={href} aria-label="アルバム詳細へ" className="absolute inset-0 block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={src} alt={alt} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+          </a>
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={src} alt={alt} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        )}
       </div>
     );
 
@@ -99,7 +106,7 @@ export function TimelineItem(props: {
       const src = list[0].thumbUrl || list[0].url;
       return (
         <div className="flex flex-col gap-1">
-          <Box ratioW={1} ratioH={1} src={src} alt="image" />
+          <Box ratioW={1} ratioH={1} src={src} alt="image" href={`/album/${album.id}`} />
         </div>
       );
     }
@@ -109,7 +116,7 @@ export function TimelineItem(props: {
       return (
         <div className="flex flex-col gap-1">
           {list.map((img, i) => (
-            <Box key={i} ratioW={2} ratioH={1} src={img.thumbUrl || img.url} alt={`image-${i}`} />
+            <Box key={i} ratioW={2} ratioH={1} src={img.thumbUrl || img.url} alt={`image-${i}`} href={`/album/${album.id}`} />
           ))}
         </div>
       );
@@ -122,11 +129,11 @@ export function TimelineItem(props: {
       return (
         <div className="flex gap-1">
           <div className="w-1/2">
-            <Box ratioW={1} ratioH={2} src={left.thumbUrl || left.url} alt="image-0" />
+            <Box ratioW={1} ratioH={2} src={left.thumbUrl || left.url} alt="image-0" href={`/album/${album.id}`} />
           </div>
           <div className="w-1/2 flex flex-col gap-1">
             {right.map((img, i) => (
-              <Box key={i} ratioW={1} ratioH={1} src={img.thumbUrl || img.url} alt={`image-${i + 1}`} />
+              <Box key={i} ratioW={1} ratioH={1} src={img.thumbUrl || img.url} alt={`image-${i + 1}`} href={`/album/${album.id}`} />
             ))}
           </div>
         </div>
@@ -137,7 +144,7 @@ export function TimelineItem(props: {
     return (
       <div className="grid grid-cols-2 gap-1">
         {list.map((img, i) => (
-          <Box key={i} ratioW={1} ratioH={1} src={img.thumbUrl || img.url} alt={`image-${i}`} />
+          <Box key={i} ratioW={1} ratioH={1} src={img.thumbUrl || img.url} alt={`image-${i}`} href={`/album/${album.id}`} />
         ))}
       </div>
     );
