@@ -87,6 +87,8 @@ export default function AlbumDetailPage() {
     const cat = REACTION_CATEGORIES.find(c => c.key === activeCat);
     return cat ? cat.emojis : [];
   }, [activeCat]);
+  // 一覧の初期表示件数（早期 return より前に hook を宣言しておく）
+  const [visibleCount, setVisibleCount] = useState(16);
 
   useEffect(() => {
     if (!albumId) return;
@@ -665,9 +667,21 @@ export default function AlbumDetailPage() {
             photos={photos}
             rowHeight={240}
             margin={6}
+            layoutType="grid"
+            columns={4}
+            visibleCount={visibleCount}
             canDelete={(p) => isOwner || p.uploaderId === user?.uid}
             onDelete={(p) => { if (p.id) handleDeleteImage(p.id); }}
           />
+        )}
+        {images.length > visibleCount && (
+          <div className="mt-3 flex justify-center">
+            <button
+              type="button"
+              className="rounded border border-base px-3 py-1.5 text-sm hover-surface-alt"
+              onClick={() => setVisibleCount((n) => Math.min(images.length, n + 16))}
+            >もっと見る</button>
+          </div>
         )}
         {user && canAddImages && (
           <div className="mt-4">

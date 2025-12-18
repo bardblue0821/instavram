@@ -28,6 +28,9 @@ export type GalleryGridProps = {
   margin?: number; // 画像間のマージン（px）
   canDelete?: (item: PhotoItem) => boolean;
   onDelete?: (item: PhotoItem) => void;
+  layoutType?: 'rows' | 'grid';
+  columns?: number; // grid の列数（layoutType='grid' のとき使用）
+  visibleCount?: number; // 先頭からこの件数のみ表示
 };
 
 // react-photo-album のカスタムレンダラー
@@ -85,8 +88,8 @@ function PhotoRenderer({ photo, imageProps, wrapperStyle, canDelete, onDelete, o
   );
 }
 
-export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDelete, onDelete }: GalleryGridProps) {
-  const items = useMemo(() => photos, [photos]);
+export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDelete, onDelete, layoutType = 'rows', columns = 4, visibleCount }: GalleryGridProps) {
+  const items = useMemo(() => (typeof visibleCount === 'number' ? photos.slice(0, Math.max(0, visibleCount)) : photos), [photos, visibleCount]);
   const lgRef = useRef<any>(null);
   const dynamicEl = useMemo(
     () =>
@@ -114,27 +117,83 @@ export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDe
         onInit={({ instance }: any) => { lgRef.current = instance; }}
       >
         {/* サムネイルは任意の要素でOK。クリックで openGallery(index) する */}
-        <PhotoAlbum
-          layout="rows"
-          photos={items}
-          targetRowHeight={rowHeight}
-          spacing={margin}
-          renderPhoto={(props: RenderPhotoProps & { index?: number }) => (
-            <PhotoRenderer
-              {...props}
-              onOpen={() => {
-                const idx = (props as any).index ?? 0;
-                lgRef.current?.openGallery?.(idx);
-              }}
-              canDelete={canDelete}
-              onDelete={onDelete}
-            />
-          )}
-          onClick={({ index, event }: any) => {
-            event?.preventDefault?.();
-            lgRef.current?.openGallery?.(index);
-          }}
-        />
+        {layoutType === 'rows' ? (
+          <PhotoAlbum
+            layout="rows"
+            photos={items}
+            targetRowHeight={rowHeight}
+            spacing={margin}
+            renderPhoto={(props: RenderPhotoProps & { index?: number }) => (
+              <PhotoRenderer
+                {...props}
+                onOpen={() => {
+                  const idx = (props as any).index ?? 0;
+                  lgRef.current?.openGallery?.(idx);
+                }}
+                canDelete={canDelete}
+                onDelete={onDelete}
+              />
+            )}
+            onClick={({ index, event }: any) => {
+              event?.preventDefault?.();
+              lgRef.current?.openGallery?.(index);
+            }}
+          />
+        ) : (
+          <div
+            className="grid"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${Math.max(1, columns)}, 1fr)`,
+              gap: `${margin}px`,
+            }}
+          >
+            {items.map((p, idx) => (
+              <div
+                key={p.id ?? p.src + ':' + idx}
+                role="button"
+                tabIndex={0}
+                onClick={() => lgRef.current?.openGallery?.(idx)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    lgRef.current?.openGallery?.(idx);
+                  }
+                }}
+                style={{ position: 'relative', borderRadius: 8, overflow: 'hidden' }}
+              >
+                {/* 正方形トリム */}
+                <div style={{ position: 'relative', width: '100%', aspectRatio: '1 / 1' }}>
+                  {(/^data:/i.test(p.thumbSrc || p.src)) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.thumbSrc || p.src}
+                      alt={p.alt || 'photo'}
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <Image
+                      src={p.thumbSrc || p.src}
+                      alt={p.alt || 'photo'}
+                      fill
+                      sizes="(max-width: 768px) 50vw, 25vw"
+                      style={{ objectFit: 'cover' }}
+                      unoptimized={/^https?:\/\//i.test(p.thumbSrc || p.src)}
+                    />
+                  )}
+                </div>
+                {canDelete && onDelete && canDelete(p) && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(p); }}
+                    className="absolute right-1 top-1 rounded bg-red-600 px-2 py-0.5 text-[10px] text-white opacity-80 hover:opacity-100"
+                  >削除</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </LightGallery>
     </div>
   );
