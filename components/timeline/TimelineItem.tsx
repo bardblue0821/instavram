@@ -158,26 +158,14 @@ export function TimelineItem(props: {
             <Avatar src={owner?.iconURL || undefined} size={32} interactive={false} withBorder={false} className="rounded-full" />
           </a>
           <div className="min-w-0">
-            {/* 表示名（ユーザー名） */}
-            <div className="text-sm font-semibold truncate">
-              <a
-                href={`/user/${owner?.handle || album.ownerId}`}
-                className="hover:underline"
-                title={owner?.displayName || '名前未設定'}
-              >
-                {owner?.displayName || '名前未設定'}
-              </a>
-            </div>
-            {/* ハンドル名 */}
-            <div className="text-[11px] text-gray-500 truncate">
-              <a
-                href={`/user/${owner?.handle || album.ownerId}`}
-                className="hover:underline"
-                title={owner?.handle ? `@${owner.handle}` : 'ハンドル未設定'}
-              >
-                {owner?.handle ? `@${owner.handle}` : 'ハンドル未設定'}
-              </a>
-            </div>
+            <a
+              href={`/user/${owner?.handle || album.ownerId}`}
+              className="hover:underline flex items-baseline gap-2 truncate"
+              title={`${owner?.displayName || '名前未設定'} ${owner?.handle ? `@${owner.handle}` : ''}`.trim()}
+            >
+              <span className="text-sm font-semibold truncate">{owner?.displayName || '名前未設定'}</span>
+              <span className="text-xs text-gray-500 shrink-0">{owner?.handle ? `@${owner.handle}` : 'ハンドル未設定'}</span>
+            </a>
           </div>
         </div>
         {album.title && (

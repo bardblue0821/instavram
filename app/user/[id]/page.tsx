@@ -347,8 +347,15 @@ export default function ProfilePage() {
       <header className="space-y-3">
         <div className="flex items-center gap-4">
           <Avatar src={profile.iconURL ? `${profile.iconURL}${profile.iconUpdatedAt ? `?v=${new Date(profile.iconUpdatedAt.seconds ? profile.iconUpdatedAt.toDate?.() : profile.iconUpdatedAt).getTime()}` : ''}` : undefined} size={72} onClick={()=> setAvatarOpen(true)} />
-          <div>
-            <h1 className="text-2xl font-semibold">プロフィール</h1>
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-2">
+              <h1 className="text-2xl font-semibold truncate" title={profile.displayName || '名前未設定'}>
+                {profile.displayName || '名前未設定'}
+              </h1>
+              <span className="text-sm text-gray-500 shrink-0" title={profile.handle ? `@${profile.handle}` : 'ハンドル未設定'}>
+                {profile.handle ? `@${profile.handle}` : 'ハンドル未設定'}
+              </span>
+            </div>
             <p className="text-sm text-gray-700">UID: {profile.uid}</p>
           </div>
         </div>
