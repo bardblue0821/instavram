@@ -2,7 +2,10 @@
 import React, { useEffect, useState } from "react";
 import { useAuthUser } from "../../lib/hooks/useAuthUser";
 import { TimelineItem } from "../../components/timeline/TimelineItem";
-import { getLatestAlbums } from "../../lib/repos/albumRepo";
+// フィードはフレンド/ウォッチ対象のみ
+import { fetchLatestAlbums } from "../../lib/repos/timelineRepo";
+import { listAcceptedFriends } from "../../lib/repos/friendRepo";
+import { listWatchedOwnerIds } from "../../lib/repos/watchRepo";
 import { getUser, type UserDoc } from "../../lib/repos/userRepo";
 import { listImages } from "../../lib/repos/imageRepo";
 import { listComments, subscribeComments } from "../../lib/repos/commentRepo";
@@ -34,7 +37,35 @@ export default function TimelinePage() {
       setLoading(true);
       setError(null);
       try {
-        const albums = await getLatestAlbums(50);
+        // 未ログイン時はタイムラインを表示しない（要件: フレンド/ウォッチのみ）
+        if (!user?.uid) {
+          if (!cancelled) {
+            setRows([]);
+            setLoading(false);
+          }
+          return;
+        }
+        // 対象オーナーIDsを構築（自分 + フレンド + ウォッチ）
+        const ownerSet = new Set<string>();
+        ownerSet.add(user.uid);
+        try {
+          const [friends, watched] = await Promise.all([
+            listAcceptedFriends(user.uid),
+            listWatchedOwnerIds(user.uid),
+          ]);
+          // フレンド方向に依存せず相手UIDを追加
+          for (const f of friends) {
+            const other = f.userId === user.uid ? f.targetId : f.userId;
+            if (other) ownerSet.add(other);
+          }
+          for (const w of watched) ownerSet.add(w);
+        } catch (e) {
+          // フレンド/ウォッチ取得失敗時は対象なし（後で全表示に緩和したければここを変更）
+          console.warn("friend/watch fetch error", e);
+        }
+
+        const ownerIds = Array.from(ownerSet);
+        const albums = await fetchLatestAlbums(50, ownerIds);
         const userCache = new Map<string, Pick<UserDoc, "uid" | "handle" | "iconURL" | "displayName"> | null>();
         const enriched = await Promise.all(
           albums.map(async (album: any) => {

@@ -16,7 +16,9 @@ export async function fetchLatestAlbums(max: number = 50, ownerIds?: string[]): 
   for (let i = 0; i < ownerIds.length; i += 10) chunks.push(ownerIds.slice(i, i + 10));
   const results: AlbumDoc[] = [];
   await Promise.all(chunks.map(async (chunk) => {
-    const q = query(collection(db, COL.albums), where('ownerId', 'in', chunk), orderBy('createdAt', 'desc'), limit(max));
+    // in + orderBy の複合クエリは Firestore の複合インデックスが必要になるため、
+    // ここでは orderBy を外して取得し、後段でクライアント側ソートを行う。
+    const q = query(collection(db, COL.albums), where('ownerId', 'in', chunk), limit(max));
     const snap = await getDocs(q);
     snap.forEach(d => results.push(d.data() as AlbumDoc));
   }));
