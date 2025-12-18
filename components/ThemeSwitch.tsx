@@ -1,29 +1,29 @@
 "use client";
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { useMantineColorScheme, useComputedColorScheme } from '@mantine/core';
 
 export default function ThemeSwitch() {
-  const [theme, setTheme] = useState<'light'|'dark'>(() => {
-    if (typeof window === 'undefined') return 'light';
-    const stored = window.localStorage.getItem('theme');
-    if (stored === 'dark' || stored === 'light') return stored;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  });
+  // Mantine のカラースキームに統一し、SSR/CSR 初期値の不一致を防ぐ
+  const { setColorScheme } = useMantineColorScheme();
+  // SSR 時は 'light' を返し、クライアントマウント後に実際の値へ同期（Hydration ずれ防止）
+  const computed = useComputedColorScheme('light', { getInitialValueInEffect: true });
 
+  // 既存の CSS 変数切り替え（:root.theme-light / :root.theme-dark）を Mantine の値に追従
   useEffect(() => {
-    if (typeof document === 'undefined') return;
     const root = document.documentElement;
     root.classList.remove('theme-light', 'theme-dark');
-    root.classList.add(theme === 'dark' ? 'theme-dark' : 'theme-light');
-    window.localStorage.setItem('theme', theme);
-  }, [theme]);
+    root.classList.add(computed === 'dark' ? 'theme-dark' : 'theme-light');
+  }, [computed]);
+
+  const isDark = computed === 'dark';
 
   return (
     <button
-      onClick={() => setTheme(t => (t === 'dark' ? 'light' : 'dark'))}
+      onClick={() => setColorScheme(isDark ? 'light' : 'dark')}
       className="w-full text-center px-3 py-2 text-sm rounded border border-base hover-surface-alt"
       aria-label="テーマ切替"
     >
-      {theme === 'dark' ? 'ライトモードへ' : 'ダークモードへ'}
+      {isDark ? 'ライトモードへ' : 'ダークモードへ'}
     </button>
   );
 }

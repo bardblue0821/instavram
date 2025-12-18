@@ -949,7 +949,7 @@
 
 #### ダークモードとライトモード
 - 目的: OS の自動判定に加えてユーザーが任意にテーマ (ライト/ダーク) を切り替え可能にし、UI の一貫性と操作感を向上させる。
-- 実装方針: CSS 変数を `.theme-light` / `.theme-dark` クラスで上書きし、`localStorage` に保存された選択を優先。未選択時は `prefers-color-scheme` を初期値として採用。
+- 実装方針: Mantine の ColorScheme を採用（`MantineProvider` + `ColorSchemeScript`）。UI は Mantine のテーマに従い、CSS 変数は `:root.theme-light` / `:root.theme-dark` クラスを Mantine の計算結果に同期して上書きする。
 - 追加CSS: `app/globals.css` に以下を追加
     - `:root.theme-light { --background: #ffffff; --foreground: #171717; --accent: #0d9488; --accent-hover: #0f766e; --accent-fg: #ffffff; --accent-ring: rgba(13,148,136,.4); }`
     - `:root.theme-dark { --background: #0a0a0a; --foreground: #ededed; --accent: #14b8a6; --accent-hover: #0d9488; --accent-fg: #ffffff; --accent-ring: rgba(20,184,166,.5); }`
@@ -957,17 +957,17 @@
 - UI変更: ハンバーガーメニュー末尾にテーマ切替ボタンを追加。
     - ラベル: 現在がダークなら「ライトモードへ」、ライトなら「ダークモードへ」。
     - クラス: `.btn-accent` を利用しアクセント統一。
-- ロジック (Header.tsx):
-    1. 初期化: `localStorage.getItem('theme')` を読み取り `dark|light` を決定。無ければ `matchMedia('(prefers-color-scheme: dark)')`。
-    2. `useEffect` で `document.documentElement.classList` を操作し `theme-light` / `theme-dark` を付与 (既存クラス除去後)。
-    3. 切替: `setTheme(t => t === 'dark' ? 'light' : 'dark')`。保存後メニューを閉じる。
-- 永続化: `localStorage.setItem('theme', theme)`。
+- ロジック (ThemeSwitch.tsx):
+    1. `useComputedColorScheme('light', { getInitialValueInEffect: true })` で SSR/CSR 初期値を一致させ Hydration 不一致を防止。
+    2. `useMantineColorScheme().setColorScheme(...)` で `dark`/`light` をトグル。
+    3. `useEffect` で `document.documentElement.classList` に `theme-light` / `theme-dark` を付与（Mantine の計算値に追従）。
+- 永続化: Mantine がローカルストレージ管理を内包するため自前保存は不要。
 - アクセシビリティ: 切替ボタンに `aria-label="テーマ切替"` を付与。視覚ラベルは日本語表示。
 - リスク/注意点:
-    - SSR 初回描画時はライトを暫定表示後にクライアントでダークへ反映する可能性 (FART: Flash After Render of Theme)。必要なら `_document` でインラインスクリプトを挿入し初期クラス付与する改善余地。
-    - `@media` とクラスの競合: クラス定義が後勝ちのため問題なしだが、追加のテーマ変種導入時は順序確認。
+    - Hydration 不一致: `useComputedColorScheme(..., { getInitialValueInEffect: true })` を必ず使用。
+    - 独自の `localStorage` や `matchMedia` による初期化は Mantine と競合するため撤廃。
 - 拡張余地:
-    - システム設定に再同期する「自動」モード (third state)。
+    - システム設定に再同期する「自動」モードは `defaultColorScheme="auto"` で既定化。
     - `theme-[name]` を増やし将来ブランド別ダーク/ライト (例: high-contrast)。
     - `prefers-reduced-motion` やコントラストモード連動。
 
