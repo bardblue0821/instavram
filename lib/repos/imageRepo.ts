@@ -15,10 +15,10 @@ export async function canUploadMoreImages(albumId: string, uploaderId: string) {
   return current < 4
 }
 
-export async function addImage(albumId: string, uploaderId: string, url: string) {
+export async function addImage(albumId: string, uploaderId: string, url: string, thumbUrl?: string) {
   const current = await countUserImages(albumId, uploaderId)
   if (current >= 4) throw new Error('LIMIT_4_PER_USER')
-  const ref = await addDoc(collection(db, COL.albumImages), { albumId, uploaderId, url, createdAt: new Date() })
+  const ref = await addDoc(collection(db, COL.albumImages), { albumId, uploaderId, url, thumbUrl, createdAt: new Date() })
   // id フィールドを後から追加して UI 側で doc.id を持てるようにする
   await updateDoc(ref, { id: ref.id })
 }

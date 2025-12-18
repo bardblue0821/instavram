@@ -15,6 +15,7 @@ import lgThumbnail from "lightgallery/plugins/thumbnail";
 export type PhotoItem = {
   id?: string;
   src: string; // /public 直下なら /path 形式 または外部URL / dataURL
+  thumbSrc?: string; // 軽量サムネイルURL（省略時は src を使用）
   width: number;
   height: number;
   alt?: string;
@@ -31,11 +32,11 @@ export type GalleryGridProps = {
 
 // react-photo-album のカスタムレンダラー
 function PhotoRenderer({ photo, imageProps, wrapperStyle, canDelete, onDelete, onOpen }: RenderPhotoProps & { canDelete?: (p: PhotoItem) => boolean; onDelete?: (p: PhotoItem) => void; onOpen: () => void; }) {
-  const { src, width, height } = photo as PhotoItem;
+  const { src, thumbSrc, width, height } = photo as PhotoItem;
   const alt = (photo as any).alt || "photo";
   const style: CSSProperties = { ...wrapperStyle, position: "relative", borderRadius: 8 };
-
-  const isRemote = /^https?:\/\//i.test(src);
+  const displaySrc = thumbSrc || src;
+  const isRemote = /^https?:\/\//i.test(displaySrc);
 
   return (
     <div
@@ -50,11 +51,11 @@ function PhotoRenderer({ photo, imageProps, wrapperStyle, canDelete, onDelete, o
         }
       }}
     >
-      {src.startsWith("data:") ? (
+      {displaySrc.startsWith("data:") ? (
         // data URL は next/image が制限するためネイティブ img を使用
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={src}
+          src={displaySrc}
           alt={alt}
           width={width}
           height={height}
@@ -63,7 +64,7 @@ function PhotoRenderer({ photo, imageProps, wrapperStyle, canDelete, onDelete, o
         />
       ) : (
         <Image
-          src={src}
+          src={displaySrc}
           alt={alt}
           width={width}
           height={height}
@@ -91,7 +92,7 @@ export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDe
     () =>
       items.map((p) => ({
         src: p.src,
-        thumb: p.src, // サムネイル一覧用に明示（未指定だと空白になることがある）
+        thumb: p.thumbSrc || p.src, // サムネイル一覧用に軽量URLを優先
         subHtml: p.alt ? `<p>${p.alt}</p>` : undefined,
       })),
     [items]

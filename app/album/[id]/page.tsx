@@ -477,6 +477,7 @@ export default function AlbumDetailPage() {
     return images.map((img) => ({
       id: img.id,
       src: img.url,
+      thumbSrc: img.thumbUrl || img.url,
       width: 1200,
       height: 1200,
       alt: img.id || "image",
