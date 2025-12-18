@@ -1,9 +1,11 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuthUser } from '../lib/hooks/useAuthUser';
 import { createAlbumWithImages, AlbumCreateProgress } from '../lib/services/createAlbumWithImages';
 import { useRouter } from 'next/navigation';
 import { translateError } from '../lib/errors';
+import { Paper, Stack, Group, Text, Image as MantineImage, Button, Progress } from '@mantine/core';
+import { Dropzone, IMAGE_MIME_TYPE } from '@mantine/dropzone';
 
 interface Props { onCreated?: (albumId: string) => void }
 
@@ -14,24 +16,63 @@ export default function AlbumCreateModal({ onCreated }: Props) {
   const [placeUrl, setPlaceUrl] = useState('');
   const [comment, setComment] = useState('');
   const [files, setFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<{ file: File; url: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<number>(0);
   const [fileProgress, setFileProgress] = useState<AlbumCreateProgress[]>([]);
   const [loading, setLoading] = useState(false);
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const list = Array.from(e.target.files || []);
-    if (list.length > 4) {
+  // 選択クリア時に Object URL を開放
+  useEffect(() => {
+    return () => {
+      previews.forEach((p) => URL.revokeObjectURL(p.url));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleDrop(dropped: File[]) {
+    setError(null);
+    if (!dropped || dropped.length === 0) return;
+    const allow = 4;
+    const accepted = dropped.slice(0, allow);
+    if (dropped.length > allow) {
       setError('画像は最大4枚までです');
-      return;
     }
-    setFiles(list);
+    // 既存のプレビューを解放
+    previews.forEach((p) => URL.revokeObjectURL(p.url));
+    const nextPreviews = accepted.map((f) => ({ file: f, url: URL.createObjectURL(f) }));
+    setPreviews(nextPreviews);
+    setFiles(accepted);
+  }
+
+  function removeOne(target: File) {
+    const next = previews.filter((p) => p.file !== target);
+    const removed = previews.find((p) => p.file === target);
+    if (removed) URL.revokeObjectURL(removed.url);
+    setPreviews(next);
+    setFiles(next.map((p) => p.file));
+  }
+
+  function clearAll() {
+    previews.forEach((p) => URL.revokeObjectURL(p.url));
+    setPreviews([]);
+    setFiles([]);
+  }
+
+  function fmtBytes(n: number) {
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / 1024 / 1024).toFixed(1)} MB`;
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!user) {
       setError('ログインが必要です');
+      return;
+    }
+    if (files.length > 4) {
+      setError('画像は最大4枚までです');
       return;
     }
     setError(null);
@@ -110,23 +151,52 @@ export default function AlbumCreateModal({ onCreated }: Props) {
         </div>
         <div>
           <label className="block text-sm font-medium mb-1" aria-label="画像選択">画像 (最大4枚)</label>
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={handleFileChange}
-            disabled={loading || !user}
-          />
-          {files.length > 0 && (
-            <ul className="mt-2 text-xs text-gray-600 list-disc pl-5">
-              {files.map(f => <li key={f.name}>{f.name}</li>)}
-            </ul>
-          )}
+          <Paper withBorder p="md" radius="md" className="surface">
+            <Stack gap="xs">
+              <Dropzone
+                onDrop={handleDrop}
+                accept={IMAGE_MIME_TYPE}
+                disabled={loading || !user}
+                multiple
+                maxSize={5 * 1024 * 1024}
+              >
+                <Group justify="center" mih={120} className="text-center">
+                  <div>
+                    <Text fw={600}>ここにドラッグ＆ドロップ、またはクリックして選択</Text>
+                    <Text size="xs" c="dimmed">PNG / JPEG / GIF、1ファイル最大 5MB（最大 4 件）</Text>
+                  </div>
+                </Group>
+              </Dropzone>
+
+              {previews.length > 0 && (
+                <Stack gap="xs" mt="sm">
+                  {previews.map((p) => (
+                    <Group key={p.url} justify="space-between" align="center">
+                      <Group>
+                        <MantineImage src={p.url} alt={p.file.name} radius="sm" fit="cover" style={{ height: 80, width: 80, objectFit: 'cover' }} />
+                        <div>
+                          <Text size="sm" fw={500}>{p.file.name}</Text>
+                          <Text size="xs" c="dimmed">{fmtBytes(p.file.size)}</Text>
+                        </div>
+                      </Group>
+                      <Button size="xs" variant="default" onClick={() => removeOne(p.file)} disabled={loading}>削除</Button>
+                    </Group>
+                  ))}
+                  <Group justify="end">
+                    <Button size="sm" variant="default" onClick={clearAll} disabled={loading}>クリア</Button>
+                  </Group>
+                </Stack>
+              )}
+            </Stack>
+          </Paper>
         </div>
         {error && <p className="text-red-600 text-sm">{error}</p>}
         {loading && (
           <div role="status" className="space-y-2">
-            <p className="text-sm" style={{ color: 'var(--accent)' }}>アップロード中... {progress}%</p>
+            <Group justify="space-between" align="center">
+              <Text size="sm">アップロード中...</Text>
+              <div style={{ minWidth: 220 }}><Progress value={progress} color="teal" animated /></div>
+            </Group>
             <ul className="text-xs text-gray-600 space-y-1">
               {fileProgress.map((fp,i)=>(
                 <li key={i}>
