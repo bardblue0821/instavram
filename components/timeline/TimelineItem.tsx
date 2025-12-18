@@ -123,19 +123,28 @@ export function TimelineItem(props: {
     }
 
     if (n === 3) {
-      // 3枚: 左 1枚を 1:2（縦長）、右 2枚を 1:1 で縦に2枚 → 全体は正方形
+      // 3枚: CSS Gridで左を2行スパン、右は1:1を上下2枚。
+      // Gridのrow gapも左の高さに含まれるため、左右で高さが揃う。
       const left = list[0];
       const right = list.slice(1);
       return (
-        <div className="flex gap-1">
-          <div className="w-1/2">
-            <Box ratioW={1} ratioH={2} src={left.thumbUrl || left.url} alt="image-0" href={`/album/${album.id}`} />
+        <div className="grid gap-1" style={{ gridTemplateColumns: '2fr 1fr' }}>
+          {/* 左（2行分を占有、セル高に合わせて画像をカバー） */}
+          <div className="row-span-2 relative overflow-hidden rounded-[6px]">
+            <a href={`/album/${album.id}`} aria-label="アルバム詳細へ" className="absolute inset-0 block">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={left.thumbUrl || left.url}
+                alt="image-0"
+                loading="lazy"
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            </a>
           </div>
-          <div className="w-1/2 flex flex-col gap-1">
-            {right.map((img, i) => (
-              <Box key={i} ratioW={1} ratioH={1} src={img.thumbUrl || img.url} alt={`image-${i + 1}`} href={`/album/${album.id}`} />
-            ))}
-          </div>
+          {/* 右上 */}
+          <Box ratioW={1} ratioH={1} src={right[0].thumbUrl || right[0].url} alt={`image-1`} href={`/album/${album.id}`} />
+          {/* 右下 */}
+          <Box ratioW={1} ratioH={1} src={right[1].thumbUrl || right[1].url} alt={`image-2`} href={`/album/${album.id}`} />
         </div>
       );
     }
