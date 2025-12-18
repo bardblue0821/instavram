@@ -83,45 +83,60 @@ export function TimelineItem(props: {
     const n = Math.min(imgs.length, 4);
     const list = imgs.slice(0, n);
     if (n === 0) return null;
+
+    // 共通: アスペクト比ボックス（cover トリミング）
+    const Box = ({ ratioW, ratioH, src, alt }: { ratioW: number; ratioH: number; src: string; alt: string }) => (
+      <div style={{ position: 'relative', width: '100%', aspectRatio: `${ratioW} / ${ratioH}`, overflow: 'hidden', borderRadius: 6 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={alt} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+    );
+
     if (n === 1) {
+      // 1枚: 正方形
       const src = list[0].thumbUrl || list[0].url;
       return (
-        <div className="grid grid-cols-1 gap-1">
-              <img src={src} alt="image" className="w-full h-auto object-cover" loading="lazy" />
+        <div className="flex flex-col gap-1">
+          <Box ratioW={1} ratioH={1} src={src} alt="image" />
         </div>
       );
     }
+
     if (n === 2) {
+      // 2枚: 各タイルを 2:1（横長）にして縦に2枚積む → 全体はほぼ正方形
       return (
-        <div className="grid grid-cols-2 gap-1">
-          {list.map((img, i) => {
-            const src = img.thumbUrl || img.url;
-            return (
-                <img key={i} src={src} alt={`image-${i}`} className="w-full h-auto object-cover" loading="lazy" />
-            );
-          })}
+        <div className="flex flex-col gap-1">
+          {list.map((img, i) => (
+            <Box key={i} ratioW={2} ratioH={1} src={img.thumbUrl || img.url} alt={`image-${i}`} />
+          ))}
         </div>
       );
     }
+
     if (n === 3) {
-      // 左大1枚、右に上下2枚
+      // 3枚: 左 1枚を 1:2（縦長）、右 2枚を 1:1 で縦に2枚 → 全体は正方形
+      const left = list[0];
+      const right = list.slice(1);
       return (
-        <div className="grid grid-cols-3 gap-1">
-              <img src={(list[0].thumbUrl||list[0].url)} alt="image-0" className="col-span-2 row-span-2 w-full h-full object-cover" loading="lazy" />
-              <img src={(list[1].thumbUrl||list[1].url)} alt="image-1" className="w-full h-auto object-cover" loading="lazy" />
-              <img src={(list[2].thumbUrl||list[2].url)} alt="image-2" className="w-full h-auto object-cover" loading="lazy" />
+        <div className="flex gap-1">
+          <div className="w-1/2">
+            <Box ratioW={1} ratioH={2} src={left.thumbUrl || left.url} alt="image-0" />
+          </div>
+          <div className="w-1/2 flex flex-col gap-1">
+            {right.map((img, i) => (
+              <Box key={i} ratioW={1} ratioH={1} src={img.thumbUrl || img.url} alt={`image-${i + 1}`} />
+            ))}
+          </div>
         </div>
       );
     }
-    // 4枚: 2x2
+
+    // 4枚: 2x2 で全て 1:1
     return (
       <div className="grid grid-cols-2 gap-1">
-        {list.map((img, i) => {
-          const src = img.thumbUrl || img.url;
-          return (
-              <img key={i} src={src} alt={`image-${i}`} className="w-full h-auto object-cover" loading="lazy" />
-          );
-        })}
+        {list.map((img, i) => (
+          <Box key={i} ratioW={1} ratioH={1} src={img.thumbUrl || img.url} alt={`image-${i}`} />
+        ))}
       </div>
     );
   }
