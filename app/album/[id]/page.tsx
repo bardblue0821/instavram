@@ -28,6 +28,9 @@ import { listComments, subscribeComments } from "../../../lib/repos/commentRepo"
 import { CommentForm } from "../../../components/comments/CommentForm";
 import { ERR } from "../../../types/models";
 import { listReactionsByAlbum, toggleReaction, listReactorsByAlbumEmoji, Reactor } from "../../../lib/repos/reactionRepo";
+import { setThumbUrl } from "../../../lib/repos/imageRepo";
+import { storage } from "../../../lib/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { addNotification } from "../../../lib/repos/notificationRepo";
 import { REACTION_EMOJIS, REACTION_CATEGORIES, filterReactionEmojis } from "../../../lib/constants/reactions";
 
@@ -203,6 +206,118 @@ export default function AlbumDetailPage() {
       if (unsubLikes) unsubLikes();
     };
   }, [albumId, user?.uid]);
+
+  // 既存画像でサムネイルが無い場合に、軽量サムネイルをバックグラウンド生成して登録
+  const thumbGenRef = useRef<{ running: boolean; processed: Set<string> }>({ running: false, processed: new Set() });
+  useEffect(() => {
+    if (!albumId) return;
+    if (thumbGenRef.current.running) return;
+    // 可視範囲優先でサムネイル不足分を対象にする
+    const missing: any[] = images.filter((img) => !img.thumbUrl && !!img.url && !thumbGenRef.current.processed.has(img.id));
+    if (missing.length === 0) return;
+    const targets = missing.slice(0, Math.min(visibleCount, 24));
+
+    thumbGenRef.current.running = true;
+    (async () => {
+      try {
+        const concurrency = 2;
+        let index = 0;
+        const results: Array<Promise<void>> = [];
+
+        async function runOne(img: any) {
+          try {
+            // 画像を取得（CORS回避のため fetch→Blob→ObjectURL で読み込み）
+            const blob = await (async () => {
+              try {
+                const res = await fetch(img.url, { mode: 'cors' });
+                return await res.blob();
+              } catch {
+                // フォールバック: Image要素から直接読み込み（dataURL等）
+                return await new Promise<Blob>((resolve, reject) => {
+                  const image = new Image();
+                  image.crossOrigin = 'anonymous';
+                  image.onload = () => {
+                    try {
+                      const canvas = document.createElement('canvas');
+                      const maxEdge = 360;
+                      const scale = Math.min(1, maxEdge / Math.max(image.width, image.height));
+                      canvas.width = Math.max(1, Math.round(image.width * scale));
+                      canvas.height = Math.max(1, Math.round(image.height * scale));
+                      const ctx = canvas.getContext('2d');
+                      if (!ctx) throw new Error('CANVAS_CONTEXT_ERROR');
+                      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+                      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('CANVAS_TO_BLOB_ERROR'))), 'image/jpeg', 0.7);
+                    } catch (e) { reject(e as any); }
+                  };
+                  image.onerror = () => reject(new Error('IMAGE_LOAD_ERROR'));
+                  image.src = img.url;
+                });
+              }
+            })();
+
+            // Blob からサムネイル作成（360px / q=0.7）
+            const thumbBlob = await (async () => {
+              const url = URL.createObjectURL(blob);
+              try {
+                const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+                  const im = new Image();
+                  im.onload = () => resolve(im);
+                  im.onerror = () => reject(new Error('IMAGE_LOAD_ERROR'));
+                  im.src = url;
+                });
+                const maxEdge = 360;
+                const scale = Math.min(1, maxEdge / Math.max(image.width, image.height));
+                const w = Math.max(1, Math.round(image.width * scale));
+                const h = Math.max(1, Math.round(image.height * scale));
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) throw new Error('CANVAS_CONTEXT_ERROR');
+                ctx.drawImage(image, 0, 0, w, h);
+                return await new Promise<Blob>((resolve, reject) => {
+                  canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('CANVAS_TO_BLOB_ERROR'))), 'image/jpeg', 0.7);
+                });
+              } finally {
+                URL.revokeObjectURL(url);
+              }
+            })();
+
+            // Storage へアップロード
+            const base = (img.id || 'image').toString().replace(/[^a-zA-Z0-9_.-]/g, '_');
+            const userPart = (img.uploaderId || 'unknown').toString().replace(/[^a-zA-Z0-9_.-]/g, '_');
+            const ts = Date.now();
+            const thumbRef = ref(storage, `albums/${albumId}/${userPart}/${ts}_${base}_thumb.jpg`);
+            await uploadBytes(thumbRef, thumbBlob, { cacheControl: 'public, max-age=31536000, immutable', contentType: 'image/jpeg' });
+            const thumbUrl = await getDownloadURL(thumbRef);
+
+            // Firestore を更新
+            await setThumbUrl(img.id, thumbUrl);
+            // UI 側にも即反映
+            setImages((prev) => prev.map((x) => (x.id === img.id ? { ...x, thumbUrl } : x)));
+          } finally {
+            thumbGenRef.current.processed.add(img.id);
+          }
+        }
+
+        async function schedule(): Promise<void> {
+          while (index < targets.length) {
+            const running: Promise<void>[] = [];
+            for (let i = 0; i < concurrency && index < targets.length; i++) {
+              running.push(runOne(targets[index++]));
+            }
+            await Promise.allSettled(running);
+          }
+        }
+
+        await schedule();
+      } catch (e) {
+        // サムネ生成失敗は致命的ではないためログのみ
+        console.warn('thumbnail backfill failed', e);
+      } finally {
+        thumbGenRef.current.running = false;
+      }
+    })();
+  }, [albumId, images, visibleCount]);
 
   async function handleAddImage() {
     if (!user || !albumId || !file) return;
@@ -411,16 +526,15 @@ export default function AlbumDetailPage() {
     setError(null);
     try {
       await deleteAlbum(albumId);
-      // 削除後の遷移（プロフィールへ）
+      // 削除後の遷移（タイムラインへ）
       try {
         sessionStorage.setItem(
           'app:toast',
           JSON.stringify({ message: 'アルバムを削除しました', variant: 'success', duration: 3000 })
         );
       } catch {}
-      const profile = await getUser(user.uid);
-      const handle = profile?.handle || user.uid;
-      router.push(`/user/${handle}`);
+      // 削除済みページに戻れないよう replace を使用
+      router.replace('/timeline');
     } catch (e: any) {
       setError(translateError(e));
     } finally {

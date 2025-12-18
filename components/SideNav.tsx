@@ -74,7 +74,7 @@ function makeItems(authed: boolean): Item[] {
   return arr;
 }
 
-export default function SideNav() {
+function SideNavInner() {
   const { user } = useAuthUser();
   const unread = useNotificationsBadge();
   const [profileDoc, setProfileDoc] = useState<any | null>(null);
@@ -207,6 +207,11 @@ export default function SideNav() {
     </nav>
   );
 }
+
+// ルート遷移時に親レイアウトの再レンダリングが走っても、
+// プロパティが変わらない限り描画をスキップする。
+// パスに応じた見た目更新は PathHighlighter の副作用で行う。
+export default React.memo(SideNavInner);
 
 function PathHighlighter({ navRef, items }: { navRef: React.RefObject<HTMLElement | null>, items: Item[] }) {
   const path = usePathname();

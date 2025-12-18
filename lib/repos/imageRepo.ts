@@ -52,3 +52,8 @@ export async function deleteImage(imageId: string) {
   // ルール側で uploader または owner を許可。ここでは単純削除。
   await deleteDoc(doc(db, COL.albumImages, imageId))
 }
+
+// 既存画像に対して後からサムネイルURLを登録（バックフィル用）
+export async function setThumbUrl(imageId: string, thumbUrl: string) {
+  await updateDoc(doc(db, COL.albumImages, imageId), { thumbUrl, updatedAt: new Date() })
+}
