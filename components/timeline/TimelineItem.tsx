@@ -6,6 +6,11 @@ import { REACTION_CATEGORIES, filterReactionEmojis } from "../../lib/constants/r
 
 type Img = { url: string; thumbUrl?: string; uploaderId?: string };
 type LatestComment = { body: string; userId: string } | undefined;
+type CommentPreview = {
+  body: string;
+  userId: string;
+  user?: { uid: string; handle: string | null; iconURL?: string | null; displayName?: string };
+};
 
 export function TimelineItem(props: {
   album: { id: string; ownerId: string; title?: string | null; createdAt?: any };
@@ -14,13 +19,14 @@ export function TimelineItem(props: {
   liked: boolean;
   onLike: () => Promise<void> | void;
   latestComment?: LatestComment;
+  commentsPreview?: CommentPreview[];
   onCommentSubmit?: (text: string) => Promise<void>;
   submitting?: boolean;
   reactions?: Array<{ emoji: string; count: number; mine: boolean }>;
   onToggleReaction?: (emoji: string) => void;
   owner?: { uid: string; handle: string | null; iconURL?: string | null; displayName?: string };
 }) {
-  const { album, images, likeCount, liked, onLike, latestComment, onCommentSubmit, submitting, reactions = [], onToggleReaction, owner } = props;
+  const { album, images, likeCount, liked, onLike, latestComment, commentsPreview = [], onCommentSubmit, submitting, reactions = [], onToggleReaction, owner } = props;
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [hoveredEmoji, setHoveredEmoji] = useState<string | null>(null);
@@ -302,6 +308,34 @@ export function TimelineItem(props: {
         )}
       </div>
 
+      {commentsPreview && commentsPreview.length > 0 && (
+        <div className="mt-2 border-l border-gray-200 dark:border-gray-700 pl-3 space-y-2">
+          {commentsPreview.slice(0, 3).map((c, idx) => {
+            const u = c.user;
+            const name = u?.displayName || '名前未設定';
+            const icon = u?.iconURL || undefined;
+            const text = (() => {
+              const s = (c.body || '').toString();
+              return s.length > 30 ? s.slice(0, 30) + '…' : s;
+            })();
+            return (
+              <div key={idx} className="flex items-center gap-3">
+                <a href={`/user/${u?.handle || c.userId}`} className="shrink-0" aria-label="プロフィールへ">
+                  <Avatar src={icon} size={28} interactive={false} withBorder={false} className="rounded-full" />
+                </a>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 truncate">
+                    <a href={`/user/${u?.handle || c.userId}`} className="text-sm font-medium hover:underline truncate">{name}</a>
+                    {u?.handle && <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">@{u.handle}</span>}
+                  </div>
+                  <p className="text-sm text-gray-800 dark:text-gray-200 truncate">{text}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {onCommentSubmit && (
         <div className="flex items-center gap-2">
           <input
@@ -319,11 +353,7 @@ export function TimelineItem(props: {
         </div>
       )}
 
-      {latestComment?.body && (
-        <div className="text-xs text-gray-600">
-          最新コメント: {latestComment.body}
-        </div>
-      )}
+      {/* コメントプレビューは上でぶら下げ表示しています */}
     </article>
   );
 }

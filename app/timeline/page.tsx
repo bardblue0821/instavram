@@ -25,6 +25,7 @@ export default function TimelinePage() {
     likeCount: number;
     liked: boolean;
     latestComment?: { body: string; userId: string };
+    commentsPreview?: Array<{ body: string; userId: string; user?: Pick<UserDoc, "uid" | "handle" | "iconURL" | "displayName"> }>;
     reactions: { emoji: string; count: number; mine: boolean }[];
     owner?: Pick<UserDoc, "uid" | "handle" | "iconURL" | "displayName"> | null;
   }>>([]);
@@ -85,6 +86,18 @@ export default function TimelinePage() {
             const latest = [...cmts]
               .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0))
               .slice(-1)[0];
+            const previewRaw = [...cmts]
+              .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0))
+              .slice(-3);
+            const commentsPreview = await Promise.all(previewRaw.map(async (c) => {
+              let cu = userCache.get(c.userId);
+              if (cu === undefined) {
+                const u = await getUser(c.userId);
+                cu = u ? { uid: u.uid, handle: u.handle || null, iconURL: u.iconURL || null, displayName: u.displayName } : null;
+                userCache.set(c.userId, cu);
+              }
+              return { body: c.body, userId: c.userId, user: cu || undefined };
+            }));
             const imgRows = (imgs || [])
               .map((x: any) => ({
                 url: x.url || x.downloadUrl || "",
@@ -98,6 +111,7 @@ export default function TimelinePage() {
               likeCount: likeCnt,
               liked: likedFlag,
               latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined,
+                commentsPreview,
                 reactions,
               owner,
             };
@@ -111,14 +125,35 @@ export default function TimelinePage() {
             const row = enriched[i];
             // comments: 最新コメントのみ更新
             const cUnsub = await subscribeComments(row.album.id, (list) => {
-              const latest = [...list]
-                .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0))
-                .slice(-1)[0];
-              setRows(prev => {
-                const next = [...prev];
-                if (!next[i]) return prev;
-                next[i] = { ...next[i], latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined };
-                return next;
+              const sorted = [...list]
+                .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0));
+              const latest = sorted.slice(-1)[0];
+              const previewRaw = sorted.slice(-3);
+              // ユーザー情報を補完（必要に応じて非同期で更新）
+              (async () => {
+                const preview = await Promise.all(previewRaw.map(async (c) => {
+                  let cu = userCache.get(c.userId);
+                  if (cu === undefined) {
+                    const u = await getUser(c.userId);
+                    cu = u ? { uid: u.uid, handle: u.handle || null, iconURL: u.iconURL || null, displayName: u.displayName } : null;
+                    userCache.set(c.userId, cu);
+                  }
+                  return { body: c.body, userId: c.userId, user: cu || undefined };
+                }));
+                setRows(prev => {
+                  const next = [...prev];
+                  if (!next[i]) return prev;
+                  next[i] = { ...next[i], latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined, commentsPreview: preview };
+                  return next;
+                });
+              })().catch(()=>{
+                // ユーザー取得失敗時は最低限の本文のみ更新
+                setRows(prev => {
+                  const next = [...prev];
+                  if (!next[i]) return prev;
+                  next[i] = { ...next[i], latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined, commentsPreview: previewRaw.map(c => ({ body: c.body, userId: c.userId })) } as any;
+                  return next;
+                });
               });
             }, (err) => console.warn("comments subscribe error", err));
             localUnsubs.push(cUnsub);
@@ -259,6 +294,7 @@ export default function TimelinePage() {
               liked={row.liked}
               onLike={() => handleToggleLike(row.album.id, i)}
               latestComment={row.latestComment}
+              commentsPreview={row.commentsPreview}
               onCommentSubmit={user ? (text) => handleSubmitComment(row.album.id, text) : undefined}
               reactions={row.reactions}
               onToggleReaction={(emoji) => handleToggleReaction(row.album.id, i, emoji)}
