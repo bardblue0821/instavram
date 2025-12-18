@@ -770,10 +770,11 @@ export default function AlbumDetailPage() {
             <button
               ref={pickerBtnRef}
               type="button"
+              aria-label="リアクションを追加"
               disabled={!user}
               onClick={() => setPickerOpen((o) => !o)}
-              className="rounded border px-2 py-1 text-sm border-gray-300 bg-white text-gray-700 disabled:opacity-50"
-            >＋リアクション</button>
+              className="px-1 text-lg leading-none text-gray-700 dark:text-gray-300 disabled:opacity-50"
+            >＋</button>
             {pickerOpen && (
               <div ref={pickerRef} className="absolute top-full left-0 mt-2 w-80 surface-alt border border-base rounded shadow-lg p-2 z-50">
                 <p className="text-xs text-gray-600 mb-2">絵文字を選択してください（再選択で解除）</p>
