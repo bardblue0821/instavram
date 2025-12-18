@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useAuthUser } from "../../lib/hooks/useAuthUser";
 import { TimelineItem } from "../../components/timeline/TimelineItem";
 import { getLatestAlbums } from "../../lib/repos/albumRepo";
+import { getUser, type UserDoc } from "../../lib/repos/userRepo";
 import { listImages } from "../../lib/repos/imageRepo";
 import { listComments, subscribeComments } from "../../lib/repos/commentRepo";
 import { countLikes, hasLiked, toggleLike, subscribeLikes } from "../../lib/repos/likeRepo";
@@ -22,6 +23,7 @@ export default function TimelinePage() {
     liked: boolean;
     latestComment?: { body: string; userId: string };
     reactions: { emoji: string; count: number; mine: boolean }[];
+    owner?: Pick<UserDoc, "uid" | "handle" | "iconURL" | "displayName"> | null;
   }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,8 +35,15 @@ export default function TimelinePage() {
       setError(null);
       try {
         const albums = await getLatestAlbums(50);
+        const userCache = new Map<string, Pick<UserDoc, "uid" | "handle" | "iconURL" | "displayName"> | null>();
         const enriched = await Promise.all(
           albums.map(async (album: any) => {
+            let owner = userCache.get(album.ownerId);
+            if (owner === undefined) {
+              const u = await getUser(album.ownerId);
+              owner = u ? { uid: u.uid, handle: u.handle || null, iconURL: u.iconURL || null, displayName: u.displayName } : null;
+              userCache.set(album.ownerId, owner);
+            }
             const [imgs, cmts, likeCnt, likedFlag, reactions] = await Promise.all([
               listImages(album.id),
               listComments(album.id),
@@ -59,6 +68,7 @@ export default function TimelinePage() {
               liked: likedFlag,
               latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined,
                 reactions,
+              owner,
             };
           })
         );
@@ -219,6 +229,7 @@ export default function TimelinePage() {
           onCommentSubmit={user ? (text) => handleSubmitComment(row.album.id, text) : undefined}
           reactions={row.reactions}
           onToggleReaction={(emoji) => handleToggleReaction(row.album.id, i, emoji)}
+          owner={row.owner ?? undefined}
         />
       ))}
     </div>

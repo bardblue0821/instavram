@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import Avatar from "../profile/Avatar";
 import { listReactorsByAlbumEmoji, Reactor } from "../../lib/repos/reactionRepo";
 import { REACTION_CATEGORIES, filterReactionEmojis } from "../../lib/constants/reactions";
 
@@ -17,8 +18,9 @@ export function TimelineItem(props: {
   submitting?: boolean;
   reactions?: Array<{ emoji: string; count: number; mine: boolean }>;
   onToggleReaction?: (emoji: string) => void;
+  owner?: { uid: string; handle: string | null; iconURL?: string | null; displayName?: string };
 }) {
-  const { album, images, likeCount, liked, onLike, latestComment, onCommentSubmit, submitting, reactions = [], onToggleReaction } = props;
+  const { album, images, likeCount, liked, onLike, latestComment, onCommentSubmit, submitting, reactions = [], onToggleReaction, owner } = props;
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [hoveredEmoji, setHoveredEmoji] = useState<string | null>(null);
@@ -143,7 +145,34 @@ export function TimelineItem(props: {
 
   return (
     <article className="rounded border p-3 space-y-3">
-      <header className="space-y-1">
+      <header className="space-y-2">
+        <div className="flex items-center gap-2">
+          <a href={`/user/${owner?.handle || album.ownerId}`} className="shrink-0" aria-label="プロフィールへ">
+            <Avatar src={owner?.iconURL || undefined} size={32} interactive={false} withBorder={false} className="rounded-full" />
+          </a>
+          <div className="min-w-0">
+            {/* 表示名（ユーザー名） */}
+            <div className="text-sm font-semibold truncate">
+              <a
+                href={`/user/${owner?.handle || album.ownerId}`}
+                className="hover:underline"
+                title={owner?.displayName || '名前未設定'}
+              >
+                {owner?.displayName || '名前未設定'}
+              </a>
+            </div>
+            {/* ハンドル名 */}
+            <div className="text-[11px] text-gray-500 truncate">
+              <a
+                href={`/user/${owner?.handle || album.ownerId}`}
+                className="hover:underline"
+                title={owner?.handle ? `@${owner.handle}` : 'ハンドル未設定'}
+              >
+                {owner?.handle ? `@${owner.handle}` : 'ハンドル未設定'}
+              </a>
+            </div>
+          </div>
+        </div>
         {album.title && (
           <h3 className="text-base font-semibold">
             <a
@@ -152,7 +181,6 @@ export function TimelineItem(props: {
             >{album.title}</a>
           </h3>
         )}
-        <p className="text-xs text-gray-500">owner: {album.ownerId}</p>
       </header>
 
       <div className="overflow-hidden rounded">
