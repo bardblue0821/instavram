@@ -17,7 +17,7 @@ export default function TimelinePage() {
   const [unsubs, setUnsubs] = useState<(() => void)[]>([]);
   const [rows, setRows] = useState<Array<{
     album: AlbumRow;
-    images: { url: string; uploaderId?: string }[];
+    images: { url: string; thumbUrl?: string; uploaderId?: string }[];
     likeCount: number;
     liked: boolean;
     latestComment?: { body: string; userId: string };
@@ -45,7 +45,13 @@ export default function TimelinePage() {
             const latest = [...cmts]
               .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0))
               .slice(-1)[0];
-            const imgRows = (imgs || []).map((x: any) => ({ url: x.url || x.downloadUrl || "", uploaderId: x.uploaderId })).filter((x: any) => x.url);
+            const imgRows = (imgs || [])
+              .map((x: any) => ({
+                url: x.url || x.downloadUrl || "",
+                thumbUrl: x.thumbUrl || x.url || x.downloadUrl || "",
+                uploaderId: x.uploaderId,
+              }))
+              .filter((x: any) => x.url);
             return {
               album,
               images: imgRows,

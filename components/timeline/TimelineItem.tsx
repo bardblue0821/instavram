@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { listReactorsByAlbumEmoji, Reactor } from "../../lib/repos/reactionRepo";
 import { REACTION_CATEGORIES, filterReactionEmojis } from "../../lib/constants/reactions";
 
-type Img = { url: string; uploaderId?: string };
+type Img = { url: string; thumbUrl?: string; uploaderId?: string };
 type LatestComment = { body: string; userId: string } | undefined;
 
 export function TimelineItem(props: {
@@ -84,18 +84,22 @@ export function TimelineItem(props: {
     const list = imgs.slice(0, n);
     if (n === 0) return null;
     if (n === 1) {
+      const src = list[0].thumbUrl || list[0].url;
       return (
         <div className="grid grid-cols-1 gap-1">
-              <img src={list[0].url} alt="image" className="w-full h-auto object-cover" />
+              <img src={src} alt="image" className="w-full h-auto object-cover" loading="lazy" />
         </div>
       );
     }
     if (n === 2) {
       return (
         <div className="grid grid-cols-2 gap-1">
-          {list.map((img, i) => (
-                <img key={i} src={img.url} alt={`image-${i}`} className="w-full h-auto object-cover" />
-          ))}
+          {list.map((img, i) => {
+            const src = img.thumbUrl || img.url;
+            return (
+                <img key={i} src={src} alt={`image-${i}`} className="w-full h-auto object-cover" loading="lazy" />
+            );
+          })}
         </div>
       );
     }
@@ -103,18 +107,21 @@ export function TimelineItem(props: {
       // 左大1枚、右に上下2枚
       return (
         <div className="grid grid-cols-3 gap-1">
-              <img src={list[0].url} alt="image-0" className="col-span-2 row-span-2 w-full h-full object-cover" />
-              <img src={list[1].url} alt="image-1" className="w-full h-auto object-cover" />
-              <img src={list[2].url} alt="image-2" className="w-full h-auto object-cover" />
+              <img src={(list[0].thumbUrl||list[0].url)} alt="image-0" className="col-span-2 row-span-2 w-full h-full object-cover" loading="lazy" />
+              <img src={(list[1].thumbUrl||list[1].url)} alt="image-1" className="w-full h-auto object-cover" loading="lazy" />
+              <img src={(list[2].thumbUrl||list[2].url)} alt="image-2" className="w-full h-auto object-cover" loading="lazy" />
         </div>
       );
     }
     // 4枚: 2x2
     return (
       <div className="grid grid-cols-2 gap-1">
-        {list.map((img, i) => (
-              <img key={i} src={img.url} alt={`image-${i}`} className="w-full h-auto object-cover" />
-        ))}
+        {list.map((img, i) => {
+          const src = img.thumbUrl || img.url;
+          return (
+              <img key={i} src={src} alt={`image-${i}`} className="w-full h-auto object-cover" loading="lazy" />
+          );
+        })}
       </div>
     );
   }
