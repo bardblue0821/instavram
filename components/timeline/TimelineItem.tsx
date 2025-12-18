@@ -151,7 +151,7 @@ export function TimelineItem(props: {
   }
 
   return (
-    <article className="rounded border p-3 space-y-3">
+    <article className="py-4 space-y-3">
       <header className="space-y-2">
         <div className="flex items-center gap-2">
           <a href={`/user/${owner?.handle || album.ownerId}`} className="shrink-0" aria-label="プロフィールへ">

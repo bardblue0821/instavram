@@ -214,24 +214,28 @@ export default function TimelinePage() {
   if (error) return <div className="text-sm text-red-600">{error}</div>;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <h1 className="text-xl font-semibold">タイムライン</h1>
+    <div className="max-w-2xl mx-auto">
+      <h1 className="text-xl font-semibold mb-4">タイムライン</h1>
       {rows.length === 0 && <p className="text-sm text-gray-500">対象アルバムがありません</p>}
-      {rows.map((row, i) => (
-        <TimelineItem
-          key={row.album.id}
-          album={row.album}
-          images={row.images}
-          likeCount={row.likeCount}
-          liked={row.liked}
-          onLike={() => handleToggleLike(row.album.id, i)}
-          latestComment={row.latestComment}
-          onCommentSubmit={user ? (text) => handleSubmitComment(row.album.id, text) : undefined}
-          reactions={row.reactions}
-          onToggleReaction={(emoji) => handleToggleReaction(row.album.id, i, emoji)}
-          owner={row.owner ?? undefined}
-        />
-      ))}
+      {rows.length > 0 && (
+        <div className="divide-y divide-base">
+          {rows.map((row, i) => (
+            <TimelineItem
+              key={row.album.id}
+              album={row.album}
+              images={row.images}
+              likeCount={row.likeCount}
+              liked={row.liked}
+              onLike={() => handleToggleLike(row.album.id, i)}
+              latestComment={row.latestComment}
+              onCommentSubmit={user ? (text) => handleSubmitComment(row.album.id, text) : undefined}
+              reactions={row.reactions}
+              onToggleReaction={(emoji) => handleToggleReaction(row.album.id, i, emoji)}
+              owner={row.owner ?? undefined}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
