@@ -75,14 +75,13 @@ function makeItems(authed: boolean): Item[] {
 }
 
 export default function SideNav() {
-  const path = usePathname();
   const { user } = useAuthUser();
   const unread = useNotificationsBadge();
   const [profileDoc, setProfileDoc] = useState<any | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const gearBtnRef = useRef<HTMLButtonElement | null>(null);
-  const hide = path === '/' || path === '/login';
+  const navRef = useRef<HTMLElement | null>(null);
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
@@ -135,12 +134,12 @@ export default function SideNav() {
     };
   }, [menuOpen]);
 
-  if (!mounted || hide) return null;
+  if (!mounted) return null;
 
   const iconColorClass = currentTheme === 'dark' ? 'text-white' : 'text-black';
 
   return (
-    <nav aria-label="メインナビ" className="hidden sm:flex w-20 shrink-0 flex-col items-center gap-3 py-3 border-r border-base sticky top-0 h-dvh sidenav-bg">
+    <nav ref={navRef as React.RefObject<HTMLElement | null>} aria-label="メインナビ" className="hidden sm:flex w-20 shrink-0 flex-col items-center gap-3 py-3 border-r border-base sticky top-0 h-dvh sidenav-bg">
       {/* Profile on top */}
       <div className="mt-1 mb-1">
         <Link
@@ -153,7 +152,6 @@ export default function SideNav() {
         </Link>
       </div>
       {items.map((it) => {
-        const active = path?.startsWith(it.href);
         const isNew = it.key === 'new';
         const iconClass = isNew ? 'text-white' : iconColorClass;
         return (
@@ -162,7 +160,9 @@ export default function SideNav() {
             href={it.href}
             title={it.label}
             aria-label={it.label}
-            className={`relative flex items-center justify-center w-12 h-12 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent] ${isNew ? 'btn-accent-square' : 'hover-surface-alt'} ${!isNew && active ? 'surface-alt' : ''}`}
+            data-href={it.href}
+            data-new={isNew ? 'true' : 'false'}
+            className={`relative flex items-center justify-center w-12 h-12 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent] ${isNew ? 'btn-accent-square' : 'hover-surface-alt'}`}
           >
             <span className={`text-xl leading-none ${iconClass}`} aria-hidden>
               {it.icon}
@@ -202,6 +202,39 @@ export default function SideNav() {
           </div>
         )}
       </div>
+      {/* Route-aware active state without re-rendering parent */}
+      <PathHighlighter navRef={navRef} items={items} />
     </nav>
   );
+}
+
+function PathHighlighter({ navRef, items }: { navRef: React.RefObject<HTMLElement | null>, items: Item[] }) {
+  const path = usePathname();
+  useEffect(() => {
+    const navEl = navRef.current;
+    if (!navEl) return;
+    // Hide nav for specific routes without triggering parent re-render
+    if (path === '/' || path === '/login') {
+      navEl.style.display = 'none';
+    } else {
+      navEl.style.display = '';
+    }
+
+    // Update active styles on links based on current pathname
+    const anchors = Array.from(navEl.querySelectorAll('a[data-href]')) as HTMLAnchorElement[];
+    anchors.forEach(a => {
+      const href = a.getAttribute('data-href') || '';
+      const isNew = a.getAttribute('data-new') === 'true';
+      const active = path.startsWith(href);
+      if (!isNew) {
+        if (active) {
+          a.classList.add('surface-alt');
+        } else {
+          a.classList.remove('surface-alt');
+        }
+      }
+    });
+  }, [path, navRef]);
+
+  return null;
 }
