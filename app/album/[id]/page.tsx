@@ -33,6 +33,8 @@ import { storage } from "../../../lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { addNotification } from "../../../lib/repos/notificationRepo";
 import { REACTION_EMOJIS, REACTION_CATEGORIES, filterReactionEmojis } from "../../../lib/constants/reactions";
+import { getFriendStatus } from "../../../lib/repos/friendRepo";
+import { isWatched } from "../../../lib/repos/watchRepo";
 
 type CommentRecord = {
   id: string;
@@ -92,6 +94,9 @@ export default function AlbumDetailPage() {
   }, [activeCat]);
   // 一覧の初期表示件数（早期 return より前に hook を宣言しておく）
   const [visibleCount, setVisibleCount] = useState(16);
+  // アクセス権限
+  const [isFriend, setIsFriend] = useState(false);
+  const [isWatcher, setIsWatcher] = useState(false);
 
   useEffect(() => {
     if (!albumId) return;
@@ -207,6 +212,32 @@ export default function AlbumDetailPage() {
     };
   }, [albumId, user?.uid]);
 
+  // アクセス権限の判定（オーナー/フレンド/ウォッチャー）
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!album?.ownerId || !user?.uid) {
+        if (!cancelled) { setIsFriend(false); setIsWatcher(false); }
+        return;
+      }
+      try {
+        const [forward, backward, watched] = await Promise.all([
+          getFriendStatus(user.uid, album.ownerId),
+          getFriendStatus(album.ownerId, user.uid),
+          isWatched(user.uid, album.ownerId),
+        ]);
+        if (!cancelled) {
+          const f = (forward === 'accepted') || (backward === 'accepted');
+          setIsFriend(!!f);
+          setIsWatcher(!!watched);
+        }
+      } catch (e) {
+        if (!cancelled) { setIsFriend(false); setIsWatcher(false); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [album?.ownerId, user?.uid]);
+
   // 既存画像でサムネイルが無い場合に、軽量サムネイルをバックグラウンド生成して登録
   const thumbGenRef = useRef<{ running: boolean; processed: Set<string> }>({ running: false, processed: new Set() });
   useEffect(() => {
@@ -321,6 +352,11 @@ export default function AlbumDetailPage() {
 
   async function handleAddImage() {
     if (!user || !albumId || !file) return;
+    // 権限チェック: オーナー/フレンドのみ
+    if (!(isOwner || isFriend)) {
+      setError('画像を追加する権限がありません');
+      return;
+    }
     setUploading(true);
     setError(null);
     try {
@@ -437,6 +473,13 @@ export default function AlbumDetailPage() {
   async function handleDeleteImage(id: string) {
     if (!confirm("画像を削除しますか？")) return;
     try {
+      // 権限チェック: オーナーは全て、フレンドは自分の画像のみ、ウォッチャー不可
+      const target = images.find((img) => img.id === id);
+      if (!target) return;
+      if (!(isOwner || (isFriend && target.uploaderId === user?.uid))) {
+        setError('この画像を削除する権限がありません');
+        return;
+      }
       await deleteImage(id);
       const imgs = await listImages(albumId!);
       imgs.sort(
@@ -576,6 +619,10 @@ export default function AlbumDetailPage() {
 
   async function submitComment() {
     if (!user || !albumId || !commentText.trim()) return;
+    if (!(isOwner || isFriend || isWatcher)) {
+      setError('コメントする権限がありません');
+      return;
+    }
     setCommenting(true);
     setError(null);
     try {
@@ -618,12 +665,19 @@ export default function AlbumDetailPage() {
   const isOwner = !!(user && album.ownerId === user.uid);
   const myCount = images.filter((img) => img.uploaderId === user?.uid).length;
   const remaining = 4 - myCount;
-  const canAddImages = !!user;
-  const canPostComment = !!user;
+  // 権限: 画像追加はオーナー/フレンドのみ。コメントはオーナー/フレンド/ウォッチャー。
+  const canAddImages = !!user && (isOwner || isFriend);
+  const canPostComment = !!user && (isOwner || isFriend || isWatcher);
+  // タイトル表示（null/空文字の場合は「タイトルなし」）
+  const displayTitle = (album.title && (album.title + '').trim().length > 0) ? (album.title as string) : '無題';
 
   return (
     <div className="space-y-6">
       <div>
+        {/* タイトルは非オーナーに対しても表示。null/空なら「タイトルなし」 */}
+        {!isOwner && (
+          <h1 className="font-bold text-2xl">{displayTitle}</h1>
+        )}
 
         {isOwner && (
           <div className="mt-2 space-y-3">
@@ -784,7 +838,12 @@ export default function AlbumDetailPage() {
             layoutType="grid"
             columns={4}
             visibleCount={visibleCount}
-            canDelete={(p) => isOwner || p.uploaderId === user?.uid}
+            // 写真削除: オーナーは全て可、フレンドは自分がアップしたもののみ、ウォッチャーは不可
+            canDelete={(p) => {
+              if (isOwner) return true;
+              if (isFriend) return p.uploaderId === user?.uid;
+              return false;
+            }}
             onDelete={(p) => { if (p.id) handleDeleteImage(p.id); }}
           />
         )}
@@ -844,13 +903,15 @@ export default function AlbumDetailPage() {
       </section>
 
       <section>
-        <div className="pt-3 mt-2">
-          <button
-            type="button"
-            onClick={askDeleteAlbum}
-            className="rounded bg-red-600 px-3 py-1.5 text-sm text-white"
-          >アルバムを削除</button>
-        </div>
+        {isOwner && (
+          <div className="pt-3 mt-2">
+            <button
+              type="button"
+              onClick={askDeleteAlbum}
+              className="rounded bg-red-600 px-3 py-1.5 text-sm text-white"
+            >アルバムを削除</button>
+          </div>
+        )}
       </section>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
