@@ -83,20 +83,19 @@ export default function TimelinePage() {
               user ? hasLiked(album.id, user.uid) : Promise.resolve(false),
               listReactionsByAlbum(album.id, user?.uid),
             ]);
-            const latest = [...cmts]
-              .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0))
-              .slice(-1)[0];
-            const previewRaw = [...cmts]
-              .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0))
-              .slice(-3);
-            const commentsPreview = await Promise.all(previewRaw.map(async (c) => {
+            const cAsc = [...cmts]
+              .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0));
+            const latest = cAsc.slice(-1)[0];
+            // 最新が上に来るように、末尾3件を逆順に並べる
+            const previewRawDesc = cAsc.slice(-3).reverse();
+            const commentsPreview = await Promise.all(previewRawDesc.map(async (c) => {
               let cu = userCache.get(c.userId);
               if (cu === undefined) {
                 const u = await getUser(c.userId);
                 cu = u ? { uid: u.uid, handle: u.handle || null, iconURL: u.iconURL || null, displayName: u.displayName } : null;
                 userCache.set(c.userId, cu);
               }
-              return { body: c.body, userId: c.userId, user: cu || undefined };
+              return { body: c.body, userId: c.userId, user: cu || undefined, createdAt: c.createdAt };
             }));
             const imgRows = (imgs || [])
               .map((x: any) => ({
@@ -128,17 +127,18 @@ export default function TimelinePage() {
               const sorted = [...list]
                 .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0));
               const latest = sorted.slice(-1)[0];
-              const previewRaw = sorted.slice(-3);
+              // 最新が上に来るように表示順を降順に
+              const previewRawDesc = sorted.slice(-3).reverse();
               // ユーザー情報を補完（必要に応じて非同期で更新）
               (async () => {
-                const preview = await Promise.all(previewRaw.map(async (c) => {
+                const preview = await Promise.all(previewRawDesc.map(async (c) => {
                   let cu = userCache.get(c.userId);
                   if (cu === undefined) {
                     const u = await getUser(c.userId);
                     cu = u ? { uid: u.uid, handle: u.handle || null, iconURL: u.iconURL || null, displayName: u.displayName } : null;
                     userCache.set(c.userId, cu);
                   }
-                  return { body: c.body, userId: c.userId, user: cu || undefined };
+                  return { body: c.body, userId: c.userId, user: cu || undefined, createdAt: c.createdAt };
                 }));
                 setRows(prev => {
                   const next = [...prev];
@@ -151,7 +151,7 @@ export default function TimelinePage() {
                 setRows(prev => {
                   const next = [...prev];
                   if (!next[i]) return prev;
-                  next[i] = { ...next[i], latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined, commentsPreview: previewRaw.map(c => ({ body: c.body, userId: c.userId })) } as any;
+                  next[i] = { ...next[i], latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined, commentsPreview: previewRawDesc.map(c => ({ body: c.body, userId: c.userId, createdAt: c.createdAt })) } as any;
                   return next;
                 });
               });

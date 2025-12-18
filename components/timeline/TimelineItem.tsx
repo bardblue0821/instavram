@@ -10,6 +10,7 @@ type CommentPreview = {
   body: string;
   userId: string;
   user?: { uid: string; handle: string | null; iconURL?: string | null; displayName?: string };
+  createdAt?: any;
 };
 
 export function TimelineItem(props: {
@@ -318,6 +319,23 @@ export function TimelineItem(props: {
               const s = (c.body || '').toString();
               return s.length > 30 ? s.slice(0, 30) + '…' : s;
             })();
+            function toDate(x: any): Date | null {
+              if (!x) return null;
+              if (x instanceof Date) return x;
+              if (typeof x === 'object' && typeof x.seconds === 'number') return new Date(x.seconds * 1000);
+              if (typeof x === 'number') return new Date(x > 1e12 ? x : x * 1000);
+              return null;
+            }
+            function fmt(dt: Date | null): string {
+              if (!dt) return '';
+              const y = dt.getFullYear();
+              const m = String(dt.getMonth() + 1).padStart(2, '0');
+              const d = String(dt.getDate()).padStart(2, '0');
+              const hh = String(dt.getHours()).padStart(2, '0');
+              const mm = String(dt.getMinutes()).padStart(2, '0');
+              return `${y}/${m}/${d} ${hh}:${mm}`;
+            }
+            const timeText = fmt(toDate(c.createdAt));
             return (
               <div key={idx} className="flex items-center gap-3">
                 <a href={`/user/${u?.handle || c.userId}`} className="shrink-0" aria-label="プロフィールへ">
@@ -327,6 +345,7 @@ export function TimelineItem(props: {
                   <div className="flex items-center gap-2 truncate">
                     <a href={`/user/${u?.handle || c.userId}`} className="text-sm font-medium hover:underline truncate">{name}</a>
                     {u?.handle && <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">@{u.handle}</span>}
+                    {timeText && <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{timeText}</span>}
                   </div>
                   <p className="text-sm text-gray-800 dark:text-gray-200 truncate">{text}</p>
                 </div>
