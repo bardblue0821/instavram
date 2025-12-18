@@ -35,6 +35,7 @@ import { addNotification } from "../../../lib/repos/notificationRepo";
 import { REACTION_EMOJIS, REACTION_CATEGORIES, filterReactionEmojis } from "../../../lib/constants/reactions";
 import { getFriendStatus } from "../../../lib/repos/friendRepo";
 import { isWatched } from "../../../lib/repos/watchRepo";
+import { HeartIcon } from "../../../components/icons/HeartIcon";
 
 type CommentRecord = {
   id: string;
@@ -708,11 +709,14 @@ export default function AlbumDetailPage() {
         <div className="mt-2 relative flex items-center gap-3">
           <div className="flex items-center gap-1">
             <button
+              aria-label={liked ? "いいね済み" : "いいね"}
               aria-pressed={liked}
               disabled={!user || likeBusy}
               onClick={handleToggleLike}
-              className={`rounded border px-2 py-1 text-sm ${liked ? "border-pink-600 bg-pink-600 text-white" : "border-gray-300 bg-white text-gray-700"} disabled:opacity-50`}
-            >{liked ? "♥" : "♡"}</button>
+              className={`${liked ? "text-pink-600" : "text-gray-700 dark:text-gray-300"} disabled:opacity-50`}
+            >
+              <HeartIcon filled={liked} size={20} />
+            </button>
             <span className="text-xs text-gray-600">{likeCount}</span>
           </div>
           {/* リアクション絵文字（ピッカー） */}

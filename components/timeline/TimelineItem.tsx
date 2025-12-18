@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import Avatar from "../profile/Avatar";
 import { listReactorsByAlbumEmoji, Reactor } from "../../lib/repos/reactionRepo";
 import { REACTION_CATEGORIES, filterReactionEmojis } from "../../lib/constants/reactions";
+import { HeartIcon } from "../icons/HeartIcon";
 
 type Img = { url: string; thumbUrl?: string; uploaderId?: string };
 type LatestComment = { body: string; userId: string } | undefined;
@@ -200,11 +201,14 @@ export function TimelineItem(props: {
 
       <div className="flex items-center gap-2">
         <button
+          aria-label={liked ? "いいね済み" : "いいね"}
           aria-pressed={liked}
-          className={`rounded border px-2 py-1 text-sm ${liked ? "border-pink-600 bg-pink-600 text-white" : "border-gray-300 bg-white text-gray-700"}`}
+          className={`${liked ? "text-pink-600" : "text-gray-700 dark:text-gray-300"}`}
           onClick={() => onLike?.()}
-        >{liked ? "♥ いいね済み" : "♡ いいね"}</button>
-        <span className="text-xs text-gray-600">{likeCount}</span>
+        >
+          <HeartIcon filled={liked} size={20} />
+        </button>
+        <span className="text-xs text-gray-600 dark:text-gray-400">{likeCount}</span>
       </div>
 
       {/* リアクション（簡易版：1以上のみ表示、クリックでトグル、ホバーでユーザー一覧） */}
