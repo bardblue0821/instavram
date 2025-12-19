@@ -46,6 +46,8 @@ export default function ProfilePage() {
   const [stats, setStats] = useState<{ ownCount: number; joinedCount: number; commentCount: number } | null>(null);
   const [loadingExtra, setLoadingExtra] = useState(false);
   const [extraError, setExtraError] = useState<string | null>(null);
+  // Tab state for lists
+  const [listTab, setListTab] = useState<'own'|'joined'|'comments'>('own');
 
   // Inline edit state
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -322,8 +324,6 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
-        {/* 詳細の表示名フィールドはヘッダーで編集する方針のため削除 */}
-        {/* 詳細のハンドルフィールドもヘッダーで編集する方針のため削除 */}
         <InlineTextareaField
           label="自己紹介"
           value={profile.bio || ''}
@@ -381,66 +381,76 @@ export default function ProfilePage() {
   <section className="space-y-4 pt-4 border-t border-base">
         {loadingExtra && <p className="text-sm fg-subtle">読み込み中...</p>}
         {extraError && <p className="text-sm text-red-600">{extraError}</p>}
-        {stats && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-            <div className="p-3 rounded surface-alt">
-              <p className="text-xs fg-muted">作成アルバム</p>
-              <p className="text-lg font-semibold">{stats.ownCount}</p>
-            </div>
-            <div className="p-3 rounded surface-alt">
-              <p className="text-xs fg-muted">参加アルバム</p>
-              <p className="text-lg font-semibold">{stats.joinedCount}</p>
-            </div>
-            <div className="p-3 rounded surface-alt">
-              <p className="text-xs fg-muted">コメント</p>
-              <p className="text-lg font-semibold">{stats.commentCount}</p>
-            </div>
-          </div>
-        )}
 
-        <div className="space-y-6 mt-4">
-          <div>
-            <h3 className="font-medium mb-2">作成アルバム</h3>
-            {!ownAlbums && <p className="text-sm fg-subtle">-</p>}
-            {ownAlbums && ownAlbums.length === 0 && <p className="text-sm fg-subtle">まだアルバムがありません</p>}
-            <ul className="space-y-2">
-              {ownAlbums && ownAlbums.map(a => (
-                <li key={a.id} className="p-2 border rounded">
-                  <a href={`/album/${a.id}`} className="link-accent text-sm font-medium">{a.title || '無題'}</a>
-                  <p className="text-xs fg-subtle">{a.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
-                </li>
-              ))}
-            </ul>
+        <div className="space-y-4 mt-4">
+          {/* Tabs */}
+          <div role="tablist" aria-label="コンテンツ切替" className="flex gap-2">
+            <button
+              role="tab"
+              aria-selected={listTab==='own'}
+              className={`${listTab==='own' ? 'border-b-2 border-[--accent] text-foreground' : 'text-foreground/70 hover-surface-alt'} px-3 py-2`}
+              onClick={()=> setListTab('own')}
+            >作成アルバム <span className="text-xs fg-muted ml-1">({ownAlbums?.length ?? stats?.ownCount ?? 0})</span></button>
+            <button
+              role="tab"
+              aria-selected={listTab==='joined'}
+              className={`${listTab==='joined' ? 'border-b-2 border-[--accent] text-foreground' : 'text-foreground/70 hover-surface-alt'} px-3 py-2`}
+              onClick={()=> setListTab('joined')}
+            >参加アルバム <span className="text-xs fg-muted ml-1">({joinedAlbums?.length ?? stats?.joinedCount ?? 0})</span></button>
+            <button
+              role="tab"
+              aria-selected={listTab==='comments'}
+              className={`${listTab==='comments' ? 'border-b-2 border-[--accent] text-foreground' : 'text-foreground/70 hover-surface-alt'} px-3 py-2`}
+              onClick={()=> setListTab('comments')}
+            >コメント <span className="text-xs fg-muted ml-1">({userComments?.length ?? stats?.commentCount ?? 0})</span></button>
           </div>
 
-          <div>
-            <h3 className="font-medium mb-2">参加アルバム</h3>
-            {!joinedAlbums && <p className="text-sm fg-subtle">-</p>}
-            {joinedAlbums && joinedAlbums.length === 0 && <p className="text-sm fg-subtle">参加アルバムはまだありません</p>}
-            <ul className="space-y-2">
-              {joinedAlbums && joinedAlbums.map((a: any, i: number) => (
-                <li key={i} className="p-2 border rounded">
-                  <a href={`/album/${a.id}`} className="link-accent text-sm font-medium">{a.title || '無題'}</a>
-                  <p className="text-xs fg-subtle">{a.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* Panels */}
+          {listTab==='own' && (
+            <div role="tabpanel" aria-label="作成アルバム">
+              {!ownAlbums && <p className="text-sm fg-subtle">-</p>}
+              {ownAlbums && ownAlbums.length === 0 && <p className="text-sm fg-subtle">まだアルバムがありません</p>}
+              <ul className="divide-y divide-base">
+                {ownAlbums && ownAlbums.map(a => (
+                  <li key={a.id} className="py-2">
+                    <a href={`/album/${a.id}`} className="link-accent text-sm font-medium">{a.title || '無題'}</a>
+                    <p className="text-xs fg-subtle">{a.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-          <div>
-            <h3 className="font-medium mb-2">投稿コメント (最大50件)</h3>
-            {!userComments && <p className="text-sm fg-subtle">-</p>}
-            {userComments && userComments.length === 0 && <p className="text-sm fg-subtle">コメントはまだありません</p>}
-            <ul className="space-y-2">
-              {userComments && userComments.map(c => (
-                <li key={c.id} className="p-2 border rounded text-sm">
-                  <p className="whitespace-pre-line">{c.body}</p>
-                  <a href={`/album/${c.albumId}`} className="text-xs link-accent">アルバムへ</a>
-                  <p className="text-[10px] fg-subtle">{c.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {listTab==='joined' && (
+            <div role="tabpanel" aria-label="参加アルバム">
+              {!joinedAlbums && <p className="text-sm fg-subtle">-</p>}
+              {joinedAlbums && joinedAlbums.length === 0 && <p className="text-sm fg-subtle">参加アルバムはまだありません</p>}
+              <ul className="divide-y divide-base">
+                {joinedAlbums && joinedAlbums.map((a: any, i: number) => (
+                  <li key={i} className="py-2">
+                    <a href={`/album/${a.id}`} className="link-accent text-sm font-medium">{a.title || '無題'}</a>
+                    <p className="text-xs fg-subtle">{a.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {listTab==='comments' && (
+            <div role="tabpanel" aria-label="コメント">
+              {!userComments && <p className="text-sm fg-subtle">-</p>}
+              {userComments && userComments.length === 0 && <p className="text-sm fg-subtle">コメントはまだありません</p>}
+              <ul className="divide-y divide-base">
+                {userComments && userComments.map(c => (
+                  <li key={c.id} className="py-2 text-sm">
+                    <p className="whitespace-pre-line">{c.body}</p>
+                    <a href={`/album/${c.albumId}`} className="text-xs link-accent">アルバムへ</a>
+                    <p className="text-[10px] fg-subtle">{c.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </section>
 
