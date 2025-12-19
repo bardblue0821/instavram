@@ -104,7 +104,7 @@ export default function SearchPage() {
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder="ユーザー名 / @ハンドル / アルバム名 / 説明 / コメント"
-          className="w-full border-b-2 border-blue-500 bg-transparent p-2 text-sm focus:outline-none"
+          className="w-full input-underline text-sm"
         />
         {!normalized && history.length > 0 && (
           <div className="mt-2">
@@ -125,17 +125,7 @@ export default function SearchPage() {
             </ul>
           </div>
         )}
-        {suggest.length > 0 && (
-          <ul className="mt-2 border border-base rounded divide-y divide-base">
-            {suggest.map((s, i) => (
-              <li key={i} className="text-sm">
-                <Link href={s.href} className="block px-3 py-2 hover:bg-gray-50" onClick={() => saveHistory(normalized)}>
-                  {s.type === "user" ? "👤 " : "📁 "}{s.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+        {/* 入力中の候補表示は廃止（UI簡素化） */}
         {loading && <p className="text-xs text-gray-500 mt-2">検索中...</p>}
         {err && <p className="text-xs text-red-600 mt-2">{err}</p>}
       </div>
@@ -148,7 +138,7 @@ export default function SearchPage() {
           <ul className="space-y-1">
             {users.map((u) => (
               <li key={u.uid} className="text-sm truncate">
-                <Link href={u.handle ? `/user/${u.handle}` : "#"} className="link-accent">
+                <Link href={u.handle ? `/user/${u.handle}` : "#"}>
                   {u.displayName || ""}{u.displayName ? " " : ""}{u.handle ? `@${u.handle}` : ""}
                 </Link>
               </li>
@@ -163,7 +153,7 @@ export default function SearchPage() {
           <ul className="space-y-1">
             {albums.map((a) => (
               <li key={a.id} className="text-sm truncate">
-                <Link href={`/album/${a.id}`} className="link-accent">
+                <Link href={`/album/${a.id}`}>
                   {a.title || "無題"}{a.description ? ` — ${a.description}` : ""}
                 </Link>
               </li>
