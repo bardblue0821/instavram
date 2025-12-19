@@ -21,6 +21,7 @@ import {
   toggleLike,
   hasLiked,
   countLikes,
+  subscribeLikes,
 } from "../../../lib/repos/likeRepo";
 import { translateError } from "../../../lib/errors";
 import { CommentList } from "../../../components/comments/CommentList";
@@ -128,9 +129,7 @@ export default function AlbumDetailPage() {
         setEditPlaceUrl(vm.album.placeUrl ?? "");
         setImages(vm.images as any[]);
         setComments(vm.commentsAsc as CommentRecord[]);
-        setReactions(vm.reactions);
-        setLiked(vm.liked);
-        setLikeCount(vm.likeCount);
+  setReactions(vm.reactions);
 
         unsubComments = await subscribeComments(
           albumId,
@@ -169,33 +168,41 @@ export default function AlbumDetailPage() {
     let cancelled = false;
     let unsubLikes: (() => void) | undefined;
 
-    if (!user) {
-      setLiked(false);
-      setLikeCount(0);
-      return () => {
-        cancelled = true;
-        if (unsubLikes) unsubLikes();
-      };
-    }
-
     (async () => {
       try {
-        const [likedFlag, cnt] = await Promise.all([
-          hasLiked(albumId, user.uid),
-          countLikes(albumId),
-        ]);
-        if (!cancelled) {
-          setLiked(likedFlag);
-          setLikeCount(cnt);
+        // 初期値はクエリで即時反映
+        const cnt = await countLikes(albumId);
+        if (!cancelled) setLikeCount(cnt);
+        if (user?.uid) {
+          const likedFlag = await hasLiked(albumId, user.uid);
+          if (!cancelled) setLiked(likedFlag);
+        } else {
+          if (!cancelled) setLiked(false);
         }
       } catch (e: any) {
         if (!cancelled) setError(translateError(e));
+      }
+      // リアルタイム購読で常に同期
+      try {
+        unsubLikes = await subscribeLikes(
+          albumId,
+          (list) => {
+            const cnt2 = list.length;
+            const meLiked = !!(user?.uid && list.some(x => x.userId === user.uid));
+            setLikeCount(cnt2);
+            setLiked(meLiked);
+          },
+          (err) => console.warn("likes subscribe error", err)
+        );
+      } catch (e) {
+        // 購読失敗は致命的ではない
+        console.warn('subscribeLikes failed', e);
       }
     })();
 
     return () => {
       cancelled = true;
-      if (unsubLikes) unsubLikes();
+      if (unsubLikes) try { unsubLikes(); } catch {}
     };
   }, [albumId, user?.uid]);
 
