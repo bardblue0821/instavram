@@ -8,6 +8,9 @@
 - Tailwind CSS
 - TypeScript
 
+## ディレクトリ構成
+
+
 ## 手順: スプリント１
 ### 手順
 1. 開発環境準備  
@@ -1770,8 +1773,6 @@ export interface NotificationDoc {
 - アルバム詳細UIにピッカーとカウント表示を追加。
 - Firestore ルールに `reactions` セクション追加。
 - 任意: よく使う絵文字セットの定義を `lib/constants/reactions.ts` に用意。
-
-### コメントにもリアクション機能を
 
 
 ### サイズが大きい画像が来たら、サイズを縮小する
