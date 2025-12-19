@@ -24,7 +24,7 @@ interface NotificationRow {
 export default function NotificationsPage(){
   const { user } = useAuthUser();
   const [rows, setRows] = useState<NotificationRow[]>([]);
-  const [actors, setActors] = useState<Record<string, { handle?: string|null; displayName?: string|null }>>({});
+  const [actors, setActors] = useState<Record<string, { handle?: string|null; displayName?: string|null; iconURL?: string|null }>>({});
   const [friendState, setFriendState] = useState<Record<string, 'pending'|'accepted'|'none'>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string|null>(null);
@@ -64,11 +64,11 @@ export default function NotificationsPage(){
         setRows(initial as NotificationRow[]);
         // 全通知の actor 情報を取得（重複排除）。友達申請はステータスも取得。
         const allActorIds = Array.from(new Set(initial.map(r => r.actorId))).filter(a => !!a);
-        const actorProfiles: Record<string, { handle?: string|null; displayName?: string|null }> = {};
+        const actorProfiles: Record<string, { handle?: string|null; displayName?: string|null; iconURL?: string|null }> = {};
         for (const aid of allActorIds) {
           try {
             const u = await getUser(aid);
-            actorProfiles[aid] = { handle: u?.handle || null, displayName: u?.displayName || null };
+            actorProfiles[aid] = { handle: u?.handle || null, displayName: u?.displayName || null, iconURL: (u as any)?.iconURL || null };
             // friend_request ステータスのみ取得
             if (user && aid) {
               const st = await getFriendStatus(aid, user.uid);
@@ -89,11 +89,11 @@ export default function NotificationsPage(){
           const newActors = Array.from(new Set(list.map(r => r.actorId))).filter(a => !actors[a]);
           if (newActors.length) {
             (async () => {
-              const addProfiles: Record<string, { handle?: string|null; displayName?: string|null }> = {};
+              const addProfiles: Record<string, { handle?: string|null; displayName?: string|null; iconURL?: string|null }> = {};
               for (const aid of newActors) {
                 try {
                   const u = await getUser(aid);
-                  addProfiles[aid] = { handle: u?.handle || null, displayName: u?.displayName || null };
+                  addProfiles[aid] = { handle: u?.handle || null, displayName: u?.displayName || null, iconURL: (u as any)?.iconURL || null };
                   const st = await getFriendStatus(aid, user.uid);
                   friendState[aid] = st === 'accepted' ? 'accepted' : (st === 'pending' ? 'pending' : 'none');
                 } catch {}
@@ -127,18 +127,40 @@ export default function NotificationsPage(){
       <ul className="divide-y divide-base">
         {rows.map(r => {
           const isUnread = !r.readAt;
-          const targetHref = r.albumId ? `/album/${r.albumId}` : undefined;
           const actor = actors[r.actorId];
+          const targetHref = getNotificationHref(r, actor);
           const fState = r.type === 'friend_request' ? friendState[r.actorId] : undefined;
           const canActOnFriend = r.type === 'friend_request' && fState === 'pending';
+          const actorName = formatActorName(actor, r.actorId);
+          const actionText = formatActionText(r);
           return (
             <li key={r.id} className={`py-3 text-sm ${isUnread ? 'surface-alt' : ''}`}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="space-y-1">
-                  <p>{r.message}</p>
+              <div className="flex flex-col items-start gap-2">
+                {/* 誰が: アイコンを上に表示 */}
+                <div>
+                  <Link href={`/user/${actor?.handle || r.actorId}`} className="block" aria-label="プロフィールへ">
+                    {actor?.iconURL ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={actor.iconURL} alt="" className="h-12 w-12 rounded-md object-cover" />
+                    ) : (
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-md surface-alt text-[12px] fg-muted">
+                        {(actorName || '?').slice(0,1)}
+                      </span>
+                    )}
+                  </Link>
+                </div>
+                <div className="flex items-start justify-between gap-2 w-full">
+                  <div className="space-y-1">
+                    {/* 「誰が」「何に」「何をしたか」 */}
+                    {targetHref ? (
+                      <Link href={targetHref} className="text-foreground hover:text-foreground">
+                        <span className="font-medium">{actorName}</span>{actionText}
+                      </Link>
+                    ) : (
+                      <p><span className="font-medium">{actorName}</span>{actionText}</p>
+                    )}
                   {r.type === 'friend_request' && (
                     <div className="text-xs fg-muted flex flex-wrap items-center gap-2">
-                      <span>申請元: {formatActor(actor, r.actorId)}</span>
                       {canActOnFriend && (
                         <>
                           <button
@@ -157,13 +179,13 @@ export default function NotificationsPage(){
                       {fState === 'none' && <span className="fg-subtle">状態: 不明</span>}
                     </div>
                   )}
-                  {r.type !== 'friend_request' && actor && (
-                    <p className="text-xs fg-muted">発信者: {formatActor(actor, r.actorId)}</p>
+                  {r.albumId && targetHref?.startsWith('/album/') && (
+                    <Link href={targetHref} className="text-xs link-accent">アルバムを見る</Link>
                   )}
-                  {r.albumId && <Link href={targetHref!} className="text-xs link-accent">アルバムを見る</Link>}
                   <p className="text-[11px] fg-subtle">{formatDate(r.createdAt)}</p>
+                  </div>
+                  <span className="text-[10px] uppercase tracking-wide fg-subtle">{r.type}</span>
                 </div>
-                <span className="text-[10px] uppercase tracking-wide fg-subtle">{r.type}</span>
               </div>
             </li>
           );
@@ -205,11 +227,43 @@ function formatDate(v:any){
 }
 function pad(n:number){ return n<10 ? '0'+n : ''+n; }
 
-function formatActor(a?: { handle?: string|null; displayName?: string|null }, fallbackId?: string){
-  const handle = (a?.handle || '').trim();
+// （旧）発信者表記は廃止したため未使用
+
+function formatActorName(a?: { handle?: string|null; displayName?: string|null }, fallbackId?: string){
   const name = (a?.displayName || '').trim();
-  if (name && handle) return `${name} @${handle}`;
-  if (name) return name;
-  if (handle) return `@${handle}`;
-  return fallbackId || '';
+  const handle = (a?.handle || '').trim();
+  if (name) return `${name}さんが`;
+  if (handle) return `@${handle} さんが`;
+  return (fallbackId ? `${fallbackId.slice(0,6)} さんが` : '誰かが');
+}
+
+function formatActionText(r: NotificationRow){
+  // 何に / 何をしたか
+  const target = r.albumId ? 'あなたのアルバムに' : (r.imageId ? 'あなたの画像に' : 'あなたの投稿に');
+  switch(r.type){
+    case 'like': return `${target}いいねしました。`;
+    case 'comment': return `${target}コメントしました。`;
+    case 'image': return `${target}画像を追加しました。`;
+    case 'friend_request': return `あなたにフレンド申請しました。`;
+    case 'watch': return `あなたをウォッチしました。`;
+    case 'repost': return `${target}リポストしました。`;
+    case 'reaction': return `${target}リアクションしました。`;
+    default: return `アクションがありました。`;
+  }
+}
+
+function getNotificationHref(r: NotificationRow, actor?: { handle?: string|null }): string | undefined {
+  switch(r.type){
+    case 'like':
+    case 'comment':
+    case 'image':
+    case 'repost':
+    case 'reaction':
+      return r.albumId ? `/album/${r.albumId}` : undefined;
+    case 'friend_request':
+    case 'watch':
+      return (actor?.handle || r.actorId) ? `/user/${actor?.handle || r.actorId}` : undefined;
+    default:
+      return undefined;
+  }
 }
