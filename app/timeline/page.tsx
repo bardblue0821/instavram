@@ -188,18 +188,32 @@ export default function TimelinePage() {
       next[index] = { ...row };
       return next;
     });
-    toggleReaction(albumId, user.uid, emoji).then(result => {
-      const row = rows[index];
-      if (result.added && row && row.album.ownerId !== user.uid) {
-        addNotification({
-          userId: row.album.ownerId,
-          actorId: user.uid,
-          type: 'reaction',
-          albumId,
-          message: 'アルバムにリアクション: ' + emoji,
-        }).catch(()=>{});
-      }
-    }).catch(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/reactions/toggle', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ albumId, userId: user.uid, emoji }),
+        });
+        let added = false;
+        if (res.ok) {
+          const data = await res.json().catch(()=>({}));
+          added = !!data?.added;
+        } else {
+          const result = await toggleReaction(albumId, user.uid, emoji);
+          added = !!(result as any)?.added;
+        }
+        const row = rows[index];
+        if (added && row && row.album.ownerId !== user.uid) {
+          addNotification({
+            userId: row.album.ownerId,
+            actorId: user.uid,
+            type: 'reaction',
+            albumId,
+            message: 'アルバムにリアクション: ' + emoji,
+          }).catch(()=>{});
+        }
+      } catch {
       // 失敗時ロールバック: 再取得のコストを避け簡易ロールバック
       setRows((prev) => {
         const next = [...prev];
@@ -220,7 +234,8 @@ export default function TimelinePage() {
         next[index] = { ...row };
         return next;
       });
-    });
+      }
+    })();
   }
 
   async function handleSubmitComment(albumId: string, text: string) {

@@ -32,3 +32,7 @@ Route Handlers (server-side controllers):
 - Comments
 	- `app/api/comments/add/route.ts`：コメント追加。簡易レート制限（IPあたり 10req/分）＋フォールバックは既存リポジトリ側
 	- 使用箇所：`app/timeline/page.tsx` / `app/album/[id]/page.tsx`
+
+- Reactions
+	- `app/api/reactions/toggle/route.ts`：リアクショントグル。簡易レート制限（IPあたり 20req/分）＋フォールバックは既存リポジトリ側。APIは `{ added: boolean }` を返す（通知制御用）
+	- 使用箇所：`app/timeline/page.tsx` / `app/album/[id]/page.tsx`

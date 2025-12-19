@@ -431,8 +431,20 @@ export default function AlbumDetailPage() {
       }
     });
     try {
-      const result = await toggleReaction(albumId, user.uid, emoji);
-      if ((result as any).added && album && album.ownerId !== user.uid) {
+      const res = await fetch('/api/reactions/toggle', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ albumId, userId: user.uid, emoji }),
+      });
+      let added = false;
+      if (res.ok) {
+        const data = await res.json().catch(()=>({}));
+        added = !!data?.added;
+      } else {
+        const result = await toggleReaction(albumId, user.uid, emoji);
+        added = !!(result as any)?.added;
+      }
+      if (added && album && album.ownerId !== user.uid) {
         // 通知作成（失敗しても UI には影響させない）
         addNotification({
           userId: album.ownerId,
