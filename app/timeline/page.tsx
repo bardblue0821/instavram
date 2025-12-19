@@ -264,7 +264,7 @@ export default function TimelinePage() {
       <h1 className="text-xl font-semibold mb-4">タイムライン</h1>
       {rows.length === 0 && <p className="text-sm text-gray-500">対象アルバムがありません</p>}
       {rows.length > 0 && (
-        <div className="divide-y divide-base [&>*]:py-12">
+        <div className="divide-y divide-base [&>*]:pb-12">
           {rows.map((row, i) => (
             <TimelineItem
               key={row.album.id}

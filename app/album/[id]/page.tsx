@@ -1,7 +1,11 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import AlbumImageUploader from "@/components/upload/AlbumImageUploader";
-import GalleryGrid, { type PhotoItem } from "@/components/gallery/GalleryGrid";
+import { type PhotoItem } from "@/components/gallery/GalleryGrid";
+import AlbumHeader from "@/components/album/AlbumHeader";
+import ReactionsBar from "@/components/album/ReactionsBar";
+import GallerySection from "@/components/album/GallerySection";
+import CommentsSection from "@/components/album/CommentsSection";
+import DeleteConfirmModal from "@/components/album/DeleteConfirmModal";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthUser } from "../../../lib/hooks/useAuthUser";
 import {
@@ -29,14 +33,13 @@ import { listComments, subscribeComments } from "../../../lib/repos/commentRepo"
 import { CommentForm } from "../../../components/comments/CommentForm";
 import { ERR } from "../../../types/models";
 import { listReactionsByAlbum, toggleReaction, listReactorsByAlbumEmoji, Reactor } from "../../../lib/repos/reactionRepo";
-import { setThumbUrl } from "../../../lib/repos/imageRepo";
-import { storage } from "../../../lib/firebase";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+// サムネイル自動生成・アクセス判定のフックへ分離
+import { useThumbBackfill } from "@/src/hooks/useThumbBackfill";
+import { useAlbumAccess } from "@/src/hooks/useAlbumAccess";
 import { addNotification } from "../../../lib/repos/notificationRepo";
 import { REACTION_EMOJIS, REACTION_CATEGORIES, filterReactionEmojis } from "../../../lib/constants/reactions";
-import { getFriendStatus } from "../../../lib/repos/friendRepo";
-import { isWatched } from "../../../lib/repos/watchRepo";
-import { HeartIcon } from "../../../components/icons/HeartIcon";
+// アクセス判定はフックで実施
+// いいねアイコンは ReactionsBar 内で使用
 import { getAlbumDetailVM } from "@/src/services/album/getAlbumDetail";
 import type { AlbumDetailVM, UserRef } from "@/src/models/album";
 
@@ -98,9 +101,8 @@ export default function AlbumDetailPage() {
   }, [activeCat]);
   // 一覧の初期表示件数（早期 return より前に hook を宣言しておく）
   const [visibleCount, setVisibleCount] = useState(16);
-  // アクセス権限
-  const [isFriend, setIsFriend] = useState(false);
-  const [isWatcher, setIsWatcher] = useState(false);
+  // アクセス権限（フックに分離）
+  const { isFriend, isWatcher } = useAlbumAccess(album?.ownerId, user?.uid);
 
   useEffect(() => {
     if (!albumId) return;
@@ -206,143 +208,10 @@ export default function AlbumDetailPage() {
     };
   }, [albumId, user?.uid]);
 
-  // アクセス権限の判定（オーナー/フレンド/ウォッチャー）
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (!album?.ownerId || !user?.uid) {
-        if (!cancelled) { setIsFriend(false); setIsWatcher(false); }
-        return;
-      }
-      try {
-        const [forward, backward, watched] = await Promise.all([
-          getFriendStatus(user.uid, album.ownerId),
-          getFriendStatus(album.ownerId, user.uid),
-          isWatched(user.uid, album.ownerId),
-        ]);
-        if (!cancelled) {
-          const f = (forward === 'accepted') || (backward === 'accepted');
-          setIsFriend(!!f);
-          setIsWatcher(!!watched);
-        }
-      } catch (e) {
-        if (!cancelled) { setIsFriend(false); setIsWatcher(false); }
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [album?.ownerId, user?.uid]);
+  // アクセス権限の判定は useAlbumAccess へ分離
 
-  // 既存画像でサムネイルが無い場合に、軽量サムネイルをバックグラウンド生成して登録
-  const thumbGenRef = useRef<{ running: boolean; processed: Set<string> }>({ running: false, processed: new Set() });
-  useEffect(() => {
-    if (!albumId) return;
-    if (thumbGenRef.current.running) return;
-    // 可視範囲優先でサムネイル不足分を対象にする
-    const missing: any[] = images.filter((img) => !img.thumbUrl && !!img.url && !thumbGenRef.current.processed.has(img.id));
-    if (missing.length === 0) return;
-    const targets = missing.slice(0, Math.min(visibleCount, 24));
-
-    thumbGenRef.current.running = true;
-    (async () => {
-      try {
-        const concurrency = 2;
-        let index = 0;
-        const results: Array<Promise<void>> = [];
-
-        async function runOne(img: any) {
-          try {
-            // 画像を取得（CORS回避のため fetch→Blob→ObjectURL で読み込み）
-            const blob = await (async () => {
-              try {
-                const res = await fetch(img.url, { mode: 'cors' });
-                return await res.blob();
-              } catch {
-                // フォールバック: Image要素から直接読み込み（dataURL等）
-                return await new Promise<Blob>((resolve, reject) => {
-                  const image = new Image();
-                  image.crossOrigin = 'anonymous';
-                  image.onload = () => {
-                    try {
-                      const canvas = document.createElement('canvas');
-                      const maxEdge = 360;
-                      const scale = Math.min(1, maxEdge / Math.max(image.width, image.height));
-                      canvas.width = Math.max(1, Math.round(image.width * scale));
-                      canvas.height = Math.max(1, Math.round(image.height * scale));
-                      const ctx = canvas.getContext('2d');
-                      if (!ctx) throw new Error('CANVAS_CONTEXT_ERROR');
-                      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-                      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('CANVAS_TO_BLOB_ERROR'))), 'image/jpeg', 0.7);
-                    } catch (e) { reject(e as any); }
-                  };
-                  image.onerror = () => reject(new Error('IMAGE_LOAD_ERROR'));
-                  image.src = img.url;
-                });
-              }
-            })();
-
-            // Blob からサムネイル作成（360px / q=0.7）
-            const thumbBlob = await (async () => {
-              const url = URL.createObjectURL(blob);
-              try {
-                const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-                  const im = new Image();
-                  im.onload = () => resolve(im);
-                  im.onerror = () => reject(new Error('IMAGE_LOAD_ERROR'));
-                  im.src = url;
-                });
-                const maxEdge = 360;
-                const scale = Math.min(1, maxEdge / Math.max(image.width, image.height));
-                const w = Math.max(1, Math.round(image.width * scale));
-                const h = Math.max(1, Math.round(image.height * scale));
-                const canvas = document.createElement('canvas');
-                canvas.width = w; canvas.height = h;
-                const ctx = canvas.getContext('2d');
-                if (!ctx) throw new Error('CANVAS_CONTEXT_ERROR');
-                ctx.drawImage(image, 0, 0, w, h);
-                return await new Promise<Blob>((resolve, reject) => {
-                  canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('CANVAS_TO_BLOB_ERROR'))), 'image/jpeg', 0.7);
-                });
-              } finally {
-                URL.revokeObjectURL(url);
-              }
-            })();
-
-            // Storage へアップロード
-            const base = (img.id || 'image').toString().replace(/[^a-zA-Z0-9_.-]/g, '_');
-            const userPart = (img.uploaderId || 'unknown').toString().replace(/[^a-zA-Z0-9_.-]/g, '_');
-            const ts = Date.now();
-            const thumbRef = ref(storage, `albums/${albumId}/${userPart}/${ts}_${base}_thumb.jpg`);
-            await uploadBytes(thumbRef, thumbBlob, { cacheControl: 'public, max-age=31536000, immutable', contentType: 'image/jpeg' });
-            const thumbUrl = await getDownloadURL(thumbRef);
-
-            // Firestore を更新
-            await setThumbUrl(img.id, thumbUrl);
-            // UI 側にも即反映
-            setImages((prev) => prev.map((x) => (x.id === img.id ? { ...x, thumbUrl } : x)));
-          } finally {
-            thumbGenRef.current.processed.add(img.id);
-          }
-        }
-
-        async function schedule(): Promise<void> {
-          while (index < targets.length) {
-            const running: Promise<void>[] = [];
-            for (let i = 0; i < concurrency && index < targets.length; i++) {
-              running.push(runOne(targets[index++]));
-            }
-            await Promise.allSettled(running);
-          }
-        }
-
-        await schedule();
-      } catch (e) {
-        // サムネ生成失敗は致命的ではないためログのみ
-        console.warn('thumbnail backfill failed', e);
-      } finally {
-        thumbGenRef.current.running = false;
-      }
-    })();
-  }, [albumId, images, visibleCount]);
+  // 既存画像のサムネイル不足分はフックで自動生成
+  useThumbBackfill(albumId, images, visibleCount, setImages);
 
   async function handleAddImage() {
     if (!user || !albumId || !file) return;
@@ -711,241 +580,89 @@ export default function AlbumDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        {/* タイトルは非オーナーに対しても表示。null/空なら「タイトルなし」 */}
-        {!isOwner && (
-          <h1 className="font-bold text-2xl">{displayTitle}</h1>
-        )}
+      <AlbumHeader
+        album={album as any}
+        isOwner={isOwner}
+        editTitle={editTitle}
+        editPlaceUrl={editPlaceUrl}
+        savingAlbum={savingAlbum}
+        albumSavedMsg={albumSavedMsg}
+        onTitleChange={setEditTitle}
+        onPlaceUrlChange={setEditPlaceUrl}
+        onTitleBlur={saveTitleIfChanged}
+        onPlaceUrlBlur={savePlaceUrlIfChanged}
+        onInputKeyDownBlurOnEnter={handleInputKeyDownBlurOnEnter}
+      />
 
-        {isOwner && (
-          <div className="mt-2 space-y-3">
-            <div>
-              <input
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                onBlur={saveTitleIfChanged}
-                onKeyDown={handleInputKeyDownBlurOnEnter}
-                className="mt-1 input-underline font-bold text-2xl"
-                placeholder="タイトル"
-              />
-            </div>
-            <div>
-              <input
-                value={editPlaceUrl}
-                onChange={(e) => setEditPlaceUrl(e.target.value)}
-                onBlur={savePlaceUrlIfChanged}
-                onKeyDown={handleInputKeyDownBlurOnEnter}
-                className="mt-1 input-underline text-sm"
-                placeholder="https://vrchat.com/..."
-              />
-            </div>
-            
-            {albumSavedMsg && <p className="text-xs text-green-600">{albumSavedMsg}</p>}
-          </div>
-        )}
-        <div className="mt-2 relative flex items-center gap-3">
-          <div className="flex items-center gap-1">
-            <button
-              aria-label={liked ? "いいね済み" : "いいね"}
-              aria-pressed={liked}
-              disabled={!user || likeBusy}
-              onClick={handleToggleLike}
-              className={`${liked ? "text-pink-600" : "text-gray-700 dark:text-gray-300"} disabled:opacity-50`}
-            >
-              <HeartIcon filled={liked} size={20} />
-            </button>
-            <span className="text-xs text-gray-600">{likeCount}</span>
-          </div>
-          {/* リアクション絵文字（ピッカー） */}
-          <div className="ml-4 flex items-center gap-2 flex-wrap">
-            {/* 現在の集計をチップ表示（1以上のみ表示、クリックでトグル） */}
-            {reactions.filter(r => r.count > 0).map((r) => {
-              const mine = r.mine;
-              const count = r.count;
-              return (
-                <div key={r.emoji} className="relative" onMouseEnter={() => onChipEnter(r.emoji)} onMouseLeave={onChipLeave}>
-                  <button
-                    type="button"
-                    aria-label={`リアクション ${r.emoji}`}
-                    aria-pressed={mine}
-                    onClick={() => handleToggleReaction(r.emoji)}
-                    className={`rounded border px-2 py-1 text-sm ${mine ? "border-blue-600 bg-page text-blue-700" : "border-base bg-page text-gray-700"}`}
-                  >{r.emoji} <span className="text-xs">{count}</span></button>
-                  {hoveredEmoji === r.emoji && (
-                    <div className="absolute left-0 top-full mt-1 w-64 rounded border border-base bg-page text-gray-800 shadow-lg z-50">
-                      <div className="p-2">
-                        <p className="text-[11px] text-gray-500 mb-1">このリアクションをした人</p>
-                        {reactorLoading[r.emoji] && <p className="text-xs text-gray-500">読み込み中...</p>}
-                        {!reactorLoading[r.emoji] && (
-                          (reactorMap[r.emoji] && reactorMap[r.emoji]!.length > 0) ? (
-                            <ul className="max-h-64 overflow-auto divide-y divide-base">
-                              {reactorMap[r.emoji]!.map((u) => (
-                                <li key={u.uid}>
-                                  <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50">
-                                    {u.iconURL ? (
-                                      // eslint-disable-next-line @next/next/no-img-element
-                                      <img src={u.iconURL} alt="" className="h-5 w-5 rounded-full object-cover" />
-                                    ) : (
-                                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-[10px] text-gray-600">{u.displayName?.[0] || '?'}</span>
-                                    )}
-                                    <span className="text-sm font-medium">{u.displayName}</span>
-                                    <span className="text-[11px] text-gray-500">@{u.handle || u.uid.slice(0,6)}</span>
-                                  </a>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="text-xs text-gray-500">まだいません</p>
-                          )
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            <button
-              ref={pickerBtnRef}
-              type="button"
-              aria-label="リアクションを追加"
-              disabled={!user}
-              onClick={() => setPickerOpen((o) => !o)}
-              className="px-1 text-lg leading-none text-gray-700 dark:text-gray-300 disabled:opacity-50"
-            >＋</button>
-            {pickerOpen && (
-              <div ref={pickerRef} className="absolute top-full left-0 mt-2 w-80 bg-page border border-base rounded shadow-lg p-2 z-50">
-                <p className="text-xs text-gray-600 mb-2">絵文字を選択してください（再選択で解除）</p>
-                <input
-                  autoFocus
-                  value={emojiQuery}
-                  onChange={(e)=> setEmojiQuery(e.target.value)}
-                  placeholder="検索（例: ハート / fire / 👍 を貼付）"
-                  className="mb-2 w-full border-b-2 border-blue-500 bg-transparent p-1 text-sm focus:outline-none"
-                />
-                {/* カテゴリタブ（検索時は非表示） */}
-                {!emojiQuery && (
-                  <div className="mb-2 flex flex-wrap gap-1">
-                    {REACTION_CATEGORIES.map(cat => (
-                      <button
-                        key={cat.key}
-                        type="button"
-                        aria-label={cat.label}
-                        title={cat.label}
-                        onClick={() => setActiveCat(cat.key)}
-                        className={`flex items-center justify-center w-9 h-9 text-lg rounded border ${activeCat===cat.key ? 'bg-blue-600 text-white border-blue-600' : 'bg-page text-gray-700 border-base'}`}
-                      >{cat.icon}</button>
-                    ))}
-                  </div>
-                )}
-                <div className="max-h-64 overflow-auto">
-                  <div className="grid grid-cols-6 gap-2">
-                  {(emojiQuery ? filteredEmojis : categoryEmojis).map((e) => {
-                    const rec = reactions.find((x) => x.emoji === e);
-                    const mine = !!rec?.mine;
-                    return (
-                      <button
-                        key={e}
-                        type="button"
-                        aria-label={`リアクション ${e}`}
-                        aria-pressed={mine}
-                        onClick={() => { handleToggleReaction(e); setPickerOpen(false); }}
-                        className={`rounded border px-2 py-1 text-sm ${mine ? "border-blue-600 bg-blue-600 text-white" : "border-base bg-page text-gray-700"}`}
-                      >{e}</button>
-                    );
-                  })}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-        {!isOwner && album.placeUrl && (
-          <a
-            href={album.placeUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-1 inline-block text-sm link-accent"
-          >撮影場所</a>
-        )}
-      </div>
+      <ReactionsBar
+        liked={liked}
+        likeCount={likeCount}
+        likeBusy={!user || likeBusy}
+        onToggleLike={handleToggleLike}
+        reactions={reactions}
+        hoveredEmoji={hoveredEmoji}
+        onChipEnter={onChipEnter}
+        onChipLeave={onChipLeave}
+        reactorMap={reactorMap}
+        reactorLoading={reactorLoading}
+        pickerOpen={pickerOpen}
+        onTogglePicker={() => setPickerOpen((o) => !o)}
+        emojiQuery={emojiQuery}
+        onEmojiQueryChange={setEmojiQuery}
+        activeCat={activeCat}
+  onActiveCatChange={(key) => setActiveCat(key as any)}
+        filteredEmojis={filteredEmojis}
+        categoryEmojis={categoryEmojis}
+        categories={REACTION_CATEGORIES}
+        onPickEmoji={(e) => handleToggleReaction(e)}
+      />
 
-      <section>
-        {/*<h2 className="mb-2 text-lg font-medium">画像一覧 ({images.length})</h2>*/}
-        {images.length === 0 && <p className="text-sm text-gray-500">まだ画像がありません</p>}
-        {images.length > 0 && (
-          <GalleryGrid
-            photos={photos}
-            rowHeight={240}
-            margin={6}
-            layoutType="grid"
-            columns={4}
-            visibleCount={visibleCount}
-            // 写真削除: オーナーは全て可、フレンドは自分がアップしたもののみ、ウォッチャーは不可
-            canDelete={(p) => {
-              if (isOwner) return true;
-              if (isFriend) return p.uploaderId === user?.uid;
-              return false;
-            }}
-            onDelete={(p) => { if (p.id) handleDeleteImage(p.id); }}
-          />
-        )}
-        {images.length > visibleCount && (
-          <div className="mt-3 flex justify-center">
-            <button
-              type="button"
-              className="rounded border border-base px-3 py-1.5 text-sm hover-surface-alt"
-              onClick={() => setVisibleCount((n) => Math.min(images.length, n + 16))}
-            >もっと見る</button>
-          </div>
-        )}
-        {user && canAddImages && (
-          <div className="mt-4">
-            <AlbumImageUploader
-              albumId={albumId}
-              userId={user.uid}
-              remaining={remaining}
-              onUploaded={async () => {
-                const imgs = await listImages(albumId);
-                imgs.sort(
-                  (a: any, b: any) =>
-                    (b.createdAt?.seconds || b.createdAt || 0) -
-                    (a.createdAt?.seconds || a.createdAt || 0),
-                );
-                setImages(imgs);
-              }}
-            />
-          </div>
-        )}
-      </section>
+      <GallerySection
+        photos={photos}
+        imagesLength={images.length}
+        visibleCount={visibleCount}
+        onSeeMore={() => setVisibleCount((n) => Math.min(images.length, n + 16))}
+        canDelete={(p) => {
+          if (isOwner) return true;
+          if (isFriend) return p.uploaderId === user?.uid;
+          return false;
+        }}
+        onDelete={(p) => { if (p.id) handleDeleteImage(p.id); }}
+        showUploader={!!(user && canAddImages)}
+        albumId={albumId!}
+        userId={user?.uid || ''}
+        remaining={remaining}
+        onUploaded={async () => {
+          const imgs = await listImages(albumId!);
+          imgs.sort(
+            (a: any, b: any) =>
+              (b.createdAt?.seconds || b.createdAt || 0) -
+              (a.createdAt?.seconds || a.createdAt || 0),
+          );
+          setImages(imgs);
+        }}
+      />
 
-      <section className="">
-        {/*<h2 className="mb-2 text-xl font-medium">コメント ({comments.length})</h2>*/}
-        <CommentList
-          comments={comments}
-          currentUserId={user?.uid ?? ''}
-          albumOwnerId={album.ownerId}
-          onEditRequest={beginEditComment}
-          onEditChange={(_, value) => setEditingCommentBody(value)}
-          onEditSave={saveEditComment}
-          onEditCancel={cancelEditComment}
-          onDelete={handleDeleteComment}
-          editingCommentId={editingCommentId}
-          editingValue={editingCommentBody}
-        />
-        {user && canPostComment && (
-          <div className="max-w-md">
-            <CommentForm
-              value={commentText}
-              onChange={setCommentText}
-              onSubmit={submitComment}
-              busy={commenting}
-            />
-          </div>
-        )}
-      </section>
+      <CommentsSection
+        comments={comments as any}
+        currentUserId={user?.uid ?? ''}
+        albumOwnerId={album.ownerId}
+        canPostComment={!!(user && canPostComment)}
+        editingCommentId={editingCommentId}
+        editingValue={editingCommentBody}
+        commentText={commentText}
+        commenting={commenting}
+        onEditRequest={beginEditComment}
+        onEditChange={(_, value) => setEditingCommentBody(value)}
+        onEditSave={saveEditComment}
+        onEditCancel={cancelEditComment}
+        onDelete={handleDeleteComment}
+        onSubmit={submitComment}
+        onChangeText={setCommentText}
+      />
 
-      <section>
-        {isOwner && (
+      {isOwner && (
+        <section>
           <div className="pt-3 mt-2">
             <button
               type="button"
@@ -953,36 +670,20 @@ export default function AlbumDetailPage() {
               className="rounded bg-red-600 px-3 py-1.5 text-sm text-white"
             >アルバムを削除</button>
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="space-y-1 text-xs text-gray-500">
         {!canAddImages && <p>※ 操作にはログインが必要です。</p>}
       </div>
 
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-80 rounded bg-white p-4 shadow-lg">
-            <h3 className="text-sm font-semibold">本当に削除しますか？</h3>
-            <p className="mt-2 text-xs text-gray-600">この操作は取り消せません。アルバムを削除します。</p>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                className="rounded bg-gray-200 px-3 py-1 text-xs"
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={deleting}
-              >キャンセル</button>
-              <button
-                type="button"
-                className="rounded bg-red-600 px-3 py-1 text-xs text-white disabled:opacity-50"
-                onClick={confirmDeleteAlbum}
-                disabled={deleting}
-              >{deleting ? "削除中..." : "削除"}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal
+        open={showDeleteConfirm}
+        busy={deleting}
+        onCancel={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDeleteAlbum}
+      />
     </div>
   );
 }
