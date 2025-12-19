@@ -3,9 +3,11 @@ import React, { useEffect, useState } from "react";
 import { useAuthUser } from "../../lib/hooks/useAuthUser";
 import { TimelineItem } from "../../components/timeline/TimelineItem";
 // フィードはフレンド/ウォッチ対象のみ
-import { fetchLatestAlbums } from "../../lib/repos/timelineRepo";
-import { listAcceptedFriends } from "../../lib/repos/friendRepo";
-import { listWatchedOwnerIds } from "../../lib/repos/watchRepo";
+import { fetchLatestAlbums } from "../../lib/repos/timelineRepo"; 
+import { listAcceptedFriends } from "../../lib/repos/friendRepo"; 
+import { listWatchedOwnerIds } from "../../lib/repos/watchRepo"; 
+import { listLatestAlbumsVM } from "@/src/services/timeline/listLatestAlbums"; 
+import type { TimelineItemVM, UserRef } from "@/src/models/timeline"; 
 import { getUser, type UserDoc } from "../../lib/repos/userRepo";
 import { listImages } from "../../lib/repos/imageRepo";
 import { listComments, subscribeComments } from "../../lib/repos/commentRepo";
@@ -19,16 +21,7 @@ type AlbumRow = { id: string; ownerId: string; title?: string | null; createdAt?
 export default function TimelinePage() {
   const { user } = useAuthUser();
   const [unsubs, setUnsubs] = useState<(() => void)[]>([]);
-  const [rows, setRows] = useState<Array<{
-    album: AlbumRow;
-    images: { url: string; thumbUrl?: string; uploaderId?: string }[];
-    likeCount: number;
-    liked: boolean;
-    latestComment?: { body: string; userId: string };
-    commentsPreview?: Array<{ body: string; userId: string; user?: Pick<UserDoc, "uid" | "handle" | "iconURL" | "displayName"> }>;
-    reactions: { emoji: string; count: number; mine: boolean }[];
-    owner?: Pick<UserDoc, "uid" | "handle" | "iconURL" | "displayName"> | null;
-  }>>([]);
+  const [rows, setRows] = useState<TimelineItemVM[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,56 +59,8 @@ export default function TimelinePage() {
         }
 
         const ownerIds = Array.from(ownerSet);
-        const albums = await fetchLatestAlbums(50, ownerIds);
-        const userCache = new Map<string, Pick<UserDoc, "uid" | "handle" | "iconURL" | "displayName"> | null>();
-        const enriched = await Promise.all(
-          albums.map(async (album: any) => {
-            let owner = userCache.get(album.ownerId);
-            if (owner === undefined) {
-              const u = await getUser(album.ownerId);
-              owner = u ? { uid: u.uid, handle: u.handle || null, iconURL: u.iconURL || null, displayName: u.displayName } : null;
-              userCache.set(album.ownerId, owner);
-            }
-            const [imgs, cmts, likeCnt, likedFlag, reactions] = await Promise.all([
-              listImages(album.id),
-              listComments(album.id),
-              countLikes(album.id),
-              user ? hasLiked(album.id, user.uid) : Promise.resolve(false),
-              listReactionsByAlbum(album.id, user?.uid),
-            ]);
-            const cAsc = [...cmts]
-              .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0));
-            const latest = cAsc.slice(-1)[0];
-            // 最新が上に来るように、末尾3件を逆順に並べる
-            const previewRawDesc = cAsc.slice(-3).reverse();
-            const commentsPreview = await Promise.all(previewRawDesc.map(async (c) => {
-              let cu = userCache.get(c.userId);
-              if (cu === undefined) {
-                const u = await getUser(c.userId);
-                cu = u ? { uid: u.uid, handle: u.handle || null, iconURL: u.iconURL || null, displayName: u.displayName } : null;
-                userCache.set(c.userId, cu);
-              }
-              return { body: c.body, userId: c.userId, user: cu || undefined, createdAt: c.createdAt };
-            }));
-            const imgRows = (imgs || [])
-              .map((x: any) => ({
-                url: x.url || x.downloadUrl || "",
-                thumbUrl: x.thumbUrl || x.url || x.downloadUrl || "",
-                uploaderId: x.uploaderId,
-              }))
-              .filter((x: any) => x.url);
-            return {
-              album,
-              images: imgRows,
-              likeCount: likeCnt,
-              liked: likedFlag,
-              latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined,
-                commentsPreview,
-                reactions,
-              owner,
-            };
-          })
-        );
+        const userCache = new Map<string, UserRef | null>();
+        const enriched = await listLatestAlbumsVM(user.uid, userCache);
         if (!cancelled) setRows(enriched);
         // コメント/いいねのリアルタイム購読をセット
         if (!cancelled) {
