@@ -111,12 +111,11 @@ export default function AlbumCreateModal({ onCreated }: Props) {
   }
 
   return (
-    <div className="max-w-lg">
-      <h2 className="text-xl font-semibold mb-4">アルバム作成</h2>
+    <div className="w-full">
+      <h1 className="text-xl font-semibold mb-4">アルバム作成</h1>
       {!user && <p className="text-sm text-gray-600 mb-4">ログインすると作成できます。</p>}
       <form onSubmit={handleSubmit} className="space-y-4" aria-live="polite">
         <div>
-          <label className="block text-sm font-medium mb-1">タイトル (任意)</label>
           <input
             value={title}
             onChange={e => setTitle(e.target.value)}
@@ -126,7 +125,6 @@ export default function AlbumCreateModal({ onCreated }: Props) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">撮影場所URL (任意)</label>
           <input
             value={placeUrl}
             onChange={e => setPlaceUrl(e.target.value)}
@@ -137,7 +135,6 @@ export default function AlbumCreateModal({ onCreated }: Props) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">初回コメント (200文字以内 任意)</label>
           <textarea
             value={comment}
             onChange={e => setComment(e.target.value)}
@@ -145,7 +142,7 @@ export default function AlbumCreateModal({ onCreated }: Props) {
             disabled={loading || !user}
             maxLength={200}
             rows={3}
-            placeholder="どうだった？"
+            placeholder="どうだった？(200文字まで)"
           />
           <p className="text-xs text-gray-500 text-right">{comment.length}/200</p>
         </div>

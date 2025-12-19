@@ -444,7 +444,7 @@ export default function ProfilePage() {
   function discardChanges() { cancelEdit(); }
 
   return (
-    <div className="max-w-xl mx-auto p-4 space-y-6">
+    <div className="max-w-2xl mx-auto p-4 space-y-6">
       <header className="space-y-3">
         <div className="flex items-center gap-4">
           <Avatar
@@ -588,7 +588,7 @@ export default function ProfilePage() {
               {!ownAlbums && <p className="text-sm fg-subtle">-</p>}
               {ownAlbums && ownAlbums.length === 0 && <p className="text-sm fg-subtle">まだアルバムがありません</p>}
               {ownRows && ownRows.length > 0 && (
-                <div className="divide-y divide-base [&>*]:pb-12">
+                <div className="divide-y divide-base *:pb-12">
                   {ownRows.map((row, i) => (
                     <TimelineItem
                       key={row.album.id}
