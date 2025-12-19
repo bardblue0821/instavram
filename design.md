@@ -7,6 +7,8 @@
 - Firebase/PostgreSQL
 - Tailwind CSS
 - TypeScript
+- Jest/Testing Library
+- MantineUI
 
 ## ディレクトリ構成
 
@@ -1840,10 +1842,17 @@ export interface NotificationDoc {
 ### リツイート機能
 
 
+
+### fix: タイムラインでコメント機能を格納
+- いいねボタンの隣に吹き出しマークを作成。
+- 吹き出しマークを押すことで、既存のコメント入力欄が表示される。
+- 送信ボタンを押すと、その入力欄は閉じられる。
+
+
 ### 学び
 - 必要な画面を定義してからコンポーネントを用意したほうが使いまわせるので開発も運用も楽
 - 認証関係はクラウドサービスに任せる
-- 
+- Jest と Testing Library でテストを組み立てる
 
 
 ## 手順: スプリント４

@@ -4,6 +4,7 @@ import Avatar from "../profile/Avatar";
 import { listReactorsByAlbumEmoji, Reactor } from "../../lib/repos/reactionRepo";
 import { REACTION_CATEGORIES, filterReactionEmojis } from "../../lib/constants/reactions";
 import { HeartIcon } from "../icons/HeartIcon";
+import { ChatIcon } from "../icons/ChatIcon";
 
 type Img = { url: string; thumbUrl?: string; uploaderId?: string };
 type LatestComment = { body: string; userId: string } | undefined;
@@ -31,6 +32,7 @@ export function TimelineItem(props: {
   const { album, images, likeCount, liked, onLike, latestComment, commentsPreview = [], onCommentSubmit, submitting, reactions = [], onToggleReaction, owner } = props;
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showCommentBox, setShowCommentBox] = useState(false);
   const [hoveredEmoji, setHoveredEmoji] = useState<string | null>(null);
   const [reactorMap, setReactorMap] = useState<Record<string, Reactor[] | undefined>>({});
   const [reactorLoading, setReactorLoading] = useState<Record<string, boolean>>({});
@@ -51,6 +53,8 @@ export function TimelineItem(props: {
     try {
       await onCommentSubmit(text.trim());
       setText("");
+      // 送信後は入力欄を閉じる
+      setShowCommentBox(false);
     } finally {
       setBusy(false);
     }
@@ -199,7 +203,7 @@ export function TimelineItem(props: {
         {renderGrid(images)}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <button
           aria-label={liked ? "いいね済み" : "いいね"}
           aria-pressed={liked}
@@ -209,6 +213,16 @@ export function TimelineItem(props: {
           <HeartIcon filled={liked} size={20} />
         </button>
         <span className="text-xs text-gray-600 dark:text-gray-400">{likeCount}</span>
+        {onCommentSubmit && (
+          <button
+            type="button"
+            aria-label="コメント入力を開閉"
+            className={`text-gray-700 dark:text-gray-300 ${showCommentBox ? 'opacity-100' : 'opacity-80'}`}
+            onClick={() => setShowCommentBox((v) => !v)}
+          >
+            <ChatIcon size={20} />
+          </button>
+        )}
       </div>
 
       {/* リアクション（簡易版：1以上のみ表示、クリックでトグル、ホバーでユーザー一覧） */}
@@ -360,7 +374,7 @@ export function TimelineItem(props: {
         </div>
       )}
 
-      {onCommentSubmit && (
+      {onCommentSubmit && showCommentBox && (
         <div className="flex items-center gap-2">
           <input
             aria-label="コメント入力"
