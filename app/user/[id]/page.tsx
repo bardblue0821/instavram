@@ -274,50 +274,56 @@ export default function ProfilePage() {
             onClick={()=> setAvatarOpen(true)}
           />
           <div className="min-w-0">
-            <div className="flex items-baseline gap-2">
-              <h1 className="text-2xl font-semibold truncate" title={profile.displayName || '名前未設定'}>
-                {profile.displayName || '名前未設定'}
-              </h1>
-              <span className="text-sm fg-subtle shrink-0" title={profile.handle ? `@${profile.handle}` : 'ハンドル未設定'}>
-                {profile.handle ? `@${profile.handle}` : 'ハンドル未設定'}
-              </span>
+            <div className="flex flex-col">
+              {isMe && editingField === 'displayName' ? (
+                <input
+                  autoFocus
+                  type="text"
+                  className="border-b-2 border-[--accent] bg-transparent p-0.5 text-2xl font-semibold focus:outline-none"
+                  value={editingValue}
+                  onChange={(e)=> setEditingValue(e.target.value)}
+                  onBlur={handleBlur}
+                  onKeyDown={onKey}
+                  placeholder="（表示名未設定）"
+                />
+              ) : (
+                <h1
+                  className={isMe ? "text-2xl font-semibold truncate cursor-pointer" : "text-2xl font-semibold truncate"}
+                  title={profile.displayName || '名前未設定'}
+                  onClick={()=> isMe && beginEdit('displayName', profile.displayName || '')}
+                >
+                  {profile.displayName || '名前未設定'}
+                </h1>
+              )}
+
+              {isMe && editingField === 'handle' ? (
+                <div className="flex items-baseline gap-1">
+                  <span className="text-sm fg-subtle">@</span>
+                  <input
+                    autoFocus
+                    type="text"
+                    className="flex-1 border-b-2 border-[--accent] bg-transparent p-0.5 text-sm focus:outline-none"
+                    value={editingValue}
+                    onChange={(e)=> setEditingValue(e.target.value)}
+                    onBlur={handleBlur}
+                    onKeyDown={onKey}
+                    placeholder="ハンドル未設定"
+                  />
+                </div>
+              ) : (
+                <span
+                  className={isMe ? "text-sm fg-muted truncate cursor-pointer" : "text-sm fg-muted truncate"}
+                  title={profile.handle ? `@${profile.handle}` : 'ハンドル未設定'}
+                  onClick={()=> isMe && beginEdit('handle', profile.handle || '')}
+                >
+                  {profile.handle ? `@${profile.handle}` : 'ハンドル未設定'}
+                </span>
+              )}
             </div>
-            <p className="text-sm fg-muted">UID: {profile.uid}</p>
           </div>
         </div>
-        <InlineTextField
-          label="表示名"
-          value={profile.displayName || ''}
-          placeholder="（表示名未設定）"
-          field="displayName"
-          editingField={editingField}
-          editingValue={editingValue}
-          beginEdit={beginEdit}
-          onChange={setEditingValue}
-          onBlur={handleBlur}
-          onKey={onKey}
-          isMe={isMe}
-          saving={saving}
-          onSave={commitEdit}
-          setSkipDiscard={setSkipDiscardNextBlur}
-        />
-        <InlineTextField
-          prefix="@"
-          label="ハンドル"
-          value={profile.handle || ''}
-          placeholder="（ハンドル未設定）"
-          field="handle"
-          editingField={editingField}
-          editingValue={editingValue}
-          beginEdit={beginEdit}
-          onChange={setEditingValue}
-          onBlur={handleBlur}
-          onKey={onKey}
-          isMe={isMe}
-          saving={saving}
-          onSave={commitEdit}
-          setSkipDiscard={setSkipDiscardNextBlur}
-        />
+        {/* 詳細の表示名フィールドはヘッダーで編集する方針のため削除 */}
+        {/* 詳細のハンドルフィールドもヘッダーで編集する方針のため削除 */}
         <InlineTextareaField
           label="自己紹介"
           value={profile.bio || ''}
