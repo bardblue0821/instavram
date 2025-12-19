@@ -1,6 +1,5 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useAuthUser } from "../../lib/hooks/useAuthUser";
 import { TimelineItem } from "../../components/timeline/TimelineItem";
 import { listLatestAlbumsVMLimited } from "@/src/services/timeline/listLatestAlbums";
@@ -11,31 +10,22 @@ import { toggleLike, subscribeLikes } from "../../lib/repos/likeRepo";
 import { toggleReaction } from "../../lib/repos/reactionRepo";
 import { addNotification } from "../../lib/repos/notificationRepo";
 import { translateError } from "../../lib/errors";
-import DeleteConfirmModal from "../../components/album/DeleteConfirmModal";
-import ReportConfirmModal from "../../components/album/ReportConfirmModal";
-import { deleteAlbum } from "../../lib/repos/albumRepo";
 
 
 export default function TimelinePage() {
   const { user } = useAuthUser();
-  const router = useRouter();
   const [rows, setRows] = useState<TimelineItemVM[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [deleteTargetAlbumId, setDeleteTargetAlbumId] = useState<string | null>(null);
-  const [deleteBusy, setDeleteBusy] = useState(false);
-  const [reportTargetAlbumId, setReportTargetAlbumId] = useState<string | null>(null);
-  const [reportBusy, setReportBusy] = useState(false);
-
   const PAGE_SIZE = 20;
 
   const rowsRef = useRef<TimelineItemVM[]>([]);
   const hasMoreRef = useRef(true);
   const inFlightRef = useRef(false);
-  const unsubsByAlbumIdRef = useRef<Map<string, (() => void)[]>>(new Map());
+  const unsubsRef = useRef<(() => void)[]>([]);
   const userCacheRef = useRef<Map<string, UserRef | null>>(new Map());
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const loadMoreRef = useRef<() => void>(() => {});
@@ -49,41 +39,16 @@ export default function TimelinePage() {
   }, [hasMore]);
 
   function cleanupSubscriptions() {
-    const map = unsubsByAlbumIdRef.current;
-    for (const list of map.values()) {
-      for (const fn of list) {
-        try { fn(); } catch {}
-      }
-    }
-    map.clear();
-  }
-
-  function cleanupSubscriptionForAlbum(albumId: string) {
-    const map = unsubsByAlbumIdRef.current;
-    const list = map.get(albumId);
-    if (!list) return;
+    const list = unsubsRef.current;
+    unsubsRef.current = [];
     for (const fn of list) {
       try { fn(); } catch {}
     }
-    map.delete(albumId);
   }
 
-  function updateRowByAlbumId(albumId: string, updater: (row: TimelineItemVM) => TimelineItemVM) {
-    setRows((prev) => {
-      const idx = prev.findIndex((r) => r.album.id === albumId);
-      if (idx < 0) return prev;
-      const next = [...prev];
-      next[idx] = updater(next[idx]);
-      return next;
-    });
-  }
-
-  async function subscribeForRow(row: TimelineItemVM, currentUid: string) {
-    const albumId = row.album.id;
-    if (!albumId) return;
-
+  async function subscribeForRow(row: TimelineItemVM, index: number, currentUid: string) {
     // comments: 最新コメントのみ更新
-    const cUnsub = await subscribeComments(albumId, (list) => {
+    const cUnsub = await subscribeComments(row.album.id, (list) => {
       const sorted = [...list]
         .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0));
       const latest = sorted.slice(-1)[0];
@@ -100,40 +65,45 @@ export default function TimelinePage() {
           }
           return { body: c.body, userId: c.userId, user: cu || undefined, createdAt: c.createdAt };
         }));
-        updateRowByAlbumId(albumId, (r) => ({
-          ...r,
-          latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined,
-          commentsPreview: preview,
-          commentCount: list.length,
-        } as any));
+        setRows(prev => {
+          if (!prev[index]) return prev;
+          const next = [...prev];
+          next[index] = {
+            ...next[index],
+            latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined,
+            commentsPreview: preview,
+            commentCount: list.length,
+          } as any;
+          return next;
+        });
       })().catch(() => {
-        updateRowByAlbumId(albumId, (r) => ({
-          ...r,
-          latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined,
-          commentsPreview: previewRawDesc.map(c => ({ body: c.body, userId: c.userId, createdAt: c.createdAt })),
-          commentCount: list.length,
-        } as any));
+        setRows(prev => {
+          if (!prev[index]) return prev;
+          const next = [...prev];
+          next[index] = {
+            ...next[index],
+            latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined,
+            commentsPreview: previewRawDesc.map(c => ({ body: c.body, userId: c.userId, createdAt: c.createdAt })),
+            commentCount: list.length,
+          } as any;
+          return next;
+        });
       });
     }, (err) => console.warn("comments subscribe error", err));
-    {
-      const map = unsubsByAlbumIdRef.current;
-      const list = map.get(albumId) ?? [];
-      list.push(cUnsub);
-      map.set(albumId, list);
-    }
+    unsubsRef.current.push(cUnsub);
 
     // likes: 件数と自分の liked を更新
-    const lUnsub = await subscribeLikes(albumId, (list) => {
+    const lUnsub = await subscribeLikes(row.album.id, (list) => {
       const cnt = list.length;
       const meLiked = list.some(x => x.userId === currentUid);
-      updateRowByAlbumId(albumId, (r) => ({ ...r, likeCount: cnt, liked: meLiked }));
+      setRows(prev => {
+        if (!prev[index]) return prev;
+        const next = [...prev];
+        next[index] = { ...next[index], likeCount: cnt, liked: meLiked };
+        return next;
+      });
     }, (err) => console.warn("likes subscribe error", err));
-    {
-      const map = unsubsByAlbumIdRef.current;
-      const list = map.get(albumId) ?? [];
-      list.push(lUnsub);
-      map.set(albumId, list);
-    }
+    unsubsRef.current.push(lUnsub);
   }
 
   async function loadMore() {
@@ -157,15 +127,16 @@ export default function TimelinePage() {
         setRows(enriched);
         // 初回は全件購読
         for (let i = 0; i < enriched.length; i++) {
-          await subscribeForRow(enriched[i], currentUid);
+          await subscribeForRow(enriched[i], i, currentUid);
         }
       } else {
         const existingIds = new Set(prev.map(r => r.album.id));
         const appended = enriched.filter(r => r?.album?.id && !existingIds.has(r.album.id));
         if (appended.length > 0) {
+          const startIndex = prev.length;
           setRows(p => [...p, ...appended]);
           for (let j = 0; j < appended.length; j++) {
-            await subscribeForRow(appended[j], currentUid);
+            await subscribeForRow(appended[j], startIndex + j, currentUid);
           }
         }
       }
@@ -220,11 +191,16 @@ export default function TimelinePage() {
     return () => obs.disconnect();
   }, []);
 
-  async function handleToggleLike(albumId: string) {
+  async function handleToggleLike(albumId: string, index: number) {
     if (!user) return;
-    updateRowByAlbumId(albumId, (row) => {
+    setRows((prev) => {
+      const next = [...prev];
+      const row = next[index];
+      if (!row) return prev;
       const likedPrev = row.liked;
-      return { ...row, liked: !likedPrev, likeCount: likedPrev ? row.likeCount - 1 : row.likeCount + 1 };
+      row.liked = !likedPrev;
+      row.likeCount = likedPrev ? row.likeCount - 1 : row.likeCount + 1;
+      return next;
     });
     try {
       // まずはサーバーの Route Handler 経由でトグル（失敗時は従来のリポジトリをフォールバック）
@@ -239,18 +215,24 @@ export default function TimelinePage() {
       }
     } catch (e) {
       // rollback
-      updateRowByAlbumId(albumId, (row) => {
-        const likedNow = !row.liked;
-        // 直前の反転を戻す
-        return { ...row, liked: likedNow, likeCount: likedNow ? row.likeCount + 1 : row.likeCount - 1 };
+      setRows((prev) => {
+        const next = [...prev];
+        const row = next[index];
+        if (!row) return prev;
+        row.liked = !row.liked;
+        row.likeCount = row.liked ? row.likeCount + 1 : row.likeCount - 1;
+        return next;
       });
     }
   }
 
-  function handleToggleReaction(albumId: string, emoji: string) {
+  function handleToggleReaction(albumId: string, index: number, emoji: string) {
     if (!user) return;
     // 楽観更新
-    updateRowByAlbumId(albumId, (row) => {
+    setRows((prev) => {
+      const next = [...prev];
+      const row = next[index];
+      if (!row) return prev;
       const list = row.reactions.slice();
       const idx = list.findIndex((x) => x.emoji === emoji);
       if (idx >= 0) {
@@ -261,7 +243,9 @@ export default function TimelinePage() {
       } else {
         list.push({ emoji, count: 1, mine: true });
       }
-      return { ...row, reactions: list };
+      row.reactions = list;
+      next[index] = { ...row };
+      return next;
     });
     (async () => {
       try {
@@ -279,7 +263,7 @@ export default function TimelinePage() {
           const result = await toggleReaction(albumId, user.uid, emoji);
           added = !!(result as any)?.added;
         }
-        const row = rowsRef.current.find((r) => r.album.id === albumId);
+        const row = rowsRef.current[index];
         if (added && row && row.album.ownerId !== user.uid) {
           addNotification({
             userId: row.album.ownerId,
@@ -291,67 +275,27 @@ export default function TimelinePage() {
         }
       } catch {
       // 失敗時ロールバック: 再取得のコストを避け簡易ロールバック
-      updateRowByAlbumId(albumId, (row) => {
+      setRows((prev) => {
+        const next = [...prev];
+        const row = next[index];
+        if (!row) return prev;
         const list = row.reactions.slice();
         const idx = list.findIndex((x) => x.emoji === emoji);
         if (idx >= 0) {
           const item = { ...list[idx] };
-          if (item.mine) {
-            item.mine = false;
-            item.count = Math.max(0, item.count - 1);
+          if (item.mine) { // 失敗=前操作無効なので反転
+            item.mine = false; item.count = Math.max(0, item.count - 1);
           } else {
-            item.mine = true;
-            item.count += 1;
+            item.mine = true; item.count += 1;
           }
           list[idx] = item;
         }
-        return { ...row, reactions: list };
+        row.reactions = list;
+        next[index] = { ...row };
+        return next;
       });
       }
     })();
-  }
-
-  async function handleConfirmDelete() {
-    const albumId = deleteTargetAlbumId;
-    if (!albumId) return;
-    if (!user?.uid) return;
-    setDeleteBusy(true);
-    try {
-      await deleteAlbum(albumId);
-      cleanupSubscriptionForAlbum(albumId);
-      setRows((prev) => prev.filter((r) => r.album.id !== albumId));
-      setDeleteTargetAlbumId(null);
-      router.push('/timeline');
-    } catch (e: any) {
-      setError(translateError(e));
-    } finally {
-      setDeleteBusy(false);
-    }
-  }
-
-  async function handleConfirmReport() {
-    const albumId = reportTargetAlbumId;
-    if (!albumId) return;
-    if (!user) return;
-    setReportBusy(true);
-    try {
-      const token = await user.getIdToken();
-      const albumUrl = `${window.location.origin}/album/${encodeURIComponent(albumId)}`;
-      const res = await fetch('/api/reports/album', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
-        body: JSON.stringify({ albumId, albumUrl }),
-      });
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json?.error || 'REPORT_FAILED');
-      }
-      setReportTargetAlbumId(null);
-    } catch (e: any) {
-      setError(translateError(e));
-    } finally {
-      setReportBusy(false);
-    }
   }
 
   async function handleSubmitComment(albumId: string, text: string) {
@@ -388,16 +332,13 @@ export default function TimelinePage() {
               images={row.images}
               likeCount={row.likeCount}
               liked={row.liked}
-              onLike={() => handleToggleLike(row.album.id)}
-              currentUserId={user?.uid || undefined}
-              onRequestDelete={(albumId) => setDeleteTargetAlbumId(albumId)}
-              onRequestReport={(albumId) => setReportTargetAlbumId(albumId)}
+              onLike={() => handleToggleLike(row.album.id, i)}
               commentCount={row.commentCount}
               latestComment={row.latestComment}
               commentsPreview={row.commentsPreview}
               onCommentSubmit={user ? (text) => handleSubmitComment(row.album.id, text) : undefined}
               reactions={row.reactions}
-              onToggleReaction={(emoji) => handleToggleReaction(row.album.id, emoji)}
+              onToggleReaction={(emoji) => handleToggleReaction(row.album.id, i, emoji)}
               owner={row.owner ?? undefined}
             />
           ))}
@@ -411,19 +352,6 @@ export default function TimelinePage() {
         <div className="mt-4 text-sm fg-subtle">読み込み中...</div>
       )}
       <div ref={sentinelRef} className="h-px" />
-
-      <DeleteConfirmModal
-        open={!!deleteTargetAlbumId}
-        busy={deleteBusy}
-        onCancel={() => { if (!deleteBusy) setDeleteTargetAlbumId(null); }}
-        onConfirm={() => { if (!deleteBusy) handleConfirmDelete(); }}
-      />
-      <ReportConfirmModal
-        open={!!reportTargetAlbumId}
-        busy={reportBusy}
-        onCancel={() => { if (!reportBusy) setReportTargetAlbumId(null); }}
-        onConfirm={() => { if (!reportBusy) handleConfirmReport(); }}
-      />
     </div>
   );
 }
