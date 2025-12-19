@@ -1,5 +1,5 @@
 import { db } from '../firebase'
-import { collection, addDoc, query, where, doc, updateDoc, deleteDoc } from 'firebase/firestore'
+import { collection, addDoc, query, where, doc, updateDoc, deleteDoc, limit, startAfter, orderBy } from 'firebase/firestore'
 import { COL } from '../paths'
 
 // 動的 import で getDocs を遅延 (SSR 環境回避 & バンドル最適化軽微)
@@ -32,6 +32,36 @@ export async function listImages(albumId: string) {
   const { getDocs } = await import('firebase/firestore')
   const snap = await getDocs(q)
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
+// ユーザーが投稿した画像一覧（アルバム横断）
+export async function listImagesByUploader(userId: string, limitCount = 200) {
+  const q = query(
+    collection(db, COL.albumImages),
+    where('uploaderId', '==', userId),
+    limit(Math.max(1, limitCount))
+  )
+  const { getDocs } = await import('firebase/firestore')
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
+// ユーザーが投稿した画像のページング取得（新しい順）
+// NOTE: where(uploaderId==) + orderBy(createdAt desc) は Firestore の複合インデックスが必要になる場合があります。
+export async function listImagesByUploaderPage(userId: string, pageSize = 48, cursorDoc?: any) {
+  const constraints: any[] = [
+    where('uploaderId', '==', userId),
+    orderBy('createdAt', 'desc'),
+    limit(Math.max(1, pageSize)),
+  ]
+  if (cursorDoc) constraints.push(startAfter(cursorDoc))
+  const q = query(collection(db, COL.albumImages), ...constraints)
+  const { getDocs } = await import('firebase/firestore')
+  const snap = await getDocs(q)
+  const items = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  const nextCursor = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null
+  const hasMore = snap.docs.length >= Math.max(1, pageSize)
+  return { items, nextCursor, hasMore }
 }
 
 // ユーザーが画像を投稿したアルバムID一覧（重複除去）

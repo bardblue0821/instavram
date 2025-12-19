@@ -19,10 +19,20 @@ export type PhotoItem = {
   width: number;
   height: number;
   alt?: string;
+  subHtml?: string; // Lightbox 下部に表示する説明（HTML）
   uploaderId?: string;
   uploaderIconURL?: string | null;
   uploaderHandle?: string | null;
 };
+
+function escapeHtml(text: string) {
+  return text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
 
 export type GalleryGridProps = {
   photos: PhotoItem[];
@@ -33,6 +43,10 @@ export type GalleryGridProps = {
   layoutType?: 'rows' | 'grid';
   columns?: number; // grid の列数（layoutType='grid' のとき使用）
   visibleCount?: number; // 先頭からこの件数のみ表示
+  enableLightbox?: boolean;
+  lightboxPlugins?: any[];
+  lightboxThumbnail?: boolean;
+  lightboxShowThumbByDefault?: boolean;
 };
 
 // react-photo-album のカスタムレンダラー
@@ -57,8 +71,8 @@ function PhotoRenderer({ photo, imageProps, wrapperStyle, canDelete, onDelete, o
         }
       }}
     >
-      {displaySrc.startsWith("data:") ? (
-        // data URL は next/image が制限するためネイティブ img を使用
+      {displaySrc.startsWith("data:") || isRemote ? (
+        // data URL / リモートURL は next/image の制約や設定差分を避けるためネイティブ img を使用
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={displaySrc}
@@ -76,8 +90,6 @@ function PhotoRenderer({ photo, imageProps, wrapperStyle, canDelete, onDelete, o
           height={height}
           sizes={imageProps.sizes || "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"}
           style={{ display: "block", width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
-          // Firebase Storage など一部のリモートで Next の最適化が失敗するケースに備え回避
-          unoptimized={isRemote}
         />
       )}
       {canDelete && onDelete && canDelete(photo as PhotoItem) && (
@@ -127,7 +139,7 @@ function PhotoRenderer({ photo, imageProps, wrapperStyle, canDelete, onDelete, o
   );
 }
 
-export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDelete, onDelete, layoutType = 'rows', columns = 4, visibleCount }: GalleryGridProps) {
+export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDelete, onDelete, layoutType = 'rows', columns = 4, visibleCount, enableLightbox = true, lightboxPlugins, lightboxThumbnail = true, lightboxShowThumbByDefault = true }: GalleryGridProps) {
   const items = useMemo(() => (typeof visibleCount === 'number' ? photos.slice(0, Math.max(0, visibleCount)) : photos), [photos, visibleCount]);
   const lgRef = useRef<any>(null);
   const dynamicEl = useMemo(
@@ -135,20 +147,124 @@ export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDe
       items.map((p) => ({
         src: p.src,
         thumb: p.thumbSrc || p.src, // サムネイル一覧用に軽量URLを優先
-        subHtml: p.alt ? `<p>${p.alt}</p>` : undefined,
+        subHtml: p.subHtml ?? (p.alt ? `<p>${escapeHtml(p.alt)}</p>` : undefined),
       })),
     [items]
   );
+
+  const pluginsToUse = lightboxPlugins ?? [lgZoom, lgThumbnail];
+
+  // Lightbox を無効化（プロフィールなど、単純に一覧表示したい用途）
+  if (!enableLightbox) {
+    return (
+      <div className="relative">
+        {layoutType === 'rows' ? (
+          <PhotoAlbum
+            layout="rows"
+            photos={items}
+            targetRowHeight={rowHeight}
+            spacing={margin}
+            renderPhoto={(props: RenderPhotoProps) => (
+              <PhotoRenderer
+                {...(props as any)}
+                onOpen={() => {}}
+                canDelete={canDelete}
+                onDelete={onDelete}
+              />
+            )}
+          />
+        ) : (
+          <div
+            className="grid"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${Math.max(1, columns)}, 1fr)`,
+              gap: `${margin}px`,
+            }}
+          >
+            {items.map((p, idx) => (
+              <div
+                key={p.id ?? p.src + ':' + idx}
+                style={{ position: 'relative', borderRadius: 8, overflow: 'hidden' }}
+              >
+                <div style={{ position: 'relative', width: '100%', aspectRatio: '1 / 1' }}>
+                  {(/^data:/i.test(p.thumbSrc || p.src) || /^https?:\/\//i.test(p.thumbSrc || p.src)) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.thumbSrc || p.src}
+                      alt={p.alt || 'photo'}
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <Image
+                      src={p.thumbSrc || p.src}
+                      alt={p.alt || 'photo'}
+                      fill
+                      sizes="(max-width: 768px) 50vw, 25vw"
+                      style={{ objectFit: 'cover' }}
+                    />
+                  )}
+                </div>
+                {canDelete && onDelete && canDelete(p) && (
+                  <button
+                    type="button"
+                    aria-label="画像を削除"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(p); }}
+                    className="absolute right-1 top-1 rounded bg-red-600 p-1 text-white opacity-80 hover:opacity-100"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 6h18" />
+                      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                    </svg>
+                  </button>
+                )}
+                {p.uploaderIconURL && (
+                  p.uploaderHandle ? (
+                    <a
+                      href={`/user/${p.uploaderHandle}`}
+                      aria-label="投稿者プロフィールへ"
+                      className="absolute left-1 bottom-1"
+                      onClick={(e) => { e.stopPropagation(); }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={p.uploaderIconURL}
+                        alt="uploader"
+                        className="h-7 w-7 rounded-full object-cover border border-white/50 shadow"
+                        loading="lazy"
+                      />
+                    </a>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.uploaderIconURL}
+                      alt="uploader"
+                      className="absolute left-1 bottom-1 h-7 w-7 rounded-full object-cover border border-white/50 shadow"
+                      loading="lazy"
+                    />
+                  )
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="relative">
       {/* LightGallery は dynamic モードで利用し、クリック時に index を指定して開く */}
       <LightGallery
-        plugins={[lgZoom, lgThumbnail]}
+        plugins={pluginsToUse}
         dynamic
         dynamicEl={dynamicEl}
-        thumbnail={true}
-        showThumbByDefault={true}
+        thumbnail={lightboxThumbnail}
+        showThumbByDefault={lightboxThumbnail ? lightboxShowThumbByDefault : false}
         speed={300}
         elementClassNames="block"
         download={false}
@@ -189,7 +305,7 @@ export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDe
           >
             {items.map((p, idx) => (
               <div
-                key={p.id ?? p.src + ':' + idx}
+                key={(p.id ?? p.src) + ':' + idx}
                 role="button"
                 tabIndex={0}
                 className="cursor-pointer"
@@ -204,7 +320,7 @@ export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDe
               >
                 {/* 正方形トリム */}
                 <div style={{ position: 'relative', width: '100%', aspectRatio: '1 / 1' }}>
-                  {(/^data:/i.test(p.thumbSrc || p.src)) ? (
+                  {(/^data:/i.test(p.thumbSrc || p.src) || /^https?:\/\//i.test(p.thumbSrc || p.src)) ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={p.thumbSrc || p.src}
@@ -219,7 +335,6 @@ export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDe
                       fill
                       sizes="(max-width: 768px) 50vw, 25vw"
                       style={{ objectFit: 'cover' }}
-                      unoptimized={/^https?:\/\//i.test(p.thumbSrc || p.src)}
                     />
                   )}
                 </div>
