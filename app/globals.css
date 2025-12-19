@@ -140,9 +140,21 @@ body {
   text-decoration: none;
 }
 .link-accent:hover {
-  color: var(--accent-hover);
-  text-decoration: underline;
+  /* ホバー時は常に teal（accent）で統一し、下線は付けない */
+  color: var(--accent);
+  text-decoration: none;
 }
+
+/* --------------------------------------
+   Global link hover
+   目的: すべての <a> のホバーで teal に統一し、下線を付与
+--------------------------------------- */
+a { text-decoration: none; }
+a:hover { color: var(--accent); text-decoration: none !important; }
+/* Tailwind の hover:underline ユーティリティを無効化（グローバル方針に合わせる） */
+.hover\:underline:hover { text-decoration: none !important; }
+/* キーボード操作のアクセシビリティ向上: フォーカス時は視認性を確保 */
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Optional focus ring helper (Tailwind の ring を使わない場面向け) */
 .accent-ring:focus-visible {

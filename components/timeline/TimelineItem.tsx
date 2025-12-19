@@ -182,11 +182,11 @@ export function TimelineItem(props: {
           <div className="min-w-0">
             <a
               href={`/user/${owner?.handle || album.ownerId}`}
-              className="hover:underline flex items-baseline gap-2 truncate"
+              className="flex flex-col leading-tight"
               title={`${owner?.displayName || '名前未設定'} ${owner?.handle ? `@${owner.handle}` : ''}`.trim()}
             >
               <span className="text-base font-semibold truncate">{owner?.displayName || '名前未設定'}</span>
-              <span className="text-sm text-gray-500 shrink-0">{owner?.handle ? `@${owner.handle}` : 'ハンドル未設定'}</span>
+              <span className="text-sm text-gray-500">{owner?.handle ? `@${owner.handle}` : 'ハンドル未設定'}</span>
             </a>
           </div>
         </div>
@@ -194,7 +194,7 @@ export function TimelineItem(props: {
           <h3 className="text-base font-semibold">
             <a
               href={`/album/${album.id}`}
-              className="hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+              className="focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
             >{album.title}</a>
           </h3>
         )}
@@ -364,7 +364,7 @@ export function TimelineItem(props: {
                 </a>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 truncate">
-                    <a href={`/user/${u?.handle || c.userId}`} className="text-sm font-medium hover:underline truncate">{name}</a>
+                    <a href={`/user/${u?.handle || c.userId}`} className="text-sm font-medium truncate">{name}</a>
                     {u?.handle && <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">@{u.handle}</span>}
                     {timeText && <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{timeText}</span>}
                   </div>
