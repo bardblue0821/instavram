@@ -14,6 +14,15 @@ function toUserRef(u: any | null): UserRef | null {
 }
 
 export async function listLatestAlbumsVM(currentUserId: string, userCache?: Map<string, UserRef | null>): Promise<TimelineItemVM[]> {
+  return await listLatestAlbumsVMLimited(currentUserId, 50, userCache);
+}
+
+export async function listLatestAlbumsVMLimited(
+  currentUserId: string,
+  limitCount: number,
+  userCache?: Map<string, UserRef | null>
+): Promise<TimelineItemVM[]> {
+  // 既存呼び出し互換のため別関数で提供（timeline の無限ロードで使用）
   // 対象オーナーIDsを構築（自分 + フレンド + ウォッチ）
   const ownerSet = new Set<string>();
   ownerSet.add(currentUserId);
@@ -28,12 +37,11 @@ export async function listLatestAlbumsVM(currentUserId: string, userCache?: Map<
     }
     for (const w of watched) ownerSet.add(w);
   } catch (e) {
-    // フレンド/ウォッチ取得失敗時は対象なし（後で全表示に緩和したければここを変更）
     console.warn("friend/watch fetch error", e);
   }
 
   const ownerIds = Array.from(ownerSet);
-  const albums = await fetchLatestAlbums(50, ownerIds);
+  const albums = await fetchLatestAlbums(Math.max(1, limitCount), ownerIds);
   const cache = userCache ?? new Map<string, UserRef | null>();
 
   const enriched: TimelineItemVM[] = await Promise.all(

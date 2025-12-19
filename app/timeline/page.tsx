@@ -1,135 +1,195 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAuthUser } from "../../lib/hooks/useAuthUser";
 import { TimelineItem } from "../../components/timeline/TimelineItem";
-// フィードはフレンド/ウォッチ対象のみ
-import { listAcceptedFriends } from "../../lib/repos/friendRepo"; 
-import { listWatchedOwnerIds } from "../../lib/repos/watchRepo"; 
-import { listLatestAlbumsVM } from "@/src/services/timeline/listLatestAlbums"; 
-import type { TimelineItemVM, UserRef } from "@/src/models/timeline"; 
-import { getUser, type UserDoc } from "../../lib/repos/userRepo";
-import { listComments, subscribeComments } from "../../lib/repos/commentRepo";
-import { countLikes, hasLiked, toggleLike, subscribeLikes } from "../../lib/repos/likeRepo";
-import { listReactionsByAlbum, toggleReaction } from "../../lib/repos/reactionRepo";
+import { listLatestAlbumsVMLimited } from "@/src/services/timeline/listLatestAlbums";
+import type { TimelineItemVM, UserRef } from "@/src/models/timeline";
+import { getUser } from "../../lib/repos/userRepo";
+import { subscribeComments } from "../../lib/repos/commentRepo";
+import { toggleLike, subscribeLikes } from "../../lib/repos/likeRepo";
+import { toggleReaction } from "../../lib/repos/reactionRepo";
 import { addNotification } from "../../lib/repos/notificationRepo";
 import { translateError } from "../../lib/errors";
 
-type AlbumRow = { id: string; ownerId: string; title?: string | null; createdAt?: any };
 
 export default function TimelinePage() {
   const { user } = useAuthUser();
-  const [unsubs, setUnsubs] = useState<(() => void)[]>([]);
   const [rows, setRows] = useState<TimelineItemVM[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const PAGE_SIZE = 20;
+
+  const rowsRef = useRef<TimelineItemVM[]>([]);
+  const hasMoreRef = useRef(true);
+  const inFlightRef = useRef(false);
+  const unsubsRef = useRef<(() => void)[]>([]);
+  const userCacheRef = useRef<Map<string, UserRef | null>>(new Map());
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const loadMoreRef = useRef<() => void>(() => {});
+
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        // 未ログイン時はタイムラインを表示しない（要件: フレンド/ウォッチのみ）
-        if (!user?.uid) {
-          if (!cancelled) {
-            setRows([]);
-            setLoading(false);
-          }
-          return;
-        }
-        // 対象オーナーIDsを構築（自分 + フレンド + ウォッチ）
-        const ownerSet = new Set<string>();
-        ownerSet.add(user.uid);
-        try {
-          const [friends, watched] = await Promise.all([
-            listAcceptedFriends(user.uid),
-            listWatchedOwnerIds(user.uid),
-          ]);
-          // フレンド方向に依存せず相手UIDを追加
-          for (const f of friends) {
-            const other = f.userId === user.uid ? f.targetId : f.userId;
-            if (other) ownerSet.add(other);
-          }
-          for (const w of watched) ownerSet.add(w);
-        } catch (e) {
-          // フレンド/ウォッチ取得失敗時は対象なし（後で全表示に緩和したければここを変更）
-          console.warn("friend/watch fetch error", e);
-        }
+    rowsRef.current = rows;
+  }, [rows]);
 
-        const ownerIds = Array.from(ownerSet);
-        const userCache = new Map<string, UserRef | null>();
-        const enriched = await listLatestAlbumsVM(user.uid, userCache);
-        if (!cancelled) setRows(enriched);
-        // コメント/いいねのリアルタイム購読をセット
-        if (!cancelled) {
-          const localUnsubs: (() => void)[] = [];
-          for (let i = 0; i < enriched.length; i++) {
-            const row = enriched[i];
-            // comments: 最新コメントのみ更新
-            const cUnsub = await subscribeComments(row.album.id, (list) => {
-              const sorted = [...list]
-                .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0));
-              const latest = sorted.slice(-1)[0];
-              // 最新が上に来るように表示順を降順に
-              const previewRawDesc = sorted.slice(-3).reverse();
-              // ユーザー情報を補完（必要に応じて非同期で更新）
-              (async () => {
-                const preview = await Promise.all(previewRawDesc.map(async (c) => {
-                  let cu = userCache.get(c.userId);
-                  if (cu === undefined) {
-                    const u = await getUser(c.userId);
-                    cu = u ? { uid: u.uid, handle: u.handle || null, iconURL: u.iconURL || null, displayName: u.displayName } : null;
-                    userCache.set(c.userId, cu);
-                  }
-                  return { body: c.body, userId: c.userId, user: cu || undefined, createdAt: c.createdAt };
-                }));
-                setRows(prev => {
-                  const next = [...prev];
-                  if (!next[i]) return prev;
-                  next[i] = { ...next[i], latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined, commentsPreview: preview, commentCount: list.length } as any;
-                  return next;
-                });
-              })().catch(()=>{
-                // ユーザー取得失敗時は最低限の本文のみ更新
-                setRows(prev => {
-                  const next = [...prev];
-                  if (!next[i]) return prev;
-                  next[i] = { ...next[i], latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined, commentsPreview: previewRawDesc.map(c => ({ body: c.body, userId: c.userId, createdAt: c.createdAt })), commentCount: list.length } as any;
-                  return next;
-                });
-              });
-            }, (err) => console.warn("comments subscribe error", err));
-            localUnsubs.push(cUnsub);
+  useEffect(() => {
+    hasMoreRef.current = hasMore;
+  }, [hasMore]);
 
-            // likes: 件数と自分の liked を更新
-            const lUnsub = await subscribeLikes(row.album.id, (list) => {
-              const cnt = list.length;
-              const meLiked = !!(user && list.some(x => x.userId === user.uid));
-              setRows(prev => {
-                const next = [...prev];
-                if (!next[i]) return prev;
-                next[i] = { ...next[i], likeCount: cnt, liked: meLiked };
-                return next;
-              });
-            }, (err) => console.warn("likes subscribe error", err));
-            localUnsubs.push(lUnsub);
+  function cleanupSubscriptions() {
+    const list = unsubsRef.current;
+    unsubsRef.current = [];
+    for (const fn of list) {
+      try { fn(); } catch {}
+    }
+  }
+
+  async function subscribeForRow(row: TimelineItemVM, index: number, currentUid: string) {
+    // comments: 最新コメントのみ更新
+    const cUnsub = await subscribeComments(row.album.id, (list) => {
+      const sorted = [...list]
+        .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0));
+      const latest = sorted.slice(-1)[0];
+      const previewRawDesc = sorted.slice(-3).reverse();
+      const userCache = userCacheRef.current;
+
+      (async () => {
+        const preview = await Promise.all(previewRawDesc.map(async (c) => {
+          let cu = userCache.get(c.userId);
+          if (cu === undefined) {
+            const u = await getUser(c.userId);
+            cu = u ? { uid: u.uid, handle: u.handle || null, iconURL: u.iconURL || null, displayName: u.displayName } : null;
+            userCache.set(c.userId, cu);
           }
-          setUnsubs(prev => {
-            // 既存購読を解放してから置き換え
-            prev.forEach(fn => { try { fn(); } catch {} });
-            return localUnsubs;
-          });
+          return { body: c.body, userId: c.userId, user: cu || undefined, createdAt: c.createdAt };
+        }));
+        setRows(prev => {
+          if (!prev[index]) return prev;
+          const next = [...prev];
+          next[index] = {
+            ...next[index],
+            latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined,
+            commentsPreview: preview,
+            commentCount: list.length,
+          } as any;
+          return next;
+        });
+      })().catch(() => {
+        setRows(prev => {
+          if (!prev[index]) return prev;
+          const next = [...prev];
+          next[index] = {
+            ...next[index],
+            latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined,
+            commentsPreview: previewRawDesc.map(c => ({ body: c.body, userId: c.userId, createdAt: c.createdAt })),
+            commentCount: list.length,
+          } as any;
+          return next;
+        });
+      });
+    }, (err) => console.warn("comments subscribe error", err));
+    unsubsRef.current.push(cUnsub);
+
+    // likes: 件数と自分の liked を更新
+    const lUnsub = await subscribeLikes(row.album.id, (list) => {
+      const cnt = list.length;
+      const meLiked = list.some(x => x.userId === currentUid);
+      setRows(prev => {
+        if (!prev[index]) return prev;
+        const next = [...prev];
+        next[index] = { ...next[index], likeCount: cnt, liked: meLiked };
+        return next;
+      });
+    }, (err) => console.warn("likes subscribe error", err));
+    unsubsRef.current.push(lUnsub);
+  }
+
+  async function loadMore() {
+    const currentUid = user?.uid;
+    if (!currentUid) return;
+    if (inFlightRef.current) return;
+    if (!hasMoreRef.current) return;
+
+    inFlightRef.current = true;
+    setError(null);
+
+    const prev = rowsRef.current;
+    const nextLimit = prev.length === 0 ? PAGE_SIZE : prev.length + PAGE_SIZE;
+    if (prev.length === 0) setLoading(true);
+    else setLoadingMore(true);
+
+    try {
+      const enriched = await listLatestAlbumsVMLimited(currentUid, nextLimit, userCacheRef.current);
+
+      if (prev.length === 0) {
+        setRows(enriched);
+        // 初回は全件購読
+        for (let i = 0; i < enriched.length; i++) {
+          await subscribeForRow(enriched[i], i, currentUid);
         }
-      } catch (e: any) {
-        if (!cancelled) setError(translateError(e));
-      } finally {
-        if (!cancelled) setLoading(false);
+      } else {
+        const existingIds = new Set(prev.map(r => r.album.id));
+        const appended = enriched.filter(r => r?.album?.id && !existingIds.has(r.album.id));
+        if (appended.length > 0) {
+          const startIndex = prev.length;
+          setRows(p => [...p, ...appended]);
+          for (let j = 0; j < appended.length; j++) {
+            await subscribeForRow(appended[j], startIndex + j, currentUid);
+          }
+        }
       }
-    })();
+
+      setHasMore(enriched.length > prev.length);
+    } catch (e: any) {
+      setError(translateError(e));
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+      inFlightRef.current = false;
+    }
+  }
+
+  useEffect(() => {
+    cleanupSubscriptions();
+    userCacheRef.current = new Map();
+    setRows([]);
+    setHasMore(true);
+    setError(null);
+
+    if (!user?.uid) {
+      setLoading(false);
+      return;
+    }
+
+    // 初回ロード
+    loadMore().catch(() => {});
+
     return () => {
-      cancelled = true;
+      cleanupSubscriptions();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
+
+  useEffect(() => {
+    loadMoreRef.current = loadMore;
+  });
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          loadMoreRef.current();
+        }
+      },
+      { rootMargin: '400px' }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   async function handleToggleLike(albumId: string, index: number) {
     if (!user) return;
@@ -203,7 +263,7 @@ export default function TimelinePage() {
           const result = await toggleReaction(albumId, user.uid, emoji);
           added = !!(result as any)?.added;
         }
-        const row = rows[index];
+        const row = rowsRef.current[index];
         if (added && row && row.album.ownerId !== user.uid) {
           addNotification({
             userId: row.album.ownerId,
@@ -256,8 +316,8 @@ export default function TimelinePage() {
     }
   }
 
-  if (loading) return <div className="text-sm fg-subtle">読み込み中...</div>;
-  if (error) return <div className="text-sm text-red-600">{error}</div>;
+  if (loading && rows.length === 0) return <div className="text-sm fg-subtle">読み込み中...</div>;
+  if (error && rows.length === 0) return <div className="text-sm text-red-600">{error}</div>;
 
   return (
     <div className="max-w-2xl mx-auto p-4">
@@ -284,6 +344,14 @@ export default function TimelinePage() {
           ))}
         </div>
       )}
+
+      {error && rows.length > 0 && (
+        <div className="mt-4 text-sm text-red-600">{error}</div>
+      )}
+      {loadingMore && (
+        <div className="mt-4 text-sm fg-subtle">読み込み中...</div>
+      )}
+      <div ref={sentinelRef} className="h-px" />
     </div>
   );
 }
