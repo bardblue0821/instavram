@@ -1,6 +1,8 @@
+export const runtime = 'nodejs';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { toggleReaction } from '@/lib/repos/reactionRepo';
+// import { toggleReaction } from '@/lib/repos/reactionRepo';
+import { adminToggleReaction } from '@/src/repositories/admin/firestore';
 import { verifyIdToken } from '@/src/libs/firebaseAdmin';
 
 // very simple in-memory rate limit (per IP): 20 req / 60s
@@ -42,7 +44,7 @@ export async function POST(req: NextRequest) {
     if (!decoded || decoded.uid !== userId) {
       return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
     }
-    const result = await toggleReaction(albumId, userId, emoji);
+  const result = await adminToggleReaction(albumId, userId, emoji);
     // result has shape { added: boolean } in repo
     return NextResponse.json({ ok: true, added: !!(result as any)?.added });
   } catch (e: any) {

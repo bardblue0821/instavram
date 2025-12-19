@@ -347,13 +347,18 @@ export default function AlbumDetailPage() {
     setUploading(true);
     setError(null);
     try {
-      const allowMore = await canUploadMoreImages(albumId, user.uid);
-      if (!allowMore) {
-        setError(translateError(ERR.LIMIT_4_PER_USER));
+      const url = await fileToDataUrl(file);
+      const token = await user.getIdToken();
+      const res = await fetch('/api/images/add', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
+        body: JSON.stringify({ albumId, userId: user.uid, url }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(()=>({}));
+        setError(translateError(data?.error || 'UNKNOWN'));
         return;
       }
-      const url = await fileToDataUrl(file);
-      await addImage(albumId, user.uid, url);
       const imgs = await listImages(albumId);
       imgs.sort(
         (a: any, b: any) =>
@@ -488,7 +493,17 @@ export default function AlbumDetailPage() {
         setError('この画像を削除する権限がありません');
         return;
       }
-      await deleteImage(id);
+      const token = await user!.getIdToken();
+      const res = await fetch('/api/images/delete', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
+        body: JSON.stringify({ albumId, userId: user!.uid, imageId: id }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(()=>({}));
+        setError(translateError(data?.error || 'UNKNOWN'));
+        return;
+      }
       const imgs = await listImages(albumId!);
       imgs.sort(
         (a: any, b: any) =>

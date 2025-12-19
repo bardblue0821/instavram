@@ -24,6 +24,10 @@ Current services/ViewModels:
 	- usage: `app/album/[id]/page.tsx` 初期データ取得に利用、コメント/いいね購読はページ側で維持
 
 Route Handlers (server-side controllers):
+- Images
+	- `app/api/images/add/route.ts`：画像追加。Bearer トークン検証、オーナー/フレンドのみ許可、ユーザー上限（例: 4枚/人/アルバム）をサーバーで判定。
+	- `app/api/images/delete/route.ts`：画像削除。Bearer トークン検証、オーナーは全削除可／フレンドは自分の画像のみ。
+	- 使用箇所：`app/album/[id]/page.tsx`
 
 - Likes
 	- `app/api/likes/toggle/route.ts`：いいねのトグル。簡易レート制限（IPあたり 10req/分）＋フォールバックは既存リポジトリ側

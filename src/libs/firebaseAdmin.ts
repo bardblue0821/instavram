@@ -8,11 +8,12 @@ function init() {
     if (!admin.apps.length) {
       // Try application default credentials; optionally support JSON in env
       const creds = process.env.FIREBASE_ADMIN_CREDENTIALS;
+      const projectId = process.env.FIREBASE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
       if (creds) {
         const json = JSON.parse(creds);
-        admin.initializeApp({ credential: admin.credential.cert(json) });
+        admin.initializeApp({ credential: admin.credential.cert(json), projectId: projectId || json.project_id });
       } else {
-        admin.initializeApp({ credential: admin.credential.applicationDefault() });
+        admin.initializeApp({ credential: admin.credential.applicationDefault(), projectId });
       }
     }
     _initialized = true;
@@ -28,5 +29,14 @@ export async function verifyIdToken(token: string): Promise<any | null> {
     return await admin.auth().verifyIdToken(token);
   } catch {
     return null;
+  }
+}
+
+export function getAdminDb() {
+  init();
+  try {
+    return admin.firestore();
+  } catch (e) {
+    throw new Error('ADMIN_DB_NOT_INITIALIZED');
   }
 }
