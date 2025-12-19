@@ -1,3 +1,33 @@
+## テスト (Jest + Testing Library)
+
+このプロジェクトは Jest と React Testing Library を使ってコンポーネントのユニットテストを行えます。
+
+セットアップ済みのファイル:
+
+- `jest.config.js`: Next.js 用の設定ラッパ（`next/jest`）＋ jsdom 環境、有用なモジュールマッパー
+- `jest.setup.ts`: `@testing-library/jest-dom` の読み込みと `next/navigation` の最小モック
+- `tests/__mocks__/fileMock.js`: 画像等のアセットをテスト時にスタブ化
+- `__tests__/HeartIcon.test.tsx`: サンプルテスト（アイコンの fill/stroke 切り替え）
+
+インストール（開発依存）:
+
+```bash
+npm i -D jest@^29 jest-environment-jsdom@^29 @testing-library/react@^16 @testing-library/jest-dom@^6 @testing-library/user-event@^14 @types/jest@^29 identity-obj-proxy
+```
+
+実行:
+
+```bash
+npm run test
+# 監視モード
+npm run test:watch
+```
+
+補足:
+
+- App Router のフック（`next/navigation`）は `jest.setup.ts` で最低限モックしています。必要に応じて各テストで上書きしてください。
+- Firebase や外部 API を利用するコンポーネントは、テストで対象外にするか、モジュールモック（`jest.mock()`）をご利用ください。
+
 This src/ tree hosts the layered architecture:
 
 - app/ (Next.js App Router: views + controllers via route handlers/server actions)
