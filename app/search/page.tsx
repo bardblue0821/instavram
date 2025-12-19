@@ -97,7 +97,7 @@ export default function SearchPage() {
     <div className="max-w-4xl mx-auto p-4 space-y-5">
       <h1 className="text-xl font-semibold">検索</h1>
       <div>
-        <label className="block text-sm text-gray-600 mb-1">キーワード</label>
+  <label className="block text-sm fg-muted mb-1">キーワード</label>
         <input
           autoFocus
           value={q}
@@ -109,15 +109,15 @@ export default function SearchPage() {
         {!normalized && history.length > 0 && (
           <div className="mt-2">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-xs text-gray-600">最近の検索</p>
-              <button type="button" onClick={clearHistory} className="text-[11px] text-gray-500 underline">クリア</button>
+              <p className="text-xs fg-muted">最近の検索</p>
+              <button type="button" onClick={clearHistory} className="text-[11px] fg-subtle">クリア</button>
             </div>
             <ul className="border border-base rounded divide-y divide-base">
               {history.map((h, i) => (
                 <li key={i} className="text-sm">
                   <button
                     type="button"
-                    className="w-full text-left px-3 py-2 hover:bg-gray-50 truncate"
+                    className="w-full text-left px-3 py-2 hover-surface-alt truncate"
                     onClick={() => setQ(h)}
                   >{h}</button>
                 </li>
@@ -126,15 +126,15 @@ export default function SearchPage() {
           </div>
         )}
         {/* 入力中の候補表示は廃止（UI簡素化） */}
-        {loading && <p className="text-xs text-gray-500 mt-2">検索中...</p>}
+        {loading && <p className="text-xs fg-subtle mt-2">検索中...</p>}
         {err && <p className="text-xs text-red-600 mt-2">{err}</p>}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <section>
           <h2 className="font-medium mb-2">ユーザー {users.length ? `(${users.length})` : ""}</h2>
-          {!normalized && <p className="text-sm text-gray-500">キーワードを入力してください</p>}
-          {normalized && users.length === 0 && !loading && (<p className="text-sm text-gray-500">該当なし</p>)}
+          {!normalized && <p className="text-sm fg-subtle">キーワードを入力してください</p>}
+          {normalized && users.length === 0 && !loading && (<p className="text-sm fg-subtle">該当なし</p>)}
           <ul className="space-y-1">
             {users.map((u) => (
               <li key={u.uid} className="text-sm truncate">
@@ -148,8 +148,8 @@ export default function SearchPage() {
 
         <section>
           <h2 className="font-medium mb-2">アルバム {albums.length ? `(${albums.length})` : ""}</h2>
-          {!normalized && <p className="text-sm text-gray-500">キーワードを入力してください</p>}
-          {normalized && albums.length === 0 && !loading && (<p className="text-sm text-gray-500">該当なし</p>)}
+          {!normalized && <p className="text-sm fg-subtle">キーワードを入力してください</p>}
+          {normalized && albums.length === 0 && !loading && (<p className="text-sm fg-subtle">該当なし</p>)}
           <ul className="space-y-1">
             {albums.map((a) => (
               <li key={a.id} className="text-sm truncate">

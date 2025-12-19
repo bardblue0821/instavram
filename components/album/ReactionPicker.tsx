@@ -21,7 +21,7 @@ export default function ReactionPicker(props: ReactionPickerProps) {
   if (!open) return null;
   return (
     <div className="absolute top-full left-0 mt-2 w-80 bg-page border border-base rounded shadow-lg p-2 z-50">
-      <p className="text-xs text-gray-600 mb-2">絵文字を選択してください（再選択で解除）</p>
+      <p className="text-xs fg-muted mb-2">絵文字を選択してください（再選択で解除）</p>
       <input
         autoFocus
         value={query}
@@ -38,7 +38,7 @@ export default function ReactionPicker(props: ReactionPickerProps) {
               aria-label={cat.label}
               title={cat.label}
               onClick={() => onCatChange(cat.key)}
-              className={`flex items-center justify-center w-9 h-9 text-lg rounded border ${activeCat===cat.key ? 'bg-blue-600 text-white border-blue-600' : 'bg-page text-gray-700 border-base'}`}
+              className={`flex items-center justify-center w-9 h-9 text-lg rounded border ${activeCat===cat.key ? 'bg-blue-600 text-white border-blue-600' : 'bg-page fg-muted border-base'}`}
             >{cat.icon}</button>
           ))}
         </div>
@@ -55,7 +55,7 @@ export default function ReactionPicker(props: ReactionPickerProps) {
                 aria-label={`リアクション ${e}`}
                 aria-pressed={mine}
                 onClick={() => { onPickEmoji(e); onClose(); }}
-                className={`rounded border px-2 py-1 text-sm ${mine ? "border-blue-600 bg-blue-600 text-white" : "border-base bg-page text-gray-700"}`}
+                className={`rounded border px-2 py-1 text-sm ${mine ? "border-blue-600 bg-blue-600 text-white" : "border-base bg-page fg-muted"}`}
               >{e}</button>
             );
           })}

@@ -38,7 +38,7 @@ export default function InlineTextareaField(p: InlineTextareaFieldProps) {
   if (active)
     return (
       <div className="text-sm space-y-1">
-        <label className="text-xs text-gray-500">{label}</label>
+        <label className="text-xs fg-subtle">{label}</label>
         <div className="flex items-start gap-2">
           <div className="flex-1">
             <textarea
@@ -50,7 +50,7 @@ export default function InlineTextareaField(p: InlineTextareaFieldProps) {
               onChange={(e) => onChange(e.target.value)}
               onBlur={onBlur}
             />
-            <p className="text-[10px] text-gray-500">
+            <p className="text-[10px] fg-subtle">
               {editingValue
                 .replace(/[\r\n]+/g, " ")
                 .replace(/[\u3000]+/g, "")
@@ -77,7 +77,7 @@ export default function InlineTextareaField(p: InlineTextareaFieldProps) {
       className={isMe ? "cursor-pointer text-sm whitespace-pre-line" : "text-sm whitespace-pre-line"}
       onClick={() => isMe && beginEdit(field, value)}
     >
-      <span className="font-semibold text-gray-700">{label}:</span>{" "}
+      <span className="font-semibold fg-muted">{label}:</span>{" "}
       {value ? value : placeholder}
     </p>
   );

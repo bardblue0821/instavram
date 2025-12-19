@@ -87,7 +87,7 @@ export function CommentList({
   };
 
   if (!comments || comments.length === 0) {
-    return <p className="text-sm text-gray-500">コメントなし</p>;
+    return <p className="text-sm fg-subtle">コメントなし</p>;
   }
 
   return (
@@ -166,7 +166,7 @@ export function CommentList({
                         disabled={!editingValue?.trim()}
                         className="rounded bg-green-600 px-2 py-0.5 text-white disabled:opacity-50"
                       >保存</button>
-                      <button onClick={() => onEditCancel?.()} className="rounded bg-gray-400 px-2 py-0.5 text-white">キャンセル</button>
+                      <button onClick={() => onEditCancel?.()} className="rounded border px-2 py-0.5 fg-muted hover-surface-alt">キャンセル</button>
                     </>
                   )}
                 </div>

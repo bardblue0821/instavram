@@ -256,13 +256,13 @@ export default function TimelinePage() {
     }
   }
 
-  if (loading) return <div className="text-sm text-gray-500">読み込み中...</div>;
+  if (loading) return <div className="text-sm fg-subtle">読み込み中...</div>;
   if (error) return <div className="text-sm text-red-600">{error}</div>;
 
   return (
     <div className="max-w-2xl mx-auto">
       <h1 className="text-xl font-semibold mb-4">タイムライン</h1>
-      {rows.length === 0 && <p className="text-sm text-gray-500">対象アルバムがありません</p>}
+  {rows.length === 0 && <p className="text-sm fg-subtle">対象アルバムがありません</p>}
       {rows.length > 0 && (
         <div className="divide-y divide-base [&>*]:pb-12">
           {rows.map((row, i) => (

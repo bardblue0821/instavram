@@ -186,7 +186,7 @@ export function TimelineItem(props: {
               title={`${owner?.displayName || '名前未設定'} ${owner?.handle ? `@${owner.handle}` : ''}`.trim()}
             >
               <span className="text-base font-semibold truncate">{owner?.displayName || '名前未設定'}</span>
-              <span className="text-sm text-gray-500">{owner?.handle ? `@${owner.handle}` : 'ハンドル未設定'}</span>
+              <span className="text-sm fg-subtle">{owner?.handle ? `@${owner.handle}` : 'ハンドル未設定'}</span>
             </a>
           </div>
         </div>
@@ -194,7 +194,6 @@ export function TimelineItem(props: {
           <h3 className="text-base font-semibold">
             <a
               href={`/album/${album.id}`}
-              className="focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
             >{album.title}</a>
           </h3>
         )}
@@ -208,23 +207,23 @@ export function TimelineItem(props: {
         <button
           aria-label={liked ? "いいね済み" : "いいね"}
           aria-pressed={liked}
-          className={`${liked ? "text-pink-600" : "text-gray-700 dark:text-gray-300"}`}
+          className={`${liked ? "text-pink-600" : "fg-muted"}`}
           onClick={() => onLike?.()}
         >
           <HeartIcon filled={liked} size={20} />
         </button>
-        <span className="text-xs text-gray-600 dark:text-gray-400">{likeCount}</span>
+        <span className="text-xs fg-subtle">{likeCount}</span>
         {onCommentSubmit && (
           <button
             type="button"
             aria-label="コメント入力を開閉"
-            className={`text-gray-700 dark:text-gray-300 ${showCommentBox ? 'opacity-100' : 'opacity-80'}`}
+            className={`fg-muted ${showCommentBox ? 'opacity-100' : 'opacity-80'}`}
             onClick={() => setShowCommentBox((v) => !v)}
           >
             <ChatIcon size={20} />
           </button>
         )}
-        <span className="text-xs text-gray-600 dark:text-gray-400">{commentCount}</span>
+        <span className="text-xs fg-subtle">{commentCount}</span>
       </div>
 
       {/* リアクション（簡易版：1以上のみ表示、クリックでトグル、ホバーでユーザー一覧） */}
@@ -238,33 +237,33 @@ export function TimelineItem(props: {
                 aria-label={`リアクション ${r.emoji}`}
                 aria-pressed={r.mine}
                 onClick={() => onToggleReaction?.(r.emoji)}
-                className={`rounded border px-2 py-1 text-sm ${r.mine ? "border-blue-600 bg-page text-blue-700" : "border-base bg-page text-gray-700"}`}
+                className={`rounded border px-2 py-1 text-sm ${r.mine ? "border-blue-600 bg-page text-blue-700" : "border-base bg-page fg-muted"}`}
               >{r.emoji} <span className="text-xs">{r.count}</span></button>
               {hoveredEmoji === r.emoji && (
-                <div className="absolute left-0 top-full mt-1 w-64 rounded border border-base bg-page text-gray-800 shadow-lg z-40">
+                <div className="absolute left-0 top-full mt-1 w-64 rounded border border-base bg-page shadow-lg z-40">
                   <div className="p-2">
-                    <p className="text-[11px] text-gray-500 mb-1">このリアクションをした人</p>
-                    {reactorLoading[r.emoji] && <p className="text-xs text-gray-500">読み込み中...</p>}
+                    <p className="text-[11px] fg-subtle mb-1">このリアクションをした人</p>
+                    {reactorLoading[r.emoji] && <p className="text-xs fg-subtle">読み込み中...</p>}
                     {!reactorLoading[r.emoji] && (
                       (reactorMap[r.emoji] && reactorMap[r.emoji]!.length > 0) ? (
                         <ul className="max-h-64 overflow-auto divide-y divide-base">
                           {reactorMap[r.emoji]!.map((u) => (
                             <li key={u.uid}>
-                              <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50">
+                              <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 px-2 py-1 hover-surface-alt">
                                 {u.iconURL ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img src={u.iconURL} alt="" className="h-5 w-5 rounded-full object-cover" />
                                 ) : (
-                                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-[10px] text-gray-600">{u.displayName?.[0] || '?'}</span>
+                                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full surface-alt text-[10px] fg-muted">{u.displayName?.[0] || '?'}</span>
                                 )}
                                 <span className="text-sm font-medium">{u.displayName}</span>
-                                <span className="text-[11px] text-gray-500">@{u.handle || u.uid.slice(0,6)}</span>
+                                <span className="text-[11px] fg-subtle">@{u.handle || u.uid.slice(0,6)}</span>
                               </a>
                             </li>
                           ))}
                         </ul>
                       ) : (
-                        <p className="text-xs text-gray-500">まだいません</p>
+                        <p className="text-xs fg-subtle">まだいません</p>
                       )
                     )}
                   </div>
@@ -281,11 +280,11 @@ export function TimelineItem(props: {
           aria-label="リアクションを追加"
           disabled={!onToggleReaction}
           onClick={() => setPickerOpen((o) => !o)}
-          className="px-1 text-lg leading-none text-gray-700 dark:text-gray-300 disabled:opacity-50"
+          className="px-1 text-lg leading-none fg-muted disabled:opacity-50"
         >＋</button>
         {pickerOpen && (
           <div ref={pickerRef} className="absolute top-full left-0 mt-2 w-80 bg-page border border-base rounded shadow-lg p-2 z-50">
-            <p className="text-xs text-gray-600 mb-2">絵文字を選択してください（再選択で解除）</p>
+            <p className="text-xs fg-muted mb-2">絵文字を選択してください（再選択で解除）</p>
             <input
               autoFocus
               value={emojiQuery}
@@ -303,7 +302,7 @@ export function TimelineItem(props: {
                     aria-label={cat.label}
                     title={cat.label}
                     onClick={() => setActiveCat(cat.key)}
-                    className={`flex items-center justify-center w-8 h-8 text-lg rounded border ${activeCat===cat.key ? 'bg-blue-600 text-white border-blue-600' : 'bg-page text-gray-700 border-base'}`}
+                    className={`flex items-center justify-center w-8 h-8 text-lg rounded border ${activeCat===cat.key ? 'bg-blue-600 text-white border-blue-600' : 'bg-page fg-muted border-base'}`}
                   >{cat.icon}</button>
                 ))}
               </div>
@@ -320,7 +319,7 @@ export function TimelineItem(props: {
                     aria-label={`リアクション ${e}`}
                     aria-pressed={mine}
                     onClick={() => { onToggleReaction?.(e); setPickerOpen(false); }}
-                    className={`rounded border px-2 py-1 text-sm ${mine ? "border-blue-600 bg-blue-600 text-white" : "border-base bg-page text-gray-700"}`}
+                    className={`rounded border px-2 py-1 text-sm ${mine ? "border-blue-600 bg-blue-600 text-white" : "border-base bg-page fg-muted"}`}
                   >{e}</button>
                 );
               })}
@@ -365,10 +364,10 @@ export function TimelineItem(props: {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 truncate">
                     <a href={`/user/${u?.handle || c.userId}`} className="text-sm font-medium truncate">{name}</a>
-                    {u?.handle && <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">@{u.handle}</span>}
-                    {timeText && <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{timeText}</span>}
+                    {u?.handle && <span className="text-xs fg-subtle shrink-0">@{u.handle}</span>}
+                    {timeText && <span className="text-xs fg-subtle shrink-0">{timeText}</span>}
                   </div>
-                  <p className="text-sm text-gray-800 dark:text-gray-200 truncate">{text}</p>
+                  <p className="text-sm truncate">{text}</p>
                 </div>
               </div>
             );

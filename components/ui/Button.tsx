@@ -20,8 +20,8 @@ function cn(...values: Array<string | false | null | undefined>) {
 const variantClass: Record<Variant, string> = {
   primary: "btn-accent", // legacy primary -> accent
   accent: "btn-accent",
-  secondary: "bg-gray-900 text-white hover:bg-gray-800 focus-visible:ring-gray-500",
-  ghost: "border border-base text-gray-700 hover:bg-gray-100 focus-visible:ring-gray-300",
+  secondary: "surface text-white hover:opacity-90",
+  ghost: "border border-base fg-muted hover-surface-alt",
 };
 
 const sizeClass: Record<Size, string> = {

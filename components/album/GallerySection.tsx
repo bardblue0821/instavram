@@ -24,7 +24,7 @@ export default function GallerySection(props: GallerySectionProps) {
 
   return (
     <section>
-      {imagesLength === 0 && <p className="text-sm text-gray-500">まだ画像がありません</p>}
+  {imagesLength === 0 && <p className="text-sm fg-subtle">まだ画像がありません</p>}
       {imagesLength > 0 && (
         <GalleryGrid
           photos={photos}

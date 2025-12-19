@@ -556,14 +556,14 @@ export default function AlbumDetailPage() {
   }, [images]);
 
   if (!albumId) {
-    return <div className="text-sm text-gray-500">アルバムIDが指定されていません。</div>;
+    return <div className="text-sm fg-subtle">アルバムIDが指定されていません。</div>;
   }
 
-  if (loading) return <div className="text-sm text-gray-500">読み込み中...</div>;
+  if (loading) return <div className="text-sm fg-subtle">読み込み中...</div>;
 
   if (!album) {
     return (
-      <div className="text-sm text-gray-600">
+      <div className="text-sm fg-muted">
         {error ?? "アルバムが見つかりません"}
       </div>
     );
@@ -674,7 +674,7 @@ export default function AlbumDetailPage() {
       )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <div className="space-y-1 text-xs text-gray-500">
+      <div className="space-y-1 text-xs fg-subtle">
         {!canAddImages && <p>※ 操作にはログインが必要です。</p>}
       </div>
 

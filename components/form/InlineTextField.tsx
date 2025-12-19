@@ -49,7 +49,7 @@ export default function InlineTextField(p: InlineTextFieldProps) {
   if (active)
     return (
       <div className="text-sm space-y-1">
-        <label className="text-xs text-gray-500">{label}</label>
+        <label className="text-xs fg-subtle">{label}</label>
         <div className="flex items-start gap-2">
           <input
             autoFocus
@@ -80,7 +80,7 @@ export default function InlineTextField(p: InlineTextFieldProps) {
       className={isMe ? "cursor-pointer text-sm" : "text-sm"}
       onClick={() => isMe && beginEdit(field, value)}
     >
-      <span className="font-semibold text-gray-700">{label}:</span>{" "}
+      <span className="font-semibold fg-muted">{label}:</span>{" "}
       {value && isLink ? (
         <a className="link-accent" href={value} target="_blank" rel="noreferrer">
           {shown}

@@ -116,14 +116,14 @@ export default function NotificationsPage(){
     return () => { active=false; };
   }, [user]);
 
-  if (!user) return <div className="max-w-3xl mx-auto p-6"><p className="text-sm text-gray-600">ログインしてください。</p></div>;
+  if (!user) return <div className="max-w-3xl mx-auto p-6"><p className="text-sm fg-muted">ログインしてください。</p></div>;
 
   return (
     <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-2xl font-semibold mb-4">通知</h1>
-      {loading && <p className="text-sm text-gray-500">読み込み中...</p>}
+  {loading && <p className="text-sm fg-subtle">読み込み中...</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {!loading && rows.length === 0 && <p className="text-sm text-gray-500">通知はありません。</p>}
+  {!loading && rows.length === 0 && <p className="text-sm fg-subtle">通知はありません。</p>}
       <ul className="divide-y divide-base">
         {rows.map(r => {
           const isUnread = !r.readAt;
@@ -132,12 +132,12 @@ export default function NotificationsPage(){
           const fState = r.type === 'friend_request' ? friendState[r.actorId] : undefined;
           const canActOnFriend = r.type === 'friend_request' && fState === 'pending';
           return (
-            <li key={r.id} className={`py-3 text-sm ${isUnread ? 'bg-yellow-50 dark:bg-gray-800' : ''}`}>
+            <li key={r.id} className={`py-3 text-sm ${isUnread ? 'surface-alt' : ''}`}>
               <div className="flex items-start justify-between gap-2">
                 <div className="space-y-1">
                   <p>{r.message}</p>
                   {r.type === 'friend_request' && (
-                    <div className="text-xs text-gray-700 flex flex-wrap items-center gap-2">
+                    <div className="text-xs fg-muted flex flex-wrap items-center gap-2">
                       <span>申請元: {formatActor(actor, r.actorId)}</span>
                       {canActOnFriend && (
                         <>
@@ -154,16 +154,16 @@ export default function NotificationsPage(){
                         </>
                       )}
                       {fState === 'accepted' && <span className="text-green-600">承認済み</span>}
-                      {fState === 'none' && <span className="text-gray-500">状態: 不明</span>}
+                      {fState === 'none' && <span className="fg-subtle">状態: 不明</span>}
                     </div>
                   )}
                   {r.type !== 'friend_request' && actor && (
-                    <p className="text-xs text-gray-600">発信者: {formatActor(actor, r.actorId)}</p>
+                    <p className="text-xs fg-muted">発信者: {formatActor(actor, r.actorId)}</p>
                   )}
                   {r.albumId && <Link href={targetHref!} className="text-xs link-accent">アルバムを見る</Link>}
-                  <p className="text-[11px] text-gray-500">{formatDate(r.createdAt)}</p>
+                  <p className="text-[11px] fg-subtle">{formatDate(r.createdAt)}</p>
                 </div>
-                <span className="text-[10px] uppercase tracking-wide text-gray-400">{r.type}</span>
+                <span className="text-[10px] uppercase tracking-wide fg-subtle">{r.type}</span>
               </div>
             </li>
           );

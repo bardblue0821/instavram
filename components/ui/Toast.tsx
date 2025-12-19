@@ -91,7 +91,7 @@ function ToastBubble({ item, onClose }: { item: ToastItem; onClose: () => void }
         <p className="text-sm flex-1">{message}</p>
         <button
           type="button"
-          className="ml-2 text-xs text-gray-500 hover:text-gray-700"
+          className="ml-2 text-xs fg-subtle hover-fg-muted"
           onClick={onClose}
           aria-label="閉じる"
         >
@@ -111,7 +111,7 @@ function variantColor(v: ToastVariant) {
     case "error":
       return { border: "border-red-300", text: "text-red-900", dot: "bg-red-500" };
     default:
-      return { border: "border-base", text: "text-gray-900", dot: "bg-gray-500" };
+      return { border: "border-base", text: "text-foreground", dot: "bg-[--muted]" };
   }
 }
 

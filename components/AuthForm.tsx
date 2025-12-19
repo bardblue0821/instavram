@@ -180,7 +180,7 @@ export default function AuthForm() {
             <label className="block text-sm font-medium mb-1">ユーザーID (@無し / 一意)</label>
             <div className="flex items-center gap-2">
               <input type="text" value={handle} onChange={e=>setHandle(e.target.value.toLowerCase())} className={`input-underline flex-1 ${(handleStatus==='taken'||handleStatus==='invalid')?'error':''}`} disabled={loading} placeholder="例: taro_vr" aria-invalid={handleStatus==='taken'||handleStatus==='invalid'} />
-              <span className="text-xs text-gray-600 w-16">
+              <span className="text-xs fg-subtle w-16">
                 {handleStatus==='idle' && ''}
                 {handleStatus==='checking' && '確認中'}
                 {handleStatus==='ok' && '利用可'}
@@ -220,14 +220,14 @@ export default function AuthForm() {
         )}
         {error && <p className="text-red-600 text-sm">{error}</p>}
         {info && (
-          <div className="text-xs text-gray-700 bg-yellow-50 border rounded p-2">
+          <div className="text-xs fg-muted surface-alt border rounded p-2">
             <p>{info}</p>
           </div>
         )}
         <button type="submit" className="w-full btn-accent justify-center disabled:opacity-50" disabled={loading}>{loading ? '処理中...' : (mode === 'login' ? 'ログイン' : '登録')}</button>
       </form>
       <div className="mt-6 space-y-2">
-        <button onClick={handleGoogle} className="w-full bg-gray-800 text-white rounded py-2 disabled:opacity-50" disabled={loading}>{loading ? '...' : 'Google で続行'}</button>
+        <button onClick={handleGoogle} className="w-full border rounded py-2 fg-muted hover-surface-alt disabled:opacity-50" disabled={loading}>{loading ? '...' : 'Google で続行'}</button>
       </div>
     </div>
   );

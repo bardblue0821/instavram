@@ -133,7 +133,7 @@ export default function Header() {
             role="menu"
           >
             {loading && (
-              <p className="px-4 py-2 text-sm text-gray-500" role="status">読み込み中...</p>
+              <p className="px-4 py-2 text-sm fg-subtle" role="status">読み込み中...</p>
             )}
             {!loading && user && (
               <>

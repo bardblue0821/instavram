@@ -48,11 +48,11 @@ export default function ReactionsBar(props: ReactionsBarProps) {
           aria-pressed={liked}
           disabled={likeBusy}
           onClick={onToggleLike}
-          className={`${liked ? "text-pink-600" : "text-gray-700 dark:text-gray-300"} disabled:opacity-50`}
+          className={`${liked ? "text-pink-600" : "fg-muted"} disabled:opacity-50`}
         >
           <HeartIcon filled={liked} size={20} />
         </button>
-        <span className="text-xs text-gray-600">{likeCount}</span>
+        <span className="text-xs fg-subtle">{likeCount}</span>
       </div>
       <div className="ml-4 flex items-center gap-2 flex-wrap">
         {reactions.filter(r => r.count > 0).map((r) => {
@@ -65,7 +65,7 @@ export default function ReactionsBar(props: ReactionsBarProps) {
                 aria-label={`リアクション ${r.emoji}`}
                 aria-pressed={mine}
                 onClick={() => onPickEmoji(r.emoji)}
-                className={`rounded border px-2 py-1 text-sm ${mine ? "border-blue-600 bg-page text-blue-700" : "border-base bg-page text-gray-700"}`}
+                className={`rounded border px-2 py-1 text-sm ${mine ? "border-blue-600 bg-page text-blue-700" : "border-base bg-page fg-muted"}`}
               >{r.emoji} <span className="text-xs">{count}</span></button>
               {hoveredEmoji === r.emoji && (
                 <ReactorPopover emoji={r.emoji} users={reactorMap[r.emoji]} loading={reactorLoading[r.emoji]} />
@@ -77,7 +77,7 @@ export default function ReactionsBar(props: ReactionsBarProps) {
           type="button"
           aria-label="リアクションを追加"
           onClick={onTogglePicker}
-          className="px-1 text-lg leading-none text-gray-700 dark:text-gray-300"
+          className="px-1 text-lg leading-none fg-muted"
         >＋</button>
         <ReactionPicker
           open={pickerOpen}

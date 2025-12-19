@@ -23,8 +23,8 @@ export default function FriendActions({ state, busy = false, onSend, onCancel, o
       )}
       {state === "sent" && (
         <div className="flex gap-2 items-center">
-          <span className="text-sm text-gray-600">申請中...</span>
-          <button disabled={busy} onClick={onCancel} className="bg-gray-500 text-white text-xs px-2 py-1 rounded disabled:opacity-50">
+          <span className="text-sm fg-muted">申請中...</span>
+          <button disabled={busy} onClick={onCancel} className="text-xs px-2 py-1 rounded border fg-muted hover-surface-alt disabled:opacity-50">
             キャンセル
           </button>
         </div>
