@@ -22,3 +22,9 @@ Current services/ViewModels:
 	- models: `src/models/album.ts`
 	- service: `src/services/album/getAlbumDetail.ts`
 	- usage: `app/album/[id]/page.tsx` 初期データ取得に利用、コメント/いいね購読はページ側で維持
+
+Route Handlers (server-side controllers):
+
+- Likes
+	- `app/api/likes/toggle/route.ts`：いいねのトグル。簡易レート制限（IPあたり 10req/分）＋フォールバックは既存リポジトリ側
+	- 使用箇所：`app/timeline/page.tsx` / `app/album/[id]/page.tsx`

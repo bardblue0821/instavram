@@ -145,7 +145,15 @@ export default function TimelinePage() {
       return next;
     });
     try {
-      await toggleLike(albumId, user.uid);
+      // まずはサーバーの Route Handler 経由でトグル（失敗時は従来のリポジトリをフォールバック）
+      const res = await fetch('/api/likes/toggle', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ albumId, userId: user.uid }),
+      });
+      if (!res.ok) {
+        await toggleLike(albumId, user.uid);
+      }
     } catch (e) {
       // rollback
       setRows((prev) => {

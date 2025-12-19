@@ -398,7 +398,14 @@ export default function AlbumDetailPage() {
     setLiked(!prevLiked);
     setLikeCount(prevLiked ? prevCount - 1 : prevCount + 1);
     try {
-      await toggleLike(albumId, user.uid);
+      const res = await fetch('/api/likes/toggle', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ albumId, userId: user.uid }),
+      });
+      if (!res.ok) {
+        await toggleLike(albumId, user.uid);
+      }
     } catch (e: any) {
       setLiked(prevLiked);
       setLikeCount(prevCount);
