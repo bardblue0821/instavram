@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { addComment } from '@/lib/repos/commentRepo';
+import { verifyIdToken } from '@/src/libs/firebaseAdmin';
 
 // very simple in-memory rate limit (per IP): 10 req / 60s
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -31,6 +32,15 @@ export async function POST(req: NextRequest) {
     const body = (json?.body as string | undefined)?.trim();
     if (!albumId || !userId || !body) {
       return NextResponse.json({ error: 'INVALID_INPUT' }, { status: 400 });
+    }
+    const auth = req.headers.get('authorization');
+    const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null;
+    if (!token) {
+      return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    }
+    const decoded = await verifyIdToken(token);
+    if (!decoded || decoded.uid !== userId) {
+      return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
     }
     if (body.length > 1000) {
       return NextResponse.json({ error: 'COMMENT_TOO_LONG' }, { status: 400 });

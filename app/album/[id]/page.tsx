@@ -398,9 +398,10 @@ export default function AlbumDetailPage() {
     setLiked(!prevLiked);
     setLikeCount(prevLiked ? prevCount - 1 : prevCount + 1);
     try {
+      const token = await user.getIdToken();
       const res = await fetch('/api/likes/toggle', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
         body: JSON.stringify({ albumId, userId: user.uid }),
       });
       if (!res.ok) {
@@ -431,9 +432,10 @@ export default function AlbumDetailPage() {
       }
     });
     try {
+      const token = await user.getIdToken();
       const res = await fetch('/api/reactions/toggle', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
         body: JSON.stringify({ albumId, userId: user.uid, emoji }),
       });
       let added = false;
@@ -632,9 +634,10 @@ export default function AlbumDetailPage() {
     setCommenting(true);
     setError(null);
     try {
+      const token = await user.getIdToken();
       const res = await fetch('/api/comments/add', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
         body: JSON.stringify({ albumId, userId: user.uid, body: commentText.trim() }),
       });
       if (!res.ok) {

@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { toggleLike } from '@/lib/repos/likeRepo';
+import { verifyIdToken } from '@/src/libs/firebaseAdmin';
 
 // very simple in-memory rate limit (per IP): 10 req / 60s
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -30,6 +31,15 @@ export async function POST(req: NextRequest) {
     const userId = json?.userId as string | undefined;
     if (!albumId || !userId) {
       return NextResponse.json({ error: 'INVALID_INPUT' }, { status: 400 });
+    }
+    const auth = req.headers.get('authorization');
+    const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null;
+    if (!token) {
+      return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    }
+    const decoded = await verifyIdToken(token);
+    if (!decoded || decoded.uid !== userId) {
+      return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
     }
     await toggleLike(albumId, userId);
     return NextResponse.json({ ok: true });

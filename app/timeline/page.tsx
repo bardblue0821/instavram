@@ -146,9 +146,10 @@ export default function TimelinePage() {
     });
     try {
       // まずはサーバーの Route Handler 経由でトグル（失敗時は従来のリポジトリをフォールバック）
+      const token = await user.getIdToken();
       const res = await fetch('/api/likes/toggle', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
         body: JSON.stringify({ albumId, userId: user.uid }),
       });
       if (!res.ok) {
@@ -190,9 +191,10 @@ export default function TimelinePage() {
     });
     (async () => {
       try {
-        const res = await fetch('/api/reactions/toggle', {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/reactions/toggle', {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
           body: JSON.stringify({ albumId, userId: user.uid, emoji }),
         });
         let added = false;
@@ -242,9 +244,10 @@ export default function TimelinePage() {
     if (!user) return;
     const { addComment } = await import("../../lib/repos/commentRepo");
     try {
+      const token = await user.getIdToken();
       const res = await fetch('/api/comments/add', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
         body: JSON.stringify({ albumId, userId: user.uid, body: text }),
       });
       if (!res.ok) {

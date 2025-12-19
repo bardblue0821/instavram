@@ -36,3 +36,8 @@ Route Handlers (server-side controllers):
 - Reactions
 	- `app/api/reactions/toggle/route.ts`：リアクショントグル。簡易レート制限（IPあたり 20req/分）＋フォールバックは既存リポジトリ側。APIは `{ added: boolean }` を返す（通知制御用）
 	- 使用箇所：`app/timeline/page.tsx` / `app/album/[id]/page.tsx`
+
+Auth
+
+- サーバー側検証：`src/libs/firebaseAdmin.ts` で Firebase Admin を初期化し、Route Handler で Bearer トークンを検証（UID一致を確認）。
+- クライアント送信：ページ側の fetch では `user.getIdToken()` を取得し `Authorization: Bearer <token>` を付与。
