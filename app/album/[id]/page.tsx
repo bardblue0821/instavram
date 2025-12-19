@@ -101,6 +101,8 @@ export default function AlbumDetailPage() {
   }, [activeCat]);
   // 一覧の初期表示件数（早期 return より前に hook を宣言しておく）
   const [visibleCount, setVisibleCount] = useState(16);
+  // 画像の投稿者（アイコン表示用）キャッシュ
+  const [uploaderMap, setUploaderMap] = useState<Record<string, { iconURL: string | null; handle: string | null }>>({});
   // アクセス権限（フックに分離）
   const { isFriend, isWatcher } = useAlbumAccess(album?.ownerId, user?.uid);
 
@@ -212,6 +214,28 @@ export default function AlbumDetailPage() {
 
   // 既存画像のサムネイル不足分はフックで自動生成
   useThumbBackfill(albumId, images, visibleCount, setImages);
+
+  // 投稿者アイコンの取得（重複はキャッシュ）
+  useEffect(() => {
+    const ids = Array.from(new Set(images.map((img) => img.uploaderId).filter(Boolean)));
+    if (ids.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const next: Record<string, { iconURL: string | null; handle: string | null }> = { ...uploaderMap };
+      for (const uid of ids) {
+        if (!uid) continue;
+        if (next[uid] !== undefined) continue;
+        try {
+          const u = await getUser(uid);
+          next[uid] = { iconURL: u?.iconURL || null, handle: u?.handle || null };
+        } catch {
+          next[uid] = { iconURL: null, handle: null };
+        }
+      }
+      if (!cancelled) setUploaderMap(next);
+    })();
+    return () => { cancelled = true; };
+  }, [images]);
 
   async function handleAddImage() {
     if (!user || !albumId || !file) return;
@@ -552,8 +576,10 @@ export default function AlbumDetailPage() {
       height: 1200,
       alt: img.id || "image",
       uploaderId: img.uploaderId,
+      uploaderIconURL: img.uploaderId ? (uploaderMap[img.uploaderId]?.iconURL || null) : null,
+      uploaderHandle: img.uploaderId ? (uploaderMap[img.uploaderId]?.handle || null) : null,
     }));
-  }, [images]);
+  }, [images, uploaderMap]);
 
   if (!albumId) {
     return <div className="text-sm fg-subtle">アルバムIDが指定されていません。</div>;

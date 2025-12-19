@@ -20,6 +20,8 @@ export type PhotoItem = {
   height: number;
   alt?: string;
   uploaderId?: string;
+  uploaderIconURL?: string | null;
+  uploaderHandle?: string | null;
 };
 
 export type GalleryGridProps = {
@@ -35,7 +37,7 @@ export type GalleryGridProps = {
 
 // react-photo-album のカスタムレンダラー
 function PhotoRenderer({ photo, imageProps, wrapperStyle, canDelete, onDelete, onOpen }: RenderPhotoProps & { canDelete?: (p: PhotoItem) => boolean; onDelete?: (p: PhotoItem) => void; onOpen: () => void; }) {
-  const { src, thumbSrc, width, height } = photo as PhotoItem;
+  const { src, thumbSrc, width, height, uploaderIconURL, uploaderHandle, uploaderId } = photo as PhotoItem;
   const alt = (photo as any).alt || "photo";
   const style: CSSProperties = { ...wrapperStyle, position: "relative", borderRadius: 8 };
   const displaySrc = thumbSrc || src;
@@ -80,9 +82,45 @@ function PhotoRenderer({ photo, imageProps, wrapperStyle, canDelete, onDelete, o
       {canDelete && onDelete && canDelete(photo as PhotoItem) && (
         <button
           type="button"
+          aria-label="画像を削除"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(photo as PhotoItem); }}
-          className="absolute right-1 top-1 rounded bg-red-600 px-2 py-0.5 text-[10px] text-white opacity-80 hover:opacity-100"
-        >削除</button>
+          className="absolute right-1 top-1 rounded bg-red-600 p-1 text-white opacity-80 hover:opacity-100"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 6h18" />
+            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+            <path d="M10 11v6" />
+            <path d="M14 11v6" />
+          </svg>
+        </button>
+      )}
+      {/* 投稿者アイコン（左下） */}
+      {uploaderIconURL && (
+        uploaderHandle ? (
+          <a
+            href={`/user/${uploaderHandle}`}
+            aria-label="投稿者プロフィールへ"
+            className="absolute left-1 bottom-1"
+            onClick={(e) => { e.stopPropagation(); }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={uploaderIconURL}
+              alt="uploader"
+              className="h-7 w-7 rounded-full "
+              loading="lazy"
+            />
+          </a>
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={uploaderIconURL}
+            alt="uploader"
+            className="absolute left-1 bottom-1 h-7 w-7 rounded-full "
+            loading="lazy"
+          />
+        )
       )}
     </div>
   );
@@ -186,9 +224,45 @@ export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDe
                 {canDelete && onDelete && canDelete(p) && (
                   <button
                     type="button"
+                    aria-label="画像を削除"
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(p); }}
-                    className="absolute right-1 top-1 rounded bg-red-600 px-2 py-0.5 text-[10px] text-white opacity-80 hover:opacity-100"
-                  >削除</button>
+                    className="absolute right-1 top-1 rounded bg-red-600 p-1 text-white opacity-80 hover:opacity-100"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 6h18" />
+                      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                    </svg>
+                  </button>
+                )}
+                {/* 投稿者アイコン（左下） */}
+                {p.uploaderIconURL && (
+                  p.uploaderHandle ? (
+                    <a
+                      href={`/user/${p.uploaderHandle}`}
+                      aria-label="投稿者プロフィールへ"
+                      className="absolute left-1 bottom-1"
+                      onClick={(e) => { e.stopPropagation(); }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={p.uploaderIconURL}
+                        alt="uploader"
+                        className="h-7 w-7 rounded-full object-cover border border-white/50 shadow"
+                        loading="lazy"
+                      />
+                    </a>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.uploaderIconURL}
+                      alt="uploader"
+                      className="absolute left-1 bottom-1 h-7 w-7 rounded-full object-cover border border-white/50 shadow"
+                      loading="lazy"
+                    />
+                  )
                 )}
               </div>
             ))}
