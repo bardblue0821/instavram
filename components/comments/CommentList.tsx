@@ -103,17 +103,17 @@ export function CommentList({
             <div className="flex items-center gap-3">
               {u?.iconURL ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={u.iconURL} alt="" className="h-10 w-10 rounded-md object-cover shrink-0" />
+                <img src={u.iconURL} alt="" className="h-12 w-12 rounded-md object-cover shrink-0" />
               ) : (
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-md surface-alt text-[12px] fg-muted shrink-0">
+                <span className="inline-flex h-12 w-12 items-center justify-center rounded-md surface-alt text-[13px] fg-muted shrink-0">
                   {(u?.displayName?.[0] || '?')}
                 </span>
               )}
-              <div className="min-w-0 flex items-baseline gap-2">
-                <span className="font-medium text-foreground truncate">{u?.displayName || "不明なユーザー"}</span>
-                <span className="text-[11px] fg-muted truncate">{atName}</span>
+              <div className="min-w-0 flex flex-col gap-0.5">
+                <span className="font-medium text-foreground truncate leading-tight">{u?.displayName || "不明なユーザー"}</span>
+                <span className="text-[11px] fg-muted truncate leading-tight">{atName}</span>
                 {formatTimestamp(comment.createdAt) && (
-                  <span className="text-[11px] fg-muted truncate">{formatTimestamp(comment.createdAt)}</span>
+                  <span className="text-[11px] fg-muted truncate leading-tight">{formatTimestamp(comment.createdAt)}</span>
                 )}
               </div>
             </div>

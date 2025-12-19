@@ -359,7 +359,7 @@ export function TimelineItem(props: {
             return (
               <div key={idx} className="flex items-center gap-3">
                 <a href={`/user/${u?.handle || c.userId}`} className="shrink-0" aria-label="プロフィールへ">
-                  <Avatar src={icon} size={28} interactive={false} withBorder={false} className="rounded-full" />
+                  <Avatar src={icon} size={40} interactive={false} withBorder={false} className="rounded-full" />
                 </a>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 truncate">
