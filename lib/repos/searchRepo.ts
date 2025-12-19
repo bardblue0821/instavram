@@ -12,7 +12,7 @@ function prefixQuery(col: string, field: string, q: string, take = 20) {
   );
 }
 
-export type UserHit = { uid: string; displayName?: string; handle?: string };
+export type UserHit = { uid: string; displayName?: string; handle?: string; iconURL?: string };
 export type AlbumHit = { id: string; title?: string; description?: string };
 
 export async function searchUsersPrefix(qRaw: string, take = 20): Promise<UserHit[]> {
@@ -24,7 +24,7 @@ export async function searchUsersPrefix(qRaw: string, take = 20): Promise<UserHi
     const snap = await getDocs(prefixQuery(COL.users, "handle", q, take));
     snap.forEach((d) => {
       const v: any = d.data();
-      hits[v.handle || v.uid || d.id] = { uid: v.uid || d.id, displayName: v.displayName, handle: v.handle };
+      hits[v.handle || v.uid || d.id] = { uid: v.uid || d.id, displayName: v.displayName, handle: v.handle, iconURL: v.iconURL };
     });
   } catch {}
   // displayName 補完
@@ -33,7 +33,7 @@ export async function searchUsersPrefix(qRaw: string, take = 20): Promise<UserHi
     snap.forEach((d) => {
       const v: any = d.data();
       const key = v.handle || v.uid || d.id;
-      if (!hits[key]) hits[key] = { uid: v.uid || d.id, displayName: v.displayName, handle: v.handle };
+      if (!hits[key]) hits[key] = { uid: v.uid || d.id, displayName: v.displayName, handle: v.handle, iconURL: v.iconURL };
     });
   } catch {}
   return Object.values(hits).slice(0, take);
