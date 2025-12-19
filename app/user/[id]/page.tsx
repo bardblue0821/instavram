@@ -22,6 +22,13 @@ import LinksField from '../../../components/form/LinksField';
 import FriendActions from '../../../components/profile/FriendActions';
 import WatchActions from '../../../components/profile/WatchActions';
 import { buildProfilePatch } from '../../../src/services/profile/buildPatch';
+import { TimelineItem } from '../../../components/timeline/TimelineItem';
+import { listImages } from '../../../lib/repos/imageRepo';
+import { listComments } from '../../../lib/repos/commentRepo';
+import { countLikes, hasLiked, toggleLike } from '../../../lib/repos/likeRepo';
+import { listReactionsByAlbum, toggleReaction } from '../../../lib/repos/reactionRepo';
+import { addNotification } from '../../../lib/repos/notificationRepo';
+import { getUser } from '../../../lib/repos/userRepo';
 
 export default function ProfilePage() {
   const params = useParams();
@@ -48,6 +55,7 @@ export default function ProfilePage() {
   const [extraError, setExtraError] = useState<string | null>(null);
   // Tab state for lists
   const [listTab, setListTab] = useState<'own'|'joined'|'comments'>('own');
+  const [ownRows, setOwnRows] = useState<any[]>([]);
 
   // Inline edit state
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -128,6 +136,175 @@ export default function ProfilePage() {
     })();
     return () => { active = false; };
   }, [profile?.uid]);
+
+  // Build timeline-like rows for own albums
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!ownAlbums || !profile?.uid) { if (!cancelled) setOwnRows([]); return; }
+        const cache = new Map<string, any>();
+        const ownerRef = { uid: profile.uid, handle: profile.handle || null, iconURL: profile.iconURL || null, displayName: profile.displayName };
+        const rows = await Promise.all(ownAlbums.map(async (album) => {
+          const [imgs, cmts, likeCnt, likedFlag, reactions] = await Promise.all([
+            listImages(album.id),
+            listComments(album.id),
+            countLikes(album.id),
+            user?.uid ? hasLiked(album.id, user.uid) : Promise.resolve(false),
+            listReactionsByAlbum(album.id, user?.uid || ''),
+          ]);
+          const cAsc = [...cmts]
+            .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0));
+          const latest = cAsc.slice(-1)[0];
+          const previewDesc = cAsc.slice(-3).reverse();
+          const commentsPreview = await Promise.all(previewDesc.map(async (c) => {
+            let cu = cache.get(c.userId);
+            if (cu === undefined) {
+              const u = await getUser(c.userId);
+              cu = u ? { uid: u.uid, handle: u.handle || null, iconURL: u.iconURL || null, displayName: u.displayName } : null;
+              cache.set(c.userId, cu);
+            }
+            return { body: c.body, userId: c.userId, user: cu || undefined, createdAt: c.createdAt };
+          }));
+          const imgRows = (imgs || [])
+            .map((x: any) => ({ url: x.url || x.downloadUrl || "", thumbUrl: x.thumbUrl || x.url || x.downloadUrl || "", uploaderId: x.uploaderId }))
+            .filter((x: any) => x.url);
+          return {
+            album,
+            images: imgRows,
+            likeCount: likeCnt,
+            liked: !!likedFlag,
+            commentCount: (cmts || []).length,
+            latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined,
+            commentsPreview,
+            reactions,
+            owner: ownerRef,
+          };
+        }));
+        if (!cancelled) setOwnRows(rows);
+      } catch (e) {
+        // 失敗時は簡易フォールバック（タイトルリストのみになるよう、空でセット）
+        if (!cancelled) setOwnRows([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [ownAlbums, user?.uid, profile?.uid]);
+
+  // Like toggle for own rows (optimistic)
+  async function handleToggleLikeOwn(index: number) {
+    if (!user) return;
+    const albumId = ownRows[index]?.album?.id;
+    if (!albumId) return;
+    setOwnRows((prev) => {
+      const next = [...prev];
+      const row = next[index];
+      if (!row) return prev;
+      const likedPrev = row.liked;
+      row.liked = !likedPrev;
+      row.likeCount = likedPrev ? row.likeCount - 1 : row.likeCount + 1;
+      return next;
+    });
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/likes/toggle', {
+        method: 'POST', headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
+        body: JSON.stringify({ albumId, userId: user.uid }),
+      });
+      if (!res.ok) {
+        await toggleLike(albumId, user.uid);
+      }
+    } catch {
+      // rollback
+      setOwnRows((prev) => {
+        const next = [...prev];
+        const row = next[index];
+        if (!row) return prev;
+        row.liked = !row.liked;
+        row.likeCount = row.liked ? row.likeCount + 1 : row.likeCount - 1;
+        return next;
+      });
+    }
+  }
+
+  // Reaction toggle for own rows (optimistic + notification)
+  async function handleToggleReactionOwn(index: number, emoji: string) {
+    if (!user) return;
+    const albumId = ownRows[index]?.album?.id;
+    if (!albumId) return;
+    // 楽観更新
+    setOwnRows((prev) => {
+      const next = [...prev];
+      const row = next[index];
+      if (!row) return prev;
+      const list = row.reactions.slice();
+      const idx = list.findIndex((x: any) => x.emoji === emoji);
+      if (idx >= 0) {
+        const item = { ...list[idx] };
+        if (item.mine) { item.mine = false; item.count = Math.max(0, item.count - 1); }
+        else { item.mine = true; item.count += 1; }
+        list[idx] = item;
+      } else {
+        list.push({ emoji, count: 1, mine: true });
+      }
+      row.reactions = list;
+      next[index] = { ...row };
+      return next;
+    });
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/reactions/toggle', {
+        method: 'POST', headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
+        body: JSON.stringify({ albumId, userId: user.uid, emoji }),
+      });
+      let added = false;
+      if (res.ok) {
+        const data = await res.json().catch(()=>({}));
+        added = !!data?.added;
+      } else {
+        const result = await toggleReaction(albumId, user.uid, emoji);
+        added = !!(result as any)?.added;
+      }
+      const row = ownRows[index];
+      if (added && row && row.album.ownerId !== user.uid) {
+        addNotification({ userId: row.album.ownerId, actorId: user.uid, type: 'reaction', albumId, message: 'アルバムにリアクション: ' + emoji }).catch(()=>{});
+      }
+    } catch {
+      // 失敗時ロールバック
+      setOwnRows((prev) => {
+        const next = [...prev];
+        const row = next[index];
+        if (!row) return prev;
+        const list = row.reactions.slice();
+        const idx = list.findIndex((x: any) => x.emoji === emoji);
+        if (idx >= 0) {
+          const item = { ...list[idx] };
+          if (item.mine) { item.mine = false; item.count = Math.max(0, item.count - 1); }
+          else { item.mine = true; item.count += 1; }
+          list[idx] = item;
+        }
+        row.reactions = list;
+        next[index] = { ...row };
+        return next;
+      });
+    }
+  }
+
+  async function handleSubmitCommentOwn(index: number, text: string) {
+    if (!user) return;
+    const albumId = ownRows[index]?.album?.id;
+    if (!albumId) return;
+    const { addComment } = await import('../../../lib/repos/commentRepo');
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/comments/add', {
+        method: 'POST', headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
+        body: JSON.stringify({ albumId, userId: user.uid, body: text }),
+      });
+      if (!res.ok) { await addComment(albumId, user.uid, text); }
+    } catch {
+      await addComment(albumId, user.uid, text);
+    }
+  }
 
   // Friend actions
   async function doSend() {
@@ -410,14 +587,27 @@ export default function ProfilePage() {
             <div role="tabpanel" aria-label="作成アルバム">
               {!ownAlbums && <p className="text-sm fg-subtle">-</p>}
               {ownAlbums && ownAlbums.length === 0 && <p className="text-sm fg-subtle">まだアルバムがありません</p>}
-              <ul className="divide-y divide-base">
-                {ownAlbums && ownAlbums.map(a => (
-                  <li key={a.id} className="py-2">
-                    <a href={`/album/${a.id}`} className="link-accent text-sm font-medium">{a.title || '無題'}</a>
-                    <p className="text-xs fg-subtle">{a.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
-                  </li>
-                ))}
-              </ul>
+              {ownRows && ownRows.length > 0 && (
+                <div className="divide-y divide-base [&>*]:pb-12">
+                  {ownRows.map((row, i) => (
+                    <TimelineItem
+                      key={row.album.id}
+                      album={row.album}
+                      images={row.images}
+                      likeCount={row.likeCount}
+                      liked={row.liked}
+                      onLike={user ? () => handleToggleLikeOwn(i) : () => {}}
+                      commentCount={row.commentCount}
+                      latestComment={row.latestComment}
+                      commentsPreview={row.commentsPreview}
+                      onCommentSubmit={user ? (text) => handleSubmitCommentOwn(i, text) : undefined}
+                      reactions={row.reactions}
+                      onToggleReaction={user ? (emoji) => handleToggleReactionOwn(i, emoji) : undefined}
+                      owner={row.owner}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
