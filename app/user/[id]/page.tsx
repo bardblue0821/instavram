@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuthUser } from '../../../lib/hooks/useAuthUser';
-import { getUserByHandle, updateUser, isHandleTaken } from '../../../lib/repos/userRepo';
+import { getUserByHandle, updateUser } from '../../../lib/repos/userRepo';
 import { listAlbumsByOwner } from '../../../lib/repos/albumRepo';
 import { listAlbumIdsByUploader } from '../../../lib/repos/imageRepo';
 import { listCommentsByUser } from '../../../lib/repos/commentRepo';
@@ -16,45 +16,59 @@ import { auth } from '../../../lib/firebase';
 import { deleteUser, reauthenticateWithCredential, EmailAuthProvider, reauthenticateWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import Avatar from '../../../components/profile/Avatar';
 import AvatarModal from '../../../components/profile/AvatarModal';
+import InlineTextField from '../../../components/form/InlineTextField';
+import InlineTextareaField from '../../../components/form/InlineTextareaField';
+import LinksField from '../../../components/form/LinksField';
+import FriendActions from '../../../components/profile/FriendActions';
+import WatchActions from '../../../components/profile/WatchActions';
+import { buildProfilePatch } from '../../../src/services/profile/buildPatch';
 
 export default function ProfilePage() {
   const params = useParams();
-  const handleParam = params?.id as string | undefined; // /user/{handle} のみ許可
+  const handleParam = params?.id as string | undefined;
   const { user } = useAuthUser();
+
+  // Base state
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Social state
   const [friendState, setFriendState] = useState<'none'|'sent'|'received'|'accepted'>('none');
   const [busy, setBusy] = useState(false);
   const [watching, setWatching] = useState(false);
   const [watchBusy, setWatchBusy] = useState(false);
-  // プロフィール拡張データ
+
+  // Extra info
   const [ownAlbums, setOwnAlbums] = useState<any[] | null>(null);
   const [joinedAlbums, setJoinedAlbums] = useState<any[] | null>(null);
   const [userComments, setUserComments] = useState<any[] | null>(null);
   const [stats, setStats] = useState<{ ownCount: number; joinedCount: number; commentCount: number } | null>(null);
   const [loadingExtra, setLoadingExtra] = useState(false);
   const [extraError, setExtraError] = useState<string | null>(null);
-  // 個別フィールドインライン編集用ステート
-  const [editingField, setEditingField] = useState<string | null>(null); // displayName, handle, bio, vrchatUrl, link, language, gender, age, location, birthDate
+
+  // Inline edit state
+  const [editingField, setEditingField] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState('');
   const [editingLinkIndex, setEditingLinkIndex] = useState<number | null>(null);
   const [editingOriginalValue, setEditingOriginalValue] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false); // 詳細折りたたみ状態
-  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false); // 破棄確認モーダル
-  const [skipDiscardNextBlur, setSkipDiscardNextBlur] = useState(false); // 保存ボタン押下で blur を無視
-  // アカウント削除 UI
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const [skipDiscardNextBlur, setSkipDiscardNextBlur] = useState(false);
+
+  // Delete account state
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [agreeDelete, setAgreeDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [deleteStep, setDeleteStep] = useState<string>("");
+  const [deleteStep, setDeleteStep] = useState<string>('');
   const [pw, setPw] = useState('');
   const { show } = useToast();
   const authProvider = useMemo(() => (user?.providerData?.[0]?.providerId || 'password'), [user?.uid]);
   const [avatarOpen, setAvatarOpen] = useState(false);
 
+  // Load profile and social flags
   useEffect(() => {
     if (!handleParam) return;
     let active = true;
@@ -86,7 +100,7 @@ export default function ProfilePage() {
     return () => { active = false; };
   }, [handleParam, user]);
 
-  // 拡張情報ロード
+  // Load extra info
   useEffect(() => {
     if (!profile?.uid) return;
     let active = true;
@@ -102,11 +116,7 @@ export default function ProfilePage() {
           setOwnAlbums(own);
           setJoinedAlbums(joined.filter(a => !!a));
           setUserComments(comments);
-          setStats({
-            ownCount: own.length,
-            joinedCount: filteredIds.length,
-            commentCount: comments.length,
-          });
+          setStats({ ownCount: own.length, joinedCount: filteredIds.length, commentCount: comments.length });
         }
       } catch (e:any) {
         if (active) setExtraError(translateError(e));
@@ -117,62 +127,49 @@ export default function ProfilePage() {
     return () => { active = false; };
   }, [profile?.uid]);
 
+  // Friend actions
   async function doSend() {
     if (!user || !profile?.uid) return;
     setBusy(true); setError(null);
-    try {
-      await sendFriendRequest(user.uid, profile.uid);
-      setFriendState('sent');
-    } catch (e:any) { setError(translateError(e)); }
+    try { await sendFriendRequest(user.uid, profile.uid); setFriendState('sent'); }
+    catch (e:any) { setError(translateError(e)); }
     finally { setBusy(false); }
   }
   async function doAccept() {
     if (!user || !profile?.uid) return;
     setBusy(true); setError(null);
-    try {
-      await acceptFriend(profile.uid, user.uid);
-      setFriendState('accepted');
-    } catch (e:any) { setError(translateError(e)); }
+    try { await acceptFriend(profile.uid, user.uid); setFriendState('accepted'); }
+    catch (e:any) { setError(translateError(e)); }
     finally { setBusy(false); }
   }
   async function doCancel() {
     if (!user || !profile?.uid) return;
     setBusy(true); setError(null);
-    try {
-      await cancelFriendRequest(user.uid, profile.uid);
-      setFriendState('none');
-    } catch (e:any) { setError(translateError(e)); }
+    try { await cancelFriendRequest(user.uid, profile.uid); setFriendState('none'); }
+    catch (e:any) { setError(translateError(e)); }
     finally { setBusy(false); }
   }
   async function doRemove() {
     if (!user || !profile?.uid) return;
     if (!confirm('フレンドを解除しますか？')) return;
     setBusy(true); setError(null);
-    try {
-      await removeFriend(user.uid, profile.uid);
-      setFriendState('none');
-    } catch (e:any) { setError(translateError(e)); }
+    try { await removeFriend(user.uid, profile.uid); setFriendState('none'); }
+    catch (e:any) { setError(translateError(e)); }
     finally { setBusy(false); }
   }
 
+  // Watch toggle
   async function doWatchToggle() {
     if (!user || !profile?.uid || user.uid === profile.uid) return;
     setWatchBusy(true); setError(null);
     try {
-      if (watching) {
-        await removeWatch(user.uid, profile.uid);
-        setWatching(false);
-      } else {
-        await addWatch(user.uid, profile.uid);
-        setWatching(true);
-      }
-    } catch (e:any) {
-      setError(translateError(e));
-    } finally {
-      setWatchBusy(false);
-    }
+      if (watching) { await removeWatch(user.uid, profile.uid); setWatching(false); }
+      else { await addWatch(user.uid, profile.uid); setWatching(true); }
+    } catch (e:any) { setError(translateError(e)); }
+    finally { setWatchBusy(false); }
   }
 
+  // Delete account
   async function doDeleteAccount() {
     if (!user) return;
     try {
@@ -183,18 +180,13 @@ export default function ProfilePage() {
         const cred = EmailAuthProvider.credential(email, pw);
         await reauthenticateWithCredential(user, cred);
       } else if (authProvider === 'google.com') {
-        try {
-          const provider = new GoogleAuthProvider();
-          await reauthenticateWithPopup(user, provider);
-        } catch {}
+        try { const provider = new GoogleAuthProvider(); await reauthenticateWithPopup(user, provider); } catch {}
       }
       setDeleteStep('データ削除中...');
       await deleteAccountData(user.uid, (step) => setDeleteStep(`データ削除中: ${step}`));
       setDeleteStep('アカウント削除中...');
       await deleteUser(user);
-      try {
-        sessionStorage.setItem('app:toast', JSON.stringify({ message: 'アカウントを削除しました', variant: 'success' }));
-      } catch {}
+      try { sessionStorage.setItem('app:toast', JSON.stringify({ message: 'アカウントを削除しました', variant: 'success' })); } catch {}
       window.location.href = '/';
     } catch (e:any) {
       const msg = translateError(e);
@@ -203,150 +195,84 @@ export default function ProfilePage() {
       setDeleting(false);
     }
   }
+  async function reauthGoogle() { try { const provider = new GoogleAuthProvider(); await reauthenticateWithPopup(auth.currentUser!, provider); } catch {} }
 
-  async function reauthGoogle() {
-    try {
-      const provider = new GoogleAuthProvider();
-      await reauthenticateWithPopup(auth.currentUser!, provider);
-    } catch {}
-  }
-
+  // Guard
   if (loading) return <div className="p-4 text-sm text-gray-500">読み込み中...</div>;
   if (!profile) return <div className="p-4 text-sm text-gray-600">ユーザーが見つかりません (handle)</div>;
 
   const isMe = user && profile && user.uid === profile.uid;
 
+  // Inline edit helpers
   function beginEdit(field: string, current: any, linkIndex?: number) {
     if (!isMe) return;
     setSaveMsg(null);
     setEditingField(field);
     setEditingOriginalValue(current || '');
-    if (field === 'link') {
-      setEditingLinkIndex(linkIndex ?? 0);
-      setEditingValue(current || '');
-    } else if (field === 'age') {
-      setEditingValue(typeof current === 'number' ? String(current) : '');
-    } else {
-      setEditingValue(current || '');
-    }
+    if (field === 'link') { setEditingLinkIndex(linkIndex ?? 0); setEditingValue(current || ''); }
+    else if (field === 'age') { setEditingValue(typeof current === 'number' ? String(current) : ''); }
+    else { setEditingValue(current || ''); }
   }
 
   async function commitEdit() {
     if (!editingField || !profile || !isMe) { cancelEdit(); return; }
     const raw = editingValue.trim();
-    const patch: any = {};
+    let patch: any = {};
     try {
-      if (editingField === 'displayName') {
-        if (!raw) throw new Error('表示名は必須');
-        if (raw.length > 50) throw new Error('表示名は最大50文字');
-        patch.displayName = raw;
-      } else if (editingField === 'handle') {
-        const h = raw.toLowerCase();
-        if (!/^[a-z0-9_]{3,20}$/.test(h)) throw new Error('ハンドルは英数字と_ 3〜20文字');
-        if (profile.handle !== h) {
-          const taken = await isHandleTaken(h);
-          if (taken) throw new Error('そのハンドルは既に使用されています');
-        }
-        patch.handle = h;
-    } else if (editingField === 'bio') {
-      // bio: URL禁止 / 不適切語禁止 / 100文字上限 / 改行除去 / 全角スペース除去 / 連続半角スペース縮約
-      const banned = ['禁止語']; // 具体的な不適切語は後で拡張 (例: 'badword')
-      if (/(https?:\/\/|www\.)/i.test(raw)) throw new Error('bio に URL は含められません');
-      if (banned.some(w => raw.toLowerCase().includes(w))) throw new Error('不適切な語句が含まれています');
-      let b = raw
-        .replace(/[\r\n]+/g, ' ')
-        .replace(/[\u3000]+/g, '')
-        .replace(/ {2,}/g, ' ')
-        .trim();
-      if (b.length > 100) throw new Error('bio は最大100文字です');
-      patch.bio = b || null;
-      } else if (editingField === 'vrchatUrl') {
-        if (raw) {
-          if (!/^https?:\/\//.test(raw) || !/vrchat/i.test(raw)) throw new Error('VRChat URL 不正');
-          patch.vrchatUrl = raw;
-        } else patch.vrchatUrl = null;
-      } else if (editingField === 'language') {
-        patch.language = raw || null;
-      } else if (editingField === 'gender') {
-        patch.gender = raw || null;
-      } else if (editingField === 'age') {
-        if (raw) {
-          const n = Number(raw);
-          if (Number.isNaN(n) || n < 0 || n > 150) throw new Error('年齢は0〜150');
-          patch.age = n;
-        } else patch.age = null;
-      } else if (editingField === 'location') {
-        patch.location = raw || null;
-      } else if (editingField === 'birthDate') {
-        if (raw && !/^\d{4}-\d{2}-\d{2}$/.test(raw)) throw new Error('誕生日はYYYY-MM-DD');
-        patch.birthDate = raw || null;
-      } else if (editingField === 'link') {
-        const links: string[] = (profile.links || []).slice(0,3);
+      if (editingField === 'link') {
+        const links: string[] = (profile.links || []).slice(0, 3);
         const idx = editingLinkIndex ?? 0;
-        if (!raw) { links.splice(idx,1); }
+        if (!raw) { links.splice(idx, 1); }
         else {
           if (!/^https?:\/\//.test(raw)) throw new Error('URLはhttp/httpsのみ');
           if (idx < links.length) links[idx] = raw; else links.push(raw);
         }
         patch.links = links;
+      } else {
+        patch = await buildProfilePatch(editingField, raw, profile);
       }
-    } catch (e:any) {
-      setError(e.message || String(e));
-      return;
-    }
+    } catch (e:any) { setError(e.message || String(e)); return; }
+
     setSaving(true); setError(null);
     try {
       await updateUser(profile.uid, patch);
-      const updated = { ...profile, ...patch };
-      setProfile(updated);
+      setProfile({ ...profile, ...patch });
       setSaveMsg('保存しました');
       cancelEdit();
-    } catch (e:any) {
-      setError(translateError(e));
-    } finally {
-      setSaving(false);
-    }
+    } catch (e:any) { setError(translateError(e)); }
+    finally { setSaving(false); }
   }
 
   function cancelEdit() {
     setEditingField(null);
     setEditingValue('');
     setEditingLinkIndex(null);
-    setEditingOriginalValue('');
     setShowDiscardConfirm(false);
+    setSkipDiscardNextBlur(false);
   }
-
-  function onKey(e: React.KeyboardEvent) {
-    if (e.key === 'Enter' && editingField !== 'bio') { e.preventDefault(); commitEdit(); }
-    if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
-  }
-
   function handleBlur() {
-    // 入力コンポーネント外へフォーカス移動した時: 保存せず離脱しようとしている
     if (!editingField) return;
     if (skipDiscardNextBlur) { setSkipDiscardNextBlur(false); return; }
-    // 既にモーダルが出ている場合は何もしない
-    if (!showDiscardConfirm) setShowDiscardConfirm(true);
+    if (editingValue !== editingOriginalValue) setShowDiscardConfirm(true);
+    else cancelEdit();
   }
-
-  function discardChanges() {
-    // 破棄: 元値保持しているが profile は未更新なので cancelEdit で OK
-    cancelEdit();
+  function onKey(e: React.KeyboardEvent) {
+    if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); return; }
+    if (e.key === 'Enter' && !(e.shiftKey || (editingField === 'bio'))) { e.preventDefault(); void commitEdit(); }
   }
-  function keepEditing() {
-    // 編集続行: モーダル閉じて再フォーカスは任意 (ユーザが再クリック可)
-    setShowDiscardConfirm(false);
-  }
-  function saveFromModal() {
-    commitEdit();
-    setShowDiscardConfirm(false);
-  }
+  function keepEditing() { setShowDiscardConfirm(false); }
+  function saveFromModal() { void commitEdit(); }
+  function discardChanges() { cancelEdit(); }
 
   return (
     <div className="max-w-xl mx-auto p-4 space-y-6">
       <header className="space-y-3">
         <div className="flex items-center gap-4">
-          <Avatar src={profile.iconURL ? `${profile.iconURL}${profile.iconUpdatedAt ? `?v=${new Date(profile.iconUpdatedAt.seconds ? profile.iconUpdatedAt.toDate?.() : profile.iconUpdatedAt).getTime()}` : ''}` : undefined} size={72} onClick={()=> setAvatarOpen(true)} />
+          <Avatar
+            src={profile.iconURL ? `${profile.iconURL}${profile.iconUpdatedAt ? `?v=${new Date((profile.iconUpdatedAt as any)?.seconds ? (profile.iconUpdatedAt as any).toDate?.() : profile.iconUpdatedAt).getTime()}` : ''}` : undefined}
+            size={72}
+            onClick={()=> setAvatarOpen(true)}
+          />
           <div className="min-w-0">
             <div className="flex items-baseline gap-2">
               <h1 className="text-2xl font-semibold truncate" title={profile.displayName || '名前未設定'}>
@@ -359,40 +285,75 @@ export default function ProfilePage() {
             <p className="text-sm text-gray-700">UID: {profile.uid}</p>
           </div>
         </div>
-  <FieldText label="表示名" value={profile.displayName || ''} placeholder="（表示名未設定）" field="displayName" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
-  <FieldText prefix="@" label="ハンドル" value={profile.handle || ''} placeholder="（ハンドル未設定）" field="handle" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
-  <FieldTextarea label="自己紹介" value={profile.bio || ''} placeholder="未設定" field="bio" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
+        <InlineTextField
+          label="表示名"
+          value={profile.displayName || ''}
+          placeholder="（表示名未設定）"
+          field="displayName"
+          editingField={editingField}
+          editingValue={editingValue}
+          beginEdit={beginEdit}
+          onChange={setEditingValue}
+          onBlur={handleBlur}
+          onKey={onKey}
+          isMe={isMe}
+          saving={saving}
+          onSave={commitEdit}
+          setSkipDiscard={setSkipDiscardNextBlur}
+        />
+        <InlineTextField
+          prefix="@"
+          label="ハンドル"
+          value={profile.handle || ''}
+          placeholder="（ハンドル未設定）"
+          field="handle"
+          editingField={editingField}
+          editingValue={editingValue}
+          beginEdit={beginEdit}
+          onChange={setEditingValue}
+          onBlur={handleBlur}
+          onKey={onKey}
+          isMe={isMe}
+          saving={saving}
+          onSave={commitEdit}
+          setSkipDiscard={setSkipDiscardNextBlur}
+        />
+        <InlineTextareaField
+          label="自己紹介"
+          value={profile.bio || ''}
+          placeholder="未設定"
+          field="bio"
+          editingField={editingField}
+          editingValue={editingValue}
+          beginEdit={beginEdit}
+          onChange={setEditingValue}
+          onBlur={handleBlur}
+          isMe={isMe}
+          saving={saving}
+          onSave={commitEdit}
+          setSkipDiscard={setSkipDiscardNextBlur}
+        />
         {!detailsOpen && (
-          <button type="button" onClick={()=> setDetailsOpen(true)} className="text-xs text-blue-600 underline">
-            詳細を表示
-          </button>
+          <button type="button" onClick={()=> setDetailsOpen(true)} className="text-xs text-blue-600 underline">詳細を表示</button>
         )}
         {detailsOpen && (
           <div className="space-y-2">
-            <FieldText label="VRChat URL" value={profile.vrchatUrl || ''} placeholder="未設定" field="vrchatUrl" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} isLink onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
+            <InlineTextField label="VRChat URL" value={profile.vrchatUrl || ''} placeholder="未設定" field="vrchatUrl" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} isLink onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
             <LinksField profile={profile} editingField={editingField} editingValue={editingValue} editingLinkIndex={editingLinkIndex} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
-            <FieldText label="言語" value={profile.language || ''} placeholder="未設定" field="language" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
-            <FieldText label="性別" value={profile.gender || ''} placeholder="未設定" field="gender" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
-            <FieldText label="年齢" value={typeof profile.age === 'number' ? String(profile.age) : ''} placeholder="未設定" field="age" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} numeric onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
-            <FieldText label="場所" value={profile.location || ''} placeholder="未設定" field="location" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
-            <FieldText label="生年月日" value={profile.birthDate || ''} placeholder="未設定" field="birthDate" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} date onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
-            <button type="button" onClick={()=> setDetailsOpen(false)} className="text-xs text-gray-600 underline">
-              詳細を隠す
-            </button>
+            <InlineTextField label="言語" value={profile.language || ''} placeholder="未設定" field="language" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
+            <InlineTextField label="性別" value={profile.gender || ''} placeholder="未設定" field="gender" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
+            <InlineTextField label="年齢" value={typeof profile.age === 'number' ? String(profile.age) : ''} placeholder="未設定" field="age" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} numeric onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
+            <InlineTextField label="場所" value={profile.location || ''} placeholder="未設定" field="location" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
+            <InlineTextField label="生年月日" value={profile.birthDate || ''} placeholder="未設定" field="birthDate" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} date onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
+            <button type="button" onClick={()=> setDetailsOpen(false)} className="text-xs text-gray-600 underline">詳細を隠す</button>
           </div>
         )}
         {saveMsg && <p className="text-xs text-green-700">{saveMsg}</p>}
         {error && <p className="text-xs text-red-600">{error}</p>}
       </header>
-      <AvatarModal
-        open={avatarOpen}
-        onClose={()=> setAvatarOpen(false)}
-        uid={profile.uid}
-        src={profile.iconURL || undefined}
-        alt={(profile.displayName || profile.handle || 'ユーザー') + 'のアイコン'}
-        editable={!!isMe}
-        onUpdated={(url)=> setProfile((p:any)=> ({ ...p, iconURL: url, iconUpdatedAt: new Date() }))}
-      />
+
+      <AvatarModal open={avatarOpen} onClose={()=> setAvatarOpen(false)} uid={profile.uid} src={profile.iconURL || undefined} alt={(profile.displayName || profile.handle || 'ユーザー') + 'のアイコン'} editable={!!isMe} onUpdated={(url)=> setProfile((p:any)=> ({ ...p, iconURL: url, iconUpdatedAt: new Date() }))} />
+
       {isMe && (
         <section className="space-y-2 pt-4 border-t">
           <h2 className="text-lg font-medium text-red-700">危険区域</h2>
@@ -400,43 +361,19 @@ export default function ProfilePage() {
           <button type="button" onClick={()=> setShowDeleteAccount(true)} className="rounded bg-red-600 px-3 py-1.5 text-sm text-white">アカウントを削除</button>
         </section>
       )}
+
       {!isMe && user && (
-        <section className="space-y-2">
-          <h2 className="text-lg font-medium">フレンド</h2>
-          {friendState === 'none' && (
-            <button disabled={busy} onClick={doSend} className="btn-accent text-sm disabled:opacity-50">フレンド申請</button>
-          )}
-          {friendState === 'sent' && (
-            <div className="flex gap-2 items-center">
-              <span className="text-sm text-gray-600">申請中...</span>
-              <button disabled={busy} onClick={doCancel} className="bg-gray-500 text-white text-xs px-2 py-1 rounded disabled:opacity-50">キャンセル</button>
-            </div>
-          )}
-          {friendState === 'received' && (
-            <div className="flex gap-2">
-              <button disabled={busy} onClick={doAccept} className="btn-accent text-sm disabled:opacity-50">承認</button>
-              <button disabled={busy} onClick={doCancel} className="rounded bg-red-600 px-3 py-1 text-sm text-white disabled:opacity-50">拒否</button>
-            </div>
-          )}
-          {friendState === 'accepted' && (
-            <div className="flex gap-3 items-center">
-              <span className="text-sm text-green-700">フレンドです</span>
-              <button disabled={busy} onClick={doRemove} className="rounded bg-red-600 px-2 py-1 text-xs text-white disabled:opacity-50">解除</button>
-            </div>
-          )}
+        <div className="space-y-2">
+          <FriendActions state={friendState} busy={busy} onSend={doSend} onCancel={doCancel} onAccept={doAccept} onRemove={doRemove} />
           <div className="pt-2 border-t mt-3">
-            <h3 className="text-sm font-medium mb-1">ウォッチ</h3>
-            {!watching && (
-              <button disabled={watchBusy} onClick={doWatchToggle} className="btn-accent text-xs disabled:opacity-50">ウォッチ</button>
-            )}
-            {watching && (
-              <button disabled={watchBusy} onClick={doWatchToggle} className="bg-gray-600 text-white text-xs px-2 py-1 rounded disabled:opacity-50">ウォッチ解除</button>
-            )}
+            <WatchActions watching={watching} busy={watchBusy} onToggle={doWatchToggle} disabled={!user || (user && profile && user.uid === profile.uid)} />
           </div>
           {!user && <p className="text-sm text-gray-600">ログインすると操作できます</p>}
-        </section>
+        </div>
       )}
+
       {error && <p className="text-sm text-red-600">{error}</p>}
+
       <section className="space-y-4 pt-4 border-t">
         <h2 className="text-lg font-medium">活動概要</h2>
         {loadingExtra && <p className="text-sm text-gray-500">読み込み中...</p>}
@@ -455,9 +392,9 @@ export default function ProfilePage() {
               <p className="text-xs text-gray-600">コメント</p>
               <p className="text-lg font-semibold">{stats.commentCount}</p>
             </div>
-            {/* いいねしたアルバム数は後工程で */}
           </div>
         )}
+
         <div className="space-y-6 mt-4">
           <div>
             <h3 className="font-medium mb-2">作成アルバム</h3>
@@ -472,6 +409,7 @@ export default function ProfilePage() {
               ))}
             </ul>
           </div>
+
           <div>
             <h3 className="font-medium mb-2">参加アルバム</h3>
             {!joinedAlbums && <p className="text-sm text-gray-500">-</p>}
@@ -485,6 +423,7 @@ export default function ProfilePage() {
               ))}
             </ul>
           </div>
+
           <div>
             <h3 className="font-medium mb-2">投稿コメント (最大50件)</h3>
             {!userComments && <p className="text-sm text-gray-500">-</p>}
@@ -501,6 +440,7 @@ export default function ProfilePage() {
           </div>
         </div>
       </section>
+
       {showDeleteAccount && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded shadow-lg p-4 w-96 space-y-3">
@@ -516,9 +456,7 @@ export default function ProfilePage() {
                 <input type="password" value={pw} onChange={e=> setPw(e.target.value)} className="w-full border-b-2 border-blue-500 bg-transparent p-1 text-sm focus:outline-none" placeholder="現在のパスワード" />
               </div>
             )}
-            {deleting && (
-              <p className="text-xs text-gray-600">処理中: {deleteStep || '...'}</p>
-            )}
+            {deleting && (<p className="text-xs text-gray-600">処理中: {deleteStep || '...'}</p>)}
             <div className="flex justify-end gap-2">
               <button type="button" className="px-2 py-1 text-xs rounded bg-gray-200" disabled={deleting} onClick={()=> setShowDeleteAccount(false)}>キャンセル</button>
               {authProvider === 'google.com' && (
@@ -529,6 +467,7 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
+
       {showDiscardConfirm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded shadow-lg p-4 w-80 space-y-4">
@@ -542,128 +481,6 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// 共通フィールド型
-interface CommonFieldProps {
-  label: string;
-  value: string;
-  placeholder: string;
-  field: string;
-  editingField: string | null;
-  editingValue: string;
-  beginEdit: (f:string, cur:string)=>void;
-  onChange: (v:string)=>void;
-  onBlur: ()=>void;
-  onKey?: (e:React.KeyboardEvent)=>void;
-  isMe: boolean;
-  saving: boolean;
-  prefix?: string;
-  isLink?: boolean;
-  numeric?: boolean;
-  date?: boolean;
-  onSave: ()=>void;
-  setSkipDiscard: (v:boolean)=>void;
-}
-
-function FieldText(p: CommonFieldProps) {
-  const { label, value, placeholder, field, editingField, editingValue, beginEdit, onChange, onBlur, onKey, isMe, saving, prefix, isLink, numeric, date, onSave, setSkipDiscard } = p;
-  const active = editingField === field;
-  if (active) return (
-    <div className="text-sm space-y-1">
-      <label className="text-xs text-gray-500">{label}</label>
-      <div className="flex items-start gap-2">
-        <input autoFocus type={numeric ? 'number' : date ? 'date' : 'text'} className="flex-1 border-b-2 border-blue-500 bg-transparent p-1 text-sm focus:outline-none" value={editingValue} disabled={saving} onChange={e=>onChange(e.target.value)} onBlur={onBlur} onKeyDown={onKey} />
-        <button type="button" disabled={saving} className="text-xs px-2 py-1 bg-blue-600 text-white rounded disabled:opacity-50"
-          onMouseDown={()=> setSkipDiscard(true)}
-          onClick={onSave}>保存</button>
-      </div>
-    </div>
-  );
-  const shown = value ? (prefix ? prefix + value : value) : placeholder;
-  return (
-    <p className={isMe ? 'cursor-pointer text-sm' : 'text-sm'} onClick={()=> isMe && beginEdit(field, value)}>
-      <span className="font-semibold text-gray-700">{label}:</span>{' '}{value && isLink ? <a className="link-accent" href={value} target="_blank" rel="noreferrer">{shown}</a> : shown}
-    </p>
-  );
-}
-
-function FieldTextarea(p: Omit<CommonFieldProps,'onKey'|'prefix'|'isLink'|'numeric'|'date'> & { onSave: ()=>void; setSkipDiscard:(v:boolean)=>void }) {
-  const { label, value, placeholder, field, editingField, editingValue, beginEdit, onChange, onBlur, isMe, saving, onSave, setSkipDiscard } = p;
-  const active = editingField === field;
-  if (active) return (
-    <div className="text-sm space-y-1">
-      <label className="text-xs text-gray-500">{label}</label>
-      <div className="flex items-start gap-2">
-        <div className="flex-1">
-          <textarea autoFocus rows={5} className="w-full border-b-2 border-blue-500 bg-transparent p-1 text-sm focus:outline-none" value={editingValue} disabled={saving} onChange={e=>onChange(e.target.value)} onBlur={onBlur} />
-          <p className="text-[10px] text-gray-500">{editingValue.replace(/[\r\n]+/g,' ').replace(/[\u3000]+/g,'').replace(/ {2,}/g,' ').trim().length}/100</p>
-        </div>
-        <button type="button" disabled={saving} className="text-xs h-8 px-2 py-1 bg-blue-600 text-white rounded disabled:opacity-50 mt-1"
-          onMouseDown={()=> setSkipDiscard(true)}
-          onClick={onSave}>保存</button>
-      </div>
-    </div>
-  );
-  return (
-    <p className={isMe ? 'cursor-pointer text-sm whitespace-pre-line' : 'text-sm whitespace-pre-line'} onClick={()=> isMe && beginEdit(field, value)}>
-      <span className="font-semibold text-gray-700">{label}:</span>{' '}{value ? value : placeholder}
-    </p>
-  );
-}
-
-interface LinksFieldProps {
-  profile: any;
-  editingField: string | null;
-  editingValue: string;
-  editingLinkIndex: number | null;
-  beginEdit: (f:string, cur:string, idx?:number)=>void;
-  onChange: (v:string)=>void;
-  onBlur: ()=>void;
-  onKey: (e:React.KeyboardEvent)=>void;
-  isMe: boolean;
-  saving: boolean;
-  onSave: ()=>void;
-  setSkipDiscard: (v:boolean)=>void;
-}
-
-function LinksField(p: LinksFieldProps) {
-  const { profile, editingField, editingValue, editingLinkIndex, beginEdit, onChange, onBlur, onKey, isMe, saving, onSave, setSkipDiscard } = p;
-  const links: string[] = (profile.links || []).slice(0,3);
-  const active = editingField === 'link';
-  return (
-    <div className="text-sm space-y-1">
-      <span className="font-semibold text-gray-700">その他URL:</span>
-      <ul className="list-disc ml-5 space-y-1">
-        {links.map((l,i)=>(
-          <li key={i} className={isMe ? 'cursor-pointer' : ''} onClick={()=> isMe && beginEdit('link', l, i)}>
-            {active && editingLinkIndex===i ? (
-              <div className="flex items-center gap-2">
-                <input autoFocus className="flex-1 border-b-2 border-blue-500 bg-transparent p-1 text-xs focus:outline-none" value={editingValue} disabled={saving} onChange={e=>onChange(e.target.value)} onBlur={onBlur} onKeyDown={onKey} />
-                <button type="button" disabled={saving} className="text-[10px] px-2 py-1 bg-blue-600 text-white rounded disabled:opacity-50"
-                  onMouseDown={()=> setSkipDiscard(true)}
-                  onClick={onSave}>保存</button>
-              </div>
-            ) : <a href={l} className="link-accent" target="_blank" rel="noreferrer">{l}</a>}
-          </li>
-        ))}
-        {links.length === 0 && <li className="text-gray-500">未設定</li>}
-        {isMe && links.length < 3 && !active && (
-          <li><button type="button" className="text-xs text-blue-600 underline" onClick={()=> beginEdit('link','',links.length)}>+ 追加</button></li>
-        )}
-        {active && editingLinkIndex === links.length && (
-          <li>
-            <div className="flex items-center gap-2">
-              <input autoFocus className="flex-1 border-b-2 border-blue-500 bg-transparent p-1 text-xs focus:outline-none" value={editingValue} disabled={saving} onChange={e=>onChange(e.target.value)} onBlur={onBlur} onKeyDown={onKey} />
-              <button type="button" disabled={saving} className="text-[10px] px-2 py-1 bg-blue-600 text-white rounded disabled:opacity-50"
-                onMouseDown={()=> setSkipDiscard(true)}
-                onClick={onSave}>保存</button>
-            </div>
-          </li>
-        )}
-      </ul>
     </div>
   );
 }
