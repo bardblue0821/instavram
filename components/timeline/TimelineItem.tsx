@@ -238,16 +238,16 @@ export function TimelineItem(props: {
                 aria-label={`リアクション ${r.emoji}`}
                 aria-pressed={r.mine}
                 onClick={() => onToggleReaction?.(r.emoji)}
-                className={`rounded border px-2 py-1 text-sm ${r.mine ? "border-blue-600 bg-blue-50 text-blue-700" : "border-gray-300 bg-white text-gray-700"}`}
+                className={`rounded border px-2 py-1 text-sm ${r.mine ? "border-blue-600 bg-page text-blue-700" : "border-base bg-page text-gray-700"}`}
               >{r.emoji} <span className="text-xs">{r.count}</span></button>
               {hoveredEmoji === r.emoji && (
-                <div className="absolute left-0 top-full mt-1 w-64 rounded border border-gray-300 bg-white text-gray-800 shadow-lg z-40">
+                <div className="absolute left-0 top-full mt-1 w-64 rounded border border-base bg-page text-gray-800 shadow-lg z-40">
                   <div className="p-2">
                     <p className="text-[11px] text-gray-500 mb-1">このリアクションをした人</p>
                     {reactorLoading[r.emoji] && <p className="text-xs text-gray-500">読み込み中...</p>}
                     {!reactorLoading[r.emoji] && (
                       (reactorMap[r.emoji] && reactorMap[r.emoji]!.length > 0) ? (
-                        <ul className="max-h-64 overflow-auto divide-y divide-gray-100">
+                        <ul className="max-h-64 overflow-auto divide-y divide-base">
                           {reactorMap[r.emoji]!.map((u) => (
                             <li key={u.uid}>
                               <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50">
@@ -284,7 +284,7 @@ export function TimelineItem(props: {
           className="px-1 text-lg leading-none text-gray-700 dark:text-gray-300 disabled:opacity-50"
         >＋</button>
         {pickerOpen && (
-          <div ref={pickerRef} className="absolute top-full left-0 mt-2 w-80 surface-alt border border-base rounded shadow-lg p-2 z-50">
+          <div ref={pickerRef} className="absolute top-full left-0 mt-2 w-80 bg-page border border-base rounded shadow-lg p-2 z-50">
             <p className="text-xs text-gray-600 mb-2">絵文字を選択してください（再選択で解除）</p>
             <input
               autoFocus
@@ -303,7 +303,7 @@ export function TimelineItem(props: {
                     aria-label={cat.label}
                     title={cat.label}
                     onClick={() => setActiveCat(cat.key)}
-                    className={`flex items-center justify-center w-8 h-8 text-lg rounded border ${activeCat===cat.key ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300'}`}
+                    className={`flex items-center justify-center w-8 h-8 text-lg rounded border ${activeCat===cat.key ? 'bg-blue-600 text-white border-blue-600' : 'bg-page text-gray-700 border-base'}`}
                   >{cat.icon}</button>
                 ))}
               </div>
@@ -320,7 +320,7 @@ export function TimelineItem(props: {
                     aria-label={`リアクション ${e}`}
                     aria-pressed={mine}
                     onClick={() => { onToggleReaction?.(e); setPickerOpen(false); }}
-                    className={`rounded border px-2 py-1 text-sm ${mine ? "border-blue-600 bg-blue-600 text-white" : "border-gray-300 bg-white text-gray-700"}`}
+                    className={`rounded border px-2 py-1 text-sm ${mine ? "border-blue-600 bg-blue-600 text-white" : "border-base bg-page text-gray-700"}`}
                   >{e}</button>
                 );
               })}
@@ -331,7 +331,7 @@ export function TimelineItem(props: {
       </div>
 
       {commentsPreview && commentsPreview.length > 0 && (
-        <div className="mt-2 border-l border-gray-200 dark:border-gray-700 pl-3 space-y-2">
+  <div className="mt-2 border-l border-base pl-3 space-y-2">
           {commentsPreview.slice(0, 3).map((c, idx) => {
             const u = c.user;
             const name = u?.displayName || '名前未設定';
@@ -392,8 +392,6 @@ export function TimelineItem(props: {
           >送信</button>
         </div>
       )}
-
-      {/* コメントプレビューは上でぶら下げ表示しています */}
     </article>
   );
 }

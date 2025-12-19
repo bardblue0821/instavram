@@ -112,7 +112,7 @@ export default function SearchPage() {
               <p className="text-xs text-gray-600">最近の検索</p>
               <button type="button" onClick={clearHistory} className="text-[11px] text-gray-500 underline">クリア</button>
             </div>
-            <ul className="border rounded divide-y">
+            <ul className="border border-base rounded divide-y divide-base">
               {history.map((h, i) => (
                 <li key={i} className="text-sm">
                   <button
@@ -126,7 +126,7 @@ export default function SearchPage() {
           </div>
         )}
         {suggest.length > 0 && (
-          <ul className="mt-2 border rounded divide-y">
+          <ul className="mt-2 border border-base rounded divide-y divide-base">
             {suggest.map((s, i) => (
               <li key={i} className="text-sm">
                 <Link href={s.href} className="block px-3 py-2 hover:bg-gray-50" onClick={() => saveHistory(normalized)}>

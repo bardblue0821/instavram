@@ -355,7 +355,7 @@ export default function ProfilePage() {
       <AvatarModal open={avatarOpen} onClose={()=> setAvatarOpen(false)} uid={profile.uid} src={profile.iconURL || undefined} alt={(profile.displayName || profile.handle || 'ユーザー') + 'のアイコン'} editable={!!isMe} onUpdated={(url)=> setProfile((p:any)=> ({ ...p, iconURL: url, iconUpdatedAt: new Date() }))} />
 
       {isMe && (
-        <section className="space-y-2 pt-4 border-t">
+  <section className="space-y-2 pt-4 border-t border-base">
           <h2 className="text-lg font-medium text-red-700">危険区域</h2>
           <p className="text-sm text-gray-700">アカウントと関連データを削除します。この操作は取り消せません。</p>
           <button type="button" onClick={()=> setShowDeleteAccount(true)} className="rounded bg-red-600 px-3 py-1.5 text-sm text-white">アカウントを削除</button>
@@ -365,7 +365,7 @@ export default function ProfilePage() {
       {!isMe && user && (
         <div className="space-y-2">
           <FriendActions state={friendState} busy={busy} onSend={doSend} onCancel={doCancel} onAccept={doAccept} onRemove={doRemove} />
-          <div className="pt-2 border-t mt-3">
+          <div className="pt-2 border-t border-base mt-3">
             <WatchActions watching={watching} busy={watchBusy} onToggle={doWatchToggle} disabled={!user || (user && profile && user.uid === profile.uid)} />
           </div>
           {!user && <p className="text-sm text-gray-600">ログインすると操作できます</p>}
@@ -374,7 +374,7 @@ export default function ProfilePage() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <section className="space-y-4 pt-4 border-t">
+  <section className="space-y-4 pt-4 border-t border-base">
         <h2 className="text-lg font-medium">活動概要</h2>
         {loadingExtra && <p className="text-sm text-gray-500">読み込み中...</p>}
         {extraError && <p className="text-sm text-red-600">{extraError}</p>}

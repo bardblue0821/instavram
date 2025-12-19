@@ -7,10 +7,9 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  /* Surfaces & semantic colors (light) */
   --surface: #ffffff; /* 主コンテナ背景 (旧: bg-white) */
   --surface-alt: #f8fafc; /* 薄いグレー領域 (旧: bg-gray-50) */
-  --border: #d1d5db; /* 境界線 (gray-300 相当) */
+  --border: #4a4e53; /* 境界線 (gray-400 相当) */
   --muted: #4b5563; /* 二次テキスト (gray-600) */
   --subtle: #6b7280; /* 三次テキスト (gray-700) */
   --accent: #0d9488; /* base teal (Tailwind teal-600 付近) */
@@ -30,7 +29,6 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
-    /* ダーク時も同じトーンを維持（必要なら後で微調整） */
     --accent: #14b8a6; /* 少し明るい teal (teal-500) */
     --accent-hover: #0d9488; /* hover for dark mode */
     --accent-fg: #ffffff;
@@ -44,7 +42,7 @@
   --foreground: #171717;
   --surface: #ffffff;
   --surface-alt: #f8fafc;
-  --border: #d1d5db;
+  --border: #707680;
   --muted: #4b5563;
   --subtle: #6b7280;
   --accent: #0d9488;
@@ -58,7 +56,7 @@
   --foreground: #ededed;
   --surface: #161616; /* ダーク用主背景 */
   --surface-alt: #1f1f23; /* ダーク用副背景 */
-  --border: #2d2d31; /* 境界線 (ダーク) */
+  --border: #656572; /* 境界線 (やや濃いめ) */
   --muted: #94a3b8; /* 二次テキスト (淡い) */
   --subtle: #64748b; /* 三次テキスト */
   --accent: #14b8a6;
@@ -84,6 +82,10 @@ body {
 .fg-subtle { color: var(--subtle); }
 .border-base { border-color: var(--border); }
 .hover-surface-alt:hover { background-color: var(--surface-alt); }
+.bg-page { background-color: var(--background); }
+.divide-base { border-color: var(--border); --tw-divide-color: var(--border); }
+/* divide-y の線色を子要素へ明示適用（フォールバック対策） */
+.divide-y.divide-base > :not(:last-child) { border-color: var(--border); }
 
 /* --------------------------------------
    Accent utility classes (最小ユーティリティ)

@@ -3,13 +3,11 @@ import React, { useEffect, useState } from "react";
 import { useAuthUser } from "../../lib/hooks/useAuthUser";
 import { TimelineItem } from "../../components/timeline/TimelineItem";
 // フィードはフレンド/ウォッチ対象のみ
-import { fetchLatestAlbums } from "../../lib/repos/timelineRepo"; 
 import { listAcceptedFriends } from "../../lib/repos/friendRepo"; 
 import { listWatchedOwnerIds } from "../../lib/repos/watchRepo"; 
 import { listLatestAlbumsVM } from "@/src/services/timeline/listLatestAlbums"; 
 import type { TimelineItemVM, UserRef } from "@/src/models/timeline"; 
 import { getUser, type UserDoc } from "../../lib/repos/userRepo";
-import { listImages } from "../../lib/repos/imageRepo";
 import { listComments, subscribeComments } from "../../lib/repos/commentRepo";
 import { countLikes, hasLiked, toggleLike, subscribeLikes } from "../../lib/repos/likeRepo";
 import { listReactionsByAlbum, toggleReaction } from "../../lib/repos/reactionRepo";
@@ -266,7 +264,7 @@ export default function TimelinePage() {
       <h1 className="text-xl font-semibold mb-4">タイムライン</h1>
       {rows.length === 0 && <p className="text-sm text-gray-500">対象アルバムがありません</p>}
       {rows.length > 0 && (
-        <div className="divide-y divide-base">
+        <div className="divide-y divide-base [&>*]:py-12">
           {rows.map((row, i) => (
             <TimelineItem
               key={row.album.id}

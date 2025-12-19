@@ -1843,6 +1843,14 @@ export interface NotificationDoc {
 
 
 
+### ブロック機能
+
+
+
+### ミュート機能
+
+
+
 ### fix: タイムラインでコメント機能を格納
 - いいねボタンの隣に吹き出しマークを作成。
 - 吹き出しマークを押すことで、既存のコメント入力欄が表示される。
@@ -1855,7 +1863,7 @@ export interface NotificationDoc {
 - Jest と Testing Library でテストを組み立てる
 
 
-## 手順: スプリント４
+## 手順: スプリント３
 
 
 

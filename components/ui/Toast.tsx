@@ -111,7 +111,7 @@ function variantColor(v: ToastVariant) {
     case "error":
       return { border: "border-red-300", text: "text-red-900", dot: "bg-red-500" };
     default:
-      return { border: "border-gray-300", text: "text-gray-900", dot: "bg-gray-500" };
+      return { border: "border-base", text: "text-gray-900", dot: "bg-gray-500" };
   }
 }
 
