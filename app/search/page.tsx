@@ -97,7 +97,6 @@ export default function SearchPage() {
     <div className="max-w-4xl mx-auto p-4 space-y-5">
       <h1 className="text-xl font-semibold">検索</h1>
       <div>
-  <label className="block text-sm fg-muted mb-1">キーワード</label>
         <input
           autoFocus
           value={q}

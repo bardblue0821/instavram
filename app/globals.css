@@ -5,13 +5,13 @@
 @import "lightgallery/css/lg-thumbnail.css";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --surface: #ffffff; /* 主コンテナ背景 (旧: bg-white) */
-  --surface-alt: #f1f5f9; /* 薄いグレー領域 (旧: bg-slate-100) */
-  --border: #4a4e53; /* 境界線 (gray-400 相当) */
+  --background: #000000;
+  --foreground: #dfdfdf;
+  --surface: #000000; /* 主コンテナ背景 (旧: bg-white) */
+  --surface-alt: #dfdfdf; /* 薄いグレー領域 (旧: bg-slate-100) */
+  --border: #2a2b2e; /* 境界線 (gray-400 相当) */
   --muted: #4b5563; /* 二次テキスト (gray-600) */
-  --subtle: #6b7280; /* 三次テキスト (gray-700) */
+  --subtle: #4b5563; /* 三次テキスト (gray-700) */
   --accent: #0d9488; /* base teal (Tailwind teal-600 付近) */
   --accent-hover: #0f766e; /* hover/darker */
   --accent-fg: #ffffff; /* text/icon color on accent */
@@ -24,20 +24,6 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --surface: #161616; /* ダーク用主コンテナ背景 */
-    --surface-alt: #1f1f23; /* ダーク用薄いグレー領域 */
-    --accent: #14b8a6; /* 少し明るい teal (teal-500) */
-    --accent-hover: #0d9488; /* hover for dark mode */
-    --accent-fg: #ffffff;
-    --accent-ring: rgba(20, 184, 166, 0.5);
-  }
-}
-
 
 body {
   background: var(--background);
