@@ -36,6 +36,8 @@ import { REACTION_EMOJIS, REACTION_CATEGORIES, filterReactionEmojis } from "../.
 import { getFriendStatus } from "../../../lib/repos/friendRepo";
 import { isWatched } from "../../../lib/repos/watchRepo";
 import { HeartIcon } from "../../../components/icons/HeartIcon";
+import { getAlbumDetailVM } from "@/src/services/album/getAlbumDetail";
+import type { AlbumDetailVM, UserRef } from "@/src/models/album";
 
 type CommentRecord = {
   id: string;
@@ -109,8 +111,9 @@ export default function AlbumDetailPage() {
       setLoading(true);
       setError(null);
       try {
-        const albumSnap = await getAlbumSafe(albumId);
-        if (!albumSnap) {
+        const userCache = new Map<string, UserRef | null>();
+        const vm = await getAlbumDetailVM(albumId, user?.uid, userCache);
+        if (!vm) {
           if (!cancelled) {
             setAlbum(null);
             setImages([]);
@@ -119,30 +122,15 @@ export default function AlbumDetailPage() {
           }
           return;
         }
-        const albumData = albumSnap as AlbumRecord;
         if (cancelled) return;
-        setAlbum(albumData);
-        setEditTitle(albumData.title ?? "");
-        setEditPlaceUrl(albumData.placeUrl ?? "");
-
-        const imgs = await listImages(albumId);
-        if (!cancelled) {
-          imgs.sort(
-            (a: any, b: any) =>
-              (b.createdAt?.seconds || b.createdAt || 0) -
-              (a.createdAt?.seconds || a.createdAt || 0),
-          );
-          setImages(imgs);
-        }
-        const initialComments = await listComments(albumId);
-        if (!cancelled) {
-          const list = [...initialComments].sort(
-            (a, b) =>
-              (a.createdAt?.seconds || a.createdAt || 0) -
-              (b.createdAt?.seconds || b.createdAt || 0),
-          );
-          setComments(list as CommentRecord[]);
-        }
+        setAlbum(vm.album as any);
+        setEditTitle(vm.album.title ?? "");
+        setEditPlaceUrl(vm.album.placeUrl ?? "");
+        setImages(vm.images as any[]);
+        setComments(vm.commentsAsc as CommentRecord[]);
+        setReactions(vm.reactions);
+        setLiked(vm.liked);
+        setLikeCount(vm.likeCount);
 
         unsubComments = await subscribeComments(
           albumId,
@@ -157,9 +145,7 @@ export default function AlbumDetailPage() {
           },
           (err) => console.warn("comments subscribe error", err),
         );
-        // リアクション取得
-        const r = await listReactionsByAlbum(albumId, user?.uid);
-        if (!cancelled) setReactions(r);
+        // リアクションは VM セット済み（購読は個別に必要なら後で実装）
       } catch (e: any) {
         if (!cancelled) {
           setError(translateError(e));

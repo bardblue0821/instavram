@@ -10,3 +10,15 @@ This src/ tree hosts the layered architecture:
 - utils/ (shared utility functions)
 
 Migration will proceed feature-by-feature to avoid breaking changes.
+
+Current services/ViewModels:
+
+- Timeline
+	- models: `src/models/timeline.ts`
+	- service: `src/services/timeline/listLatestAlbums.ts`
+	- usage: `app/timeline/page.tsx` 初期データ取得に利用、リアルタイム購読はページ側で維持
+
+- Album Detail
+	- models: `src/models/album.ts`
+	- service: `src/services/album/getAlbumDetail.ts`
+	- usage: `app/album/[id]/page.tsx` 初期データ取得に利用、コメント/いいね購読はページ側で維持
