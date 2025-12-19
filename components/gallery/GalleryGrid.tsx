@@ -47,6 +47,7 @@ function PhotoRenderer({ photo, imageProps, wrapperStyle, canDelete, onDelete, o
     <div
       role="button"
       tabIndex={0}
+      className="cursor-pointer"
       style={style}
       onClick={onOpen}
       onKeyDown={(e) => {
@@ -191,6 +192,7 @@ export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDe
                 key={p.id ?? p.src + ':' + idx}
                 role="button"
                 tabIndex={0}
+                className="cursor-pointer"
                 onClick={() => lgRef.current?.openGallery?.(idx)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {

@@ -18,6 +18,11 @@
   --accent-ring: rgba(13, 148, 136, 0.4); /* focus outline / shadow */
 }
 
+/* スクロールバー出現/消失による横ズレ（特にWindows）を防ぐ */
+html {
+  scrollbar-gutter: stable;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
