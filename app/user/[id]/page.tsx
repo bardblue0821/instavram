@@ -354,16 +354,14 @@ export default function ProfilePage() {
             <button type="button" onClick={()=> setDetailsOpen(false)} className="text-xs link-accent">詳細を隠す</button>
           </div>
         )}
-        {saveMsg && <p className="text-xs text-green-700">{saveMsg}</p>}
+        {/*saveMsg && <p className="text-xs text-green-700">{saveMsg}</p>*/}
         {error && <p className="text-xs text-red-600">{error}</p>}
       </header>
 
       <AvatarModal open={avatarOpen} onClose={()=> setAvatarOpen(false)} uid={profile.uid} src={profile.iconURL || undefined} alt={(profile.displayName || profile.handle || 'ユーザー') + 'のアイコン'} editable={!!isMe} onUpdated={(url)=> setProfile((p:any)=> ({ ...p, iconURL: url, iconUpdatedAt: new Date() }))} />
 
       {isMe && (
-  <section className="space-y-2 pt-4 border-t border-base">
-          <h2 className="text-lg font-medium text-red-700">危険区域</h2>
-          <p className="text-sm fg-muted">アカウントと関連データを削除します。この操作は取り消せません。</p>
+        <section className="space-y-2 pt-4 border-base">
           <button type="button" onClick={()=> setShowDeleteAccount(true)} className="rounded bg-red-600 px-3 py-1.5 text-sm text-white">アカウントを削除</button>
         </section>
       )}
@@ -381,8 +379,7 @@ export default function ProfilePage() {
       {error && <p className="text-sm text-red-600">{error}</p>}
 
   <section className="space-y-4 pt-4 border-t border-base">
-        <h2 className="text-lg font-medium">活動概要</h2>
-  {loadingExtra && <p className="text-sm fg-subtle">読み込み中...</p>}
+        {loadingExtra && <p className="text-sm fg-subtle">読み込み中...</p>}
         {extraError && <p className="text-sm text-red-600">{extraError}</p>}
         {stats && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
