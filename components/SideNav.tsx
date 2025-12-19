@@ -141,12 +141,12 @@ function SideNavInner() {
   return (
     <nav ref={navRef as React.RefObject<HTMLElement | null>} aria-label="メインナビ" className="hidden sm:flex w-20 shrink-0 flex-col items-center gap-3 py-3 border-r border-base sticky top-0 h-dvh sidenav-bg">
       {/* Profile on top */}
-      <div className="mt-1 mb-1">
+      <div className="">
         <Link
           href={user && handle ? `/user/${handle}` : (user ? `/user/${user.uid}` : '/login')}
           title="プロフィール"
           aria-label="プロフィール"
-          className="flex items-center justify-center w-20 h-20 rounded-lg hover-surface-alt focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]"
+          className="flex items-center justify-center w-15 h-15 rounded-lg border-2 border-transparent hover:border-(--accent) transition-colors"
         >
           <Avatar size={56} src={profileDoc?.iconURL || undefined} alt="プロフィール" interactive={false} withBorder={false} />
         </Link>
@@ -162,7 +162,7 @@ function SideNavInner() {
             aria-label={it.label}
             data-href={it.href}
             data-new={isNew ? 'true' : 'false'}
-            className={`relative flex items-center justify-center w-12 h-12 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent] ${isNew ? 'btn-accent-square' : 'hover-surface-alt'}`}
+            className={`relative flex items-center justify-center w-12 h-12 rounded-lg ${isNew ? 'btn-accent-square' : 'hover-surface-alt'}`}
           >
             <span className={`text-xl leading-none ${iconClass}`} aria-hidden>
               {it.icon}

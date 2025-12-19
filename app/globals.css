@@ -8,7 +8,7 @@
   --background: #ffffff;
   --foreground: #171717;
   --surface: #ffffff; /* 主コンテナ背景 (旧: bg-white) */
-  --surface-alt: #f8fafc; /* 薄いグレー領域 (旧: bg-gray-50) */
+  --surface-alt: #f1f5f9; /* 薄いグレー領域 (旧: bg-slate-100) */
   --border: #4a4e53; /* 境界線 (gray-400 相当) */
   --muted: #4b5563; /* 二次テキスト (gray-600) */
   --subtle: #6b7280; /* 三次テキスト (gray-700) */
@@ -29,6 +29,8 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --surface: #161616; /* ダーク用主コンテナ背景 */
+    --surface-alt: #1f1f23; /* ダーク用薄いグレー領域 */
     --accent: #14b8a6; /* 少し明るい teal (teal-500) */
     --accent-hover: #0d9488; /* hover for dark mode */
     --accent-fg: #ffffff;
@@ -36,34 +38,6 @@
   }
 }
 
-/* 手動テーマ切替用クラス (localStorage 'theme' で制御) */
-:root.theme-light {
-  --background: #ffffff;
-  --foreground: #171717;
-  --surface: #ffffff;
-  --surface-alt: #f8fafc;
-  --border: #707680;
-  --muted: #4b5563;
-  --subtle: #6b7280;
-  --accent: #0d9488;
-  --accent-hover: #0f766e;
-  --accent-fg: #ffffff;
-  --accent-ring: rgba(13, 148, 136, 0.4);
-}
-
-:root.theme-dark {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --surface: #161616; /* ダーク用主背景 */
-  --surface-alt: #1f1f23; /* ダーク用副背景 */
-  --border: #656572; /* 境界線 (やや濃いめ) */
-  --muted: #94a3b8; /* 二次テキスト (淡い) */
-  --subtle: #64748b; /* 三次テキスト */
-  --accent: #14b8a6;
-  --accent-hover: #0d9488;
-  --accent-fg: #ffffff;
-  --accent-ring: rgba(20, 184, 166, 0.5);
-}
 
 body {
   background: var(--background);
