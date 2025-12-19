@@ -28,3 +28,7 @@ Route Handlers (server-side controllers):
 - Likes
 	- `app/api/likes/toggle/route.ts`：いいねのトグル。簡易レート制限（IPあたり 10req/分）＋フォールバックは既存リポジトリ側
 	- 使用箇所：`app/timeline/page.tsx` / `app/album/[id]/page.tsx`
+
+- Comments
+	- `app/api/comments/add/route.ts`：コメント追加。簡易レート制限（IPあたり 10req/分）＋フォールバックは既存リポジトリ側
+	- 使用箇所：`app/timeline/page.tsx` / `app/album/[id]/page.tsx`

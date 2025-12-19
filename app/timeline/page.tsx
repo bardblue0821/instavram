@@ -226,7 +226,18 @@ export default function TimelinePage() {
   async function handleSubmitComment(albumId: string, text: string) {
     if (!user) return;
     const { addComment } = await import("../../lib/repos/commentRepo");
-    await addComment(albumId, user.uid, text);
+    try {
+      const res = await fetch('/api/comments/add', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ albumId, userId: user.uid, body: text }),
+      });
+      if (!res.ok) {
+        await addComment(albumId, user.uid, text);
+      }
+    } catch {
+      await addComment(albumId, user.uid, text);
+    }
   }
 
   if (loading) return <div className="text-sm text-gray-500">読み込み中...</div>;

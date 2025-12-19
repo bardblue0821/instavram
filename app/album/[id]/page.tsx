@@ -620,7 +620,14 @@ export default function AlbumDetailPage() {
     setCommenting(true);
     setError(null);
     try {
-      await addComment(albumId, user.uid, commentText.trim());
+      const res = await fetch('/api/comments/add', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ albumId, userId: user.uid, body: commentText.trim() }),
+      });
+      if (!res.ok) {
+        await addComment(albumId, user.uid, commentText.trim());
+      }
       setCommentText("");
     } catch (e: any) {
       setError(translateError(e));
