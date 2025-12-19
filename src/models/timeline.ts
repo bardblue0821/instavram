@@ -25,6 +25,7 @@ export type TimelineItemVM = {
   images: ImgVM[];
   likeCount: number;
   liked: boolean;
+  commentCount?: number;
   latestComment?: LatestCommentVM;
   commentsPreview?: CommentPreviewVM[];
   reactions: ReactionVM[];

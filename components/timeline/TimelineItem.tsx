@@ -21,6 +21,7 @@ export function TimelineItem(props: {
   likeCount: number;
   liked: boolean;
   onLike: () => Promise<void> | void;
+  commentCount?: number;
   latestComment?: LatestComment;
   commentsPreview?: CommentPreview[];
   onCommentSubmit?: (text: string) => Promise<void>;
@@ -29,7 +30,7 @@ export function TimelineItem(props: {
   onToggleReaction?: (emoji: string) => void;
   owner?: { uid: string; handle: string | null; iconURL?: string | null; displayName?: string };
 }) {
-  const { album, images, likeCount, liked, onLike, latestComment, commentsPreview = [], onCommentSubmit, submitting, reactions = [], onToggleReaction, owner } = props;
+  const { album, images, likeCount, liked, onLike, commentCount = 0, latestComment, commentsPreview = [], onCommentSubmit, submitting, reactions = [], onToggleReaction, owner } = props;
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [showCommentBox, setShowCommentBox] = useState(false);
@@ -223,6 +224,7 @@ export function TimelineItem(props: {
             <ChatIcon size={20} />
           </button>
         )}
+        <span className="text-xs text-gray-600 dark:text-gray-400">{commentCount}</span>
       </div>
 
       {/* リアクション（簡易版：1以上のみ表示、クリックでトグル、ホバーでユーザー一覧） */}

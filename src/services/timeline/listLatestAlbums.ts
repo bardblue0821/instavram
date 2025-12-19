@@ -76,6 +76,7 @@ export async function listLatestAlbumsVM(currentUserId: string, userCache?: Map<
         images: imgRows,
         likeCount: likeCnt,
         liked: !!likedFlag,
+        commentCount: (cmts || []).length,
         latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined,
         commentsPreview,
         reactions,

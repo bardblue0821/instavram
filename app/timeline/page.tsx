@@ -88,7 +88,7 @@ export default function TimelinePage() {
                 setRows(prev => {
                   const next = [...prev];
                   if (!next[i]) return prev;
-                  next[i] = { ...next[i], latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined, commentsPreview: preview };
+                  next[i] = { ...next[i], latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined, commentsPreview: preview, commentCount: list.length } as any;
                   return next;
                 });
               })().catch(()=>{
@@ -96,7 +96,7 @@ export default function TimelinePage() {
                 setRows(prev => {
                   const next = [...prev];
                   if (!next[i]) return prev;
-                  next[i] = { ...next[i], latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined, commentsPreview: previewRawDesc.map(c => ({ body: c.body, userId: c.userId, createdAt: c.createdAt })) } as any;
+                  next[i] = { ...next[i], latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined, commentsPreview: previewRawDesc.map(c => ({ body: c.body, userId: c.userId, createdAt: c.createdAt })), commentCount: list.length } as any;
                   return next;
                 });
               });
@@ -275,6 +275,7 @@ export default function TimelinePage() {
               likeCount={row.likeCount}
               liked={row.liked}
               onLike={() => handleToggleLike(row.album.id, i)}
+              commentCount={row.commentCount}
               latestComment={row.latestComment}
               commentsPreview={row.commentsPreview}
               onCommentSubmit={user ? (text) => handleSubmitComment(row.album.id, text) : undefined}
