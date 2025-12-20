@@ -191,9 +191,6 @@ function SideNavInner() {
         </button>
         {menuOpen && (
           <div ref={menuRef} className="absolute bottom-14 left-0 z-50 surface border border-base rounded-md shadow-md min-w-40 p-2">
-            <button type="button" className="w-full text-left px-2 py-1 rounded hover-surface-alt" onClick={toggleTheme}>
-              {currentTheme === 'dark' ? 'ライトモードへ' : 'ダークモードへ'}
-            </button>
             {user && (
               <button type="button" className="w-full text-left px-2 py-1 rounded hover-surface-alt text-red-600" onClick={() => { signOut(auth).catch(()=>{}); setMenuOpen(false); }}>
                 ログアウト
