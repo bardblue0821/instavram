@@ -912,26 +912,26 @@ export default function ProfilePage() {
 
       {showDeleteAccount && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="surface rounded shadow-lg p-4 w-96 space-y-3">
-            <h3 className="text-sm font-semibold text-red-700">アカウント削除の確認</h3>
+          <div className="relative surface-alt border border-base rounded shadow-lg max-w-sm w-[90%] p-5 space-y-3">
+            <h3 className="text-sm font-semibold text-red-600">アカウント削除の確認</h3>
             <p className="text-xs fg-muted">この操作は元に戻せません。作成したアルバム/コメント/いいね/フレンド/ウォッチは削除されます（通知は残る場合があります）。</p>
             <label className="flex items-center gap-2 text-xs fg-muted">
-              <input type="checkbox" checked={agreeDelete} onChange={e=> setAgreeDelete(e.target.checked)} />
+              <input type="checkbox" checked={agreeDelete} onChange={e=> setAgreeDelete(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
               理解しました
             </label>
             {authProvider === 'password' && (
               <div>
                 <label className="block text-xs fg-muted mb-1">パスワード（再認証）</label>
-                <input type="password" value={pw} onChange={e=> setPw(e.target.value)} className="w-full border-b-2 border-blue-500 bg-transparent p-1 text-sm focus:outline-none" placeholder="現在のパスワード" />
+                <input type="password" value={pw} onChange={e=> setPw(e.target.value)} className="w-full border-b-2 border-[--accent] bg-transparent p-1 text-sm focus:outline-none" placeholder="現在のパスワード" />
               </div>
             )}
             {deleting && (<p className="text-xs fg-muted">処理中: {deleteStep || '...'}</p>)}
             <div className="flex justify-end gap-2">
-              <button type="button" className="px-2 py-1 text-xs rounded surface-alt" disabled={deleting} onClick={()=> setShowDeleteAccount(false)}>キャンセル</button>
+              <button type="button" className="px-3 py-2 text-sm rounded border border-base hover-surface-alt" disabled={deleting} onClick={()=> setShowDeleteAccount(false)}>キャンセル</button>
               {authProvider === 'google.com' && (
-                <button type="button" className="px-2 py-1 text-xs rounded border fg-muted hover-surface-alt" disabled={deleting} onClick={reauthGoogle}>Googleで再認証</button>
+                <button type="button" className="px-3 py-2 text-sm rounded border border-base fg-muted hover-surface-alt" disabled={deleting} onClick={reauthGoogle}>Googleで再認証</button>
               )}
-              <button type="button" className="px-2 py-1 text-xs rounded bg-red-600 text-white disabled:opacity-50" disabled={!agreeDelete || deleting || (authProvider==='password' && !pw)} onClick={doDeleteAccount}>削除</button>
+              <button type="button" className="px-3 py-2 text-sm rounded bg-red-600 text-white disabled:opacity-50" disabled={!agreeDelete || deleting || (authProvider==='password' && !pw)} onClick={doDeleteAccount}>削除</button>
             </div>
           </div>
         </div>
@@ -944,7 +944,7 @@ export default function ProfilePage() {
             <p className="text-xs fg-muted">保存せずに編集を終了すると内容は元に戻ります。保存しますか、それとも破棄しますか？</p>
             <div className="flex justify-end gap-2">
               <button type="button" className="px-2 py-1 text-xs rounded surface-alt" onClick={keepEditing}>編集を続ける</button>
-              <button type="button" className="px-2 py-1 text-xs rounded bg-blue-600 text-white" onClick={saveFromModal}>保存</button>
+              <button type="button" className="px-2 py-1 text-xs rounded btn-accent" onClick={saveFromModal}>保存</button>
               <button type="button" className="px-2 py-1 text-xs rounded bg-red-600 text-white" onClick={discardChanges}>破棄</button>
             </div>
           </div>

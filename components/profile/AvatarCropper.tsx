@@ -41,10 +41,10 @@ export default function AvatarCropper({ src, onCancel, onConfirm }: Props) {
         />
       </div>
       <div className="flex justify-end gap-2">
-        <button type="button" className="px-3 py-1.5 text-sm rounded bg-gray-200" onClick={onCancel}>キャンセル</button>
+        <button type="button" className="px-3 py-1.5 text-sm rounded surface-alt" onClick={onCancel}>キャンセル</button>
         <button
           type="button"
-          className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white disabled:opacity-50"
+          className="px-3 py-1.5 text-sm rounded btn-accent disabled:opacity-50"
           onClick={() => area && onConfirm(area, zoom)}
           disabled={!area}
         >
