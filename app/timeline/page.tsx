@@ -11,6 +11,7 @@ import { toggleLike, subscribeLikes } from "../../lib/repos/likeRepo";
 import { toggleReaction } from "../../lib/repos/reactionRepo";
 import { addNotification } from "../../lib/repos/notificationRepo";
 import { translateError } from "../../lib/errors";
+import { notifications } from "@mantine/notifications";
 import DeleteConfirmModal from "../../components/album/DeleteConfirmModal";
 import ReportConfirmModal from "../../components/album/ReportConfirmModal";
 import { deleteAlbum } from "../../lib/repos/albumRepo";
@@ -343,12 +344,23 @@ export default function TimelinePage() {
         body: JSON.stringify({ albumId, albumUrl }),
       });
       if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json?.error || 'REPORT_FAILED');
+        const json = await res.json().catch(() => ({} as any));
+        const err = (json as any)?.error || 'REPORT_FAILED';
+        const hint = (json as any)?.hint as string | undefined;
+        const missingEnv = (json as any)?.missingEnv as string | undefined;
+
+        let msg = err;
+        if (typeof err === 'string' && err.startsWith('MISSING_ENV:')) {
+          msg = `通報メール送信の設定が未完了です（${missingEnv || err.slice('MISSING_ENV:'.length)}）`;
+        }
+        if (hint) msg = `${msg} / ${hint}`;
+        throw new Error(msg);
       }
       setReportTargetAlbumId(null);
     } catch (e: any) {
-      setError(translateError(e));
+      const msg = translateError(e);
+      setError(msg);
+      notifications.show({ color: 'red', message: msg });
     } finally {
       setReportBusy(false);
     }

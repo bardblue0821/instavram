@@ -21,6 +21,9 @@ export function TimelineItem(props: {
   likeCount: number;
   liked: boolean;
   onLike: () => Promise<void> | void;
+  currentUserId?: string;
+  onRequestDelete?: (albumId: string) => void;
+  onRequestReport?: (albumId: string) => void;
   commentCount?: number;
   latestComment?: LatestComment;
   commentsPreview?: CommentPreview[];
@@ -30,10 +33,30 @@ export function TimelineItem(props: {
   onToggleReaction?: (emoji: string) => void;
   owner?: { uid: string; handle: string | null; iconURL?: string | null; displayName?: string };
 }) {
-  const { album, images, likeCount, liked, onLike, commentCount = 0, latestComment, commentsPreview = [], onCommentSubmit, submitting, reactions = [], onToggleReaction, owner } = props;
+  const {
+    album,
+    images,
+    likeCount,
+    liked,
+    onLike,
+    currentUserId,
+    onRequestDelete,
+    onRequestReport,
+    commentCount = 0,
+    latestComment,
+    commentsPreview = [],
+    onCommentSubmit,
+    submitting,
+    reactions = [],
+    onToggleReaction,
+    owner,
+  } = props;
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [showCommentBox, setShowCommentBox] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const menuBtnRef = useRef<HTMLButtonElement | null>(null);
   const [hoveredEmoji, setHoveredEmoji] = useState<string | null>(null);
   const [reactorMap, setReactorMap] = useState<Record<string, Reactor[] | undefined>>({});
   const [reactorLoading, setReactorLoading] = useState<Record<string, boolean>>({});
@@ -94,6 +117,24 @@ export function TimelineItem(props: {
   // 開くたびに検索語をクリア
   useEffect(() => { if (pickerOpen) setEmojiQuery(""); }, [pickerOpen]);
 
+  // メニュー外クリック/ESCで閉じる
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onMouseDown(e: MouseEvent) {
+      const t = e.target as Node;
+      if (menuRef.current && !menuRef.current.contains(t) && menuBtnRef.current && !menuBtnRef.current.contains(t)) {
+        setMenuOpen(false);
+      }
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setMenuOpen(false); }
+    window.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
+
   function renderGrid(imgs: Img[]) {
     const n = Math.min(imgs.length, 4);
     const list = imgs.slice(0, n);
@@ -143,7 +184,7 @@ export function TimelineItem(props: {
       return (
         <div className="grid gap-1" style={{ gridTemplateColumns: '2fr 1fr' }}>
           {/* 左（2行分を占有、セル高に合わせて画像をカバー） */}
-          <div className="row-span-2 relative overflow-hidden rounded-[6px]">
+          <div className="row-span-2 relative overflow-hidden rounded-md">
             <a href={`/album/${album.id}`} aria-label="アルバム詳細へ" className="absolute inset-0 block">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -188,6 +229,53 @@ export function TimelineItem(props: {
               <span className="text-base font-semibold truncate">{owner?.displayName || '名前未設定'}</span>
               <span className="text-sm fg-subtle">{owner?.handle ? `@${owner.handle}` : 'ハンドル未設定'}</span>
             </a>
+          </div>
+
+          <div className="ml-auto relative">
+            <button
+              ref={menuBtnRef}
+              type="button"
+              aria-label="メニュー"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              className="w-8 h-8 rounded border border-base hover-surface-alt fg-muted"
+              onClick={() => setMenuOpen((o) => !o)}
+            >
+              ⋯
+            </button>
+            {menuOpen && (
+              <div
+                ref={menuRef}
+                role="menu"
+                className="absolute right-0 top-full mt-2 w-40 rounded border border-base bg-page shadow-lg z-50 overflow-hidden"
+              >
+                {currentUserId && currentUserId === album.ownerId && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="w-full text-left px-3 py-2 text-sm hover-surface-alt"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onRequestDelete?.(album.id);
+                    }}
+                  >
+                    削除する
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="w-full text-left px-3 py-2 text-sm hover-surface-alt"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onRequestReport?.(album.id);
+                  }}
+                >
+                  通報する
+                </button>
+              </div>
+            )}
           </div>
         </div>
         {album.title && (

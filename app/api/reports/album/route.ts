@@ -93,6 +93,30 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'UNKNOWN' }, { status: 500 });
+    // ログに残して原因特定しやすくする（秘密情報は含めないよう注意）
+    console.error('[reports/album] error', {
+      message: e?.message,
+      code: e?.code,
+      name: e?.name,
+    });
+    if (e?.stack) console.error(e.stack);
+
+    const msg = typeof e?.message === 'string' && e.message ? e.message : 'UNKNOWN';
+
+    // 典型: .env 未設定
+    if (msg.startsWith('MISSING_ENV:')) {
+      const missing = msg.slice('MISSING_ENV:'.length);
+      return NextResponse.json(
+        {
+          error: msg,
+          hint: '通報メール送信の環境変数が未設定です。.env.local を設定して dev サーバーを再起動してください。',
+          missingEnv: missing,
+          requiredEnvs: ['REPORT_SMTP_HOST', 'REPORT_SMTP_PORT', 'REPORT_SMTP_SECURE', 'REPORT_SMTP_USER', 'REPORT_SMTP_PASS', 'REPORT_TO', 'REPORT_FROM'],
+        },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

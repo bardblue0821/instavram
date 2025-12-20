@@ -57,3 +57,19 @@ import { auth, db, storage } from './lib/firebase'
 
 Restart `npm run dev` after changing environment variables.
 
+## Report (Album) Email Setup
+
+タイムライン/アルバムの「通報する」は、`/api/reports/album` からSMTPでメール送信します。ローカル開発では `.env.local` に以下を設定してください（設定後は `npm run dev` を再起動）。
+
+```bash
+REPORT_SMTP_HOST=smtp.gmail.com
+REPORT_SMTP_PORT=587
+REPORT_SMTP_SECURE=false
+REPORT_SMTP_USER=youraddress@gmail.com
+REPORT_SMTP_PASS=xxxxxx  # Gmailの場合はアプリパスワード推奨
+
+# 任意（未設定なら REPORT_TO は既定、REPORT_FROM は REPORT_SMTP_USER になります）
+REPORT_TO=youraddress@gmail.com
+REPORT_FROM=youraddress@gmail.com
+```
+
