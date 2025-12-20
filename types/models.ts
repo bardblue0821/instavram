@@ -1,7 +1,7 @@
 // 基本データモデル (Firestore / Prisma 両対応の最低限版)
 // Firestore 保存時は Date をそのまま入れると Timestamp に変換される。
 
-export interface UserDoc { uid: string; displayName: string; iconURL?: string; bio?: string; createdAt: Date }
+export interface UserDoc { uid: string; displayName: string; iconURL?: string; iconFullURL?: string; bio?: string; createdAt: Date }
 export interface AlbumDoc { id: string; ownerId: string; title?: string; placeUrl?: string; createdAt: Date; updatedAt: Date }
 export interface AlbumImageDoc { id: string; albumId: string; uploaderId: string; url: string; createdAt: Date }
 export interface CommentDoc { id: string; albumId: string; userId: string; body: string; createdAt: Date }

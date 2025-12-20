@@ -13,7 +13,7 @@ interface Props {
   src?: string | null;
   alt?: string;
   editable?: boolean;
-  onUpdated?: (url: string) => void;
+  onUpdated?: (thumbUrl: string, fullUrl: string) => void;
 }
 
 export default function AvatarModal({ open, onClose, uid, src, alt = 'ユーザーアイコン', editable, onUpdated }: Props) {
@@ -23,14 +23,18 @@ export default function AvatarModal({ open, onClose, uid, src, alt = 'ユーザ�
   const [error, setError] = useState<string | null>(null);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
 
+  const MAX_AVATAR_FILE_SIZE = 20 * 1024 * 1024; // 20MB（元画像は切り抜き後に512pxへ圧縮して保存）
+
   if (!open) return null;
 
+  const THUMB_SIZE = 256;
+  const FULL_SIZE = 512;
   const pickFile = () => inputRef.current?.click();
 
   const onFile = (file?: File) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) { setError('画像ファイルを選択してください'); return; }
-    if (file.size > 5 * 1024 * 1024) { setError('5MB 以下の画像を選択してください'); return; }
+    if (file.size > MAX_AVATAR_FILE_SIZE) { setError('20MB 以下の画像を選択してください'); return; }
     const url = URL.createObjectURL(file);
     setPreviewSrc(url);
     setStage('crop');
@@ -40,13 +44,27 @@ export default function AvatarModal({ open, onClose, uid, src, alt = 'ユーザ�
     if (!previewSrc) return;
     try {
       setBusy(true); setError(null);
-      const blob = await getCroppedBlob(previewSrc, area, 512, 'image/jpeg', 0.9);
-      const path = `users/${uid}/icon/512.jpg`;
-      const ref = storageRef(storage, path);
-      await uploadBytes(ref, blob, { contentType: 'image/jpeg' });
-      const url = await getDownloadURL(ref);
-      await updateUserIcon(uid, url);
-      onUpdated?.(url);
+      const [thumbBlob, fullBlob] = await Promise.all([
+        getCroppedBlob(previewSrc, area, THUMB_SIZE, 'image/jpeg', 0.85),
+        getCroppedBlob(previewSrc, area, FULL_SIZE, 'image/jpeg', 0.9),
+      ]);
+
+      const thumbPath = `users/${uid}/icon/${THUMB_SIZE}.jpg`;
+      const fullPath = `users/${uid}/icon/${FULL_SIZE}.jpg`;
+      const [thumbRef, fullRef] = [storageRef(storage, thumbPath), storageRef(storage, fullPath)];
+
+      await Promise.all([
+        uploadBytes(thumbRef, thumbBlob, { contentType: 'image/jpeg' }),
+        uploadBytes(fullRef, fullBlob, { contentType: 'image/jpeg' }),
+      ]);
+
+      const [thumbUrl, fullUrl] = await Promise.all([
+        getDownloadURL(thumbRef),
+        getDownloadURL(fullRef),
+      ]);
+
+      await updateUserIcon(uid, thumbUrl, fullUrl);
+      onUpdated?.(thumbUrl, fullUrl);
       onClose();
     } catch (e: any) {
       setError(e.message || '保存に失敗しました');

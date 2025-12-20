@@ -138,7 +138,7 @@ export default function AlbumImageUploader({
       const prepared = await Promise.all(
         items.map(async (it) => {
           const mainBlob = await fileToCanvasBlob(it.file, 1600, 0.8);
-          const thumbBlob = await fileToCanvasBlob(it.file, 360, 0.7);
+          const thumbBlob = await fileToCanvasBlob(it.file, 512, 0.7);
           return { it, mainBlob, thumbBlob };
         })
       );

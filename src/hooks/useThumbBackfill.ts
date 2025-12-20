@@ -43,7 +43,7 @@ export function useThumbBackfill(
                   image.onload = () => {
                     try {
                       const canvas = document.createElement('canvas');
-                      const maxEdge = 360;
+                      const maxEdge = 512;
                       const scale = Math.min(1, maxEdge / Math.max(image.width, image.height));
                       canvas.width = Math.max(1, Math.round(image.width * scale));
                       canvas.height = Math.max(1, Math.round(image.height * scale));
@@ -68,7 +68,7 @@ export function useThumbBackfill(
                   im.onerror = () => reject(new Error('IMAGE_LOAD_ERROR'));
                   im.src = url;
                 });
-                const maxEdge = 360;
+                  const maxEdge = 512;
                 const scale = Math.min(1, maxEdge / Math.max(image.width, image.height));
                 const w = Math.max(1, Math.round(image.width * scale));
                 const h = Math.max(1, Math.round(image.height * scale));

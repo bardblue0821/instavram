@@ -744,7 +744,19 @@ export default function ProfilePage() {
         {error && <p className="text-xs text-red-600">{error}</p>}
       </header>
 
-      <AvatarModal open={avatarOpen} onClose={()=> setAvatarOpen(false)} uid={profile.uid} src={profile.iconURL || undefined} alt={(profile.displayName || profile.handle || 'ユーザー') + 'のアイコン'} editable={!!isMe} onUpdated={(url)=> setProfile((p:any)=> ({ ...p, iconURL: url, iconUpdatedAt: new Date() }))} />
+      <AvatarModal
+        open={avatarOpen}
+        onClose={()=> setAvatarOpen(false)}
+        uid={profile.uid}
+        src={
+          isMe
+            ? (profile.iconURL || undefined)
+            : (profile.iconFullURL || profile.iconURL || undefined)
+        }
+        alt={(profile.displayName || profile.handle || 'ユーザー') + 'のアイコン'}
+        editable={!!isMe}
+        onUpdated={(thumbUrl, fullUrl)=> setProfile((p:any)=> ({ ...p, iconURL: thumbUrl, iconFullURL: fullUrl, iconUpdatedAt: new Date() }))}
+      />
 
       {isMe && (
         <section className="space-y-2 pt-4 border-base">
