@@ -179,6 +179,14 @@ export default function ProfilePage() {
       .replaceAll("'", '&#39;');
   }
 
+  function toHalfWidthAscii(text: string): string {
+    // 全角英数記号(！〜)と全角スペースを半角へ。
+    // それ以外の文字はそのまま（IMEで全角英数になったケースを主に想定）。
+    return String(text)
+      .replace(/\u3000/g, ' ')
+      .replace(/[\uFF01-\uFF5E]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+  }
+
   function toDate(value: any): Date | null {
     if (!value) return null;
     if (value instanceof Date) return value;
@@ -939,7 +947,18 @@ export default function ProfilePage() {
             {canReauthWithPassword && (
               <div>
                 <label className="block text-xs fg-muted mb-1">パスワード（再認証）</label>
-                <input type="password" value={pw} onChange={e=> setPw(e.target.value)} className="w-full border-b-2 border-[--accent] bg-transparent p-1 text-sm focus:outline-none" placeholder="現在のパスワード" />
+                <input
+                  type="password"
+                  value={pw}
+                  onChange={(e) => setPw(toHalfWidthAscii(e.target.value))}
+                  inputMode="text"
+                  lang="en"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className="w-full border-b-2 border-[--accent] bg-transparent p-1 text-sm focus:outline-none"
+                  placeholder="現在のパスワード"
+                />
               </div>
             )}
             {deleting && (<p className="text-xs fg-muted">処理中: {deleteStep || '...'}</p>)}
