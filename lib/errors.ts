@@ -8,6 +8,14 @@ const messages: Record<string, string> = {
   SELF_FRIEND: '自分自身をフレンドにはできません',
   REQUEST_NOT_FOUND: 'フレンド申請が見つかりません',
   SELF_WATCH: '自分自身をウォッチする必要はありません',
+
+  // Firebase Auth
+  'auth/invalid-credential': '認証に失敗しました（パスワードが違うか、再ログインが必要です）',
+  'auth/wrong-password': 'パスワードが違います',
+  'auth/user-mismatch': '別のアカウントでログインしている可能性があります。再ログインしてください。',
+  'auth/requires-recent-login': '安全のため再ログインが必要です。一度ログアウトしてログインし直してください。',
+  MISSING_PASSWORD: 'パスワードを入力してください',
+  MISSING_EMAIL: 'メールアドレスが取得できません。再ログインしてください。',
 };
 
 export function translateError(e: unknown): string {

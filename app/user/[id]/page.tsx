@@ -88,7 +88,18 @@ export default function ProfilePage() {
   const [deleteStep, setDeleteStep] = useState<string>('');
   const [pw, setPw] = useState('');
   const { show } = useToast();
-  const authProvider = useMemo(() => (user?.providerData?.[0]?.providerId || 'password'), [user?.uid]);
+  const providerIds = useMemo(() => (user?.providerData || []).map(p => p.providerId).filter(Boolean), [user]);
+  const canReauthWithPassword = useMemo(() => {
+    // providerData が空のケース（匿名など）で誤って password 扱いしない
+    if (!user) return false;
+    if (user.isAnonymous) return false;
+    return providerIds.includes('password') && !!user.email;
+  }, [user, providerIds]);
+  const canReauthWithGoogle = useMemo(() => {
+    if (!user) return false;
+    if (user.isAnonymous) return false;
+    return providerIds.includes('google.com');
+  }, [user, providerIds]);
   const [avatarOpen, setAvatarOpen] = useState(false);
 
   // Load profile and social flags
@@ -563,13 +574,19 @@ export default function ProfilePage() {
     try {
       setDeleting(true);
       setDeleteStep('再認証中...');
-      if (authProvider === 'password') {
-        const email = user.email || '';
+
+      // プロバイダに応じて再認証（必要なときだけ）
+      if (canReauthWithPassword) {
+        if (!pw) throw new Error('MISSING_PASSWORD');
+        const email = user.email;
+        if (!email) throw new Error('MISSING_EMAIL');
         const cred = EmailAuthProvider.credential(email, pw);
         await reauthenticateWithCredential(user, cred);
-      } else if (authProvider === 'google.com') {
-        try { const provider = new GoogleAuthProvider(); await reauthenticateWithPopup(user, provider); } catch {}
+      } else if (canReauthWithGoogle) {
+        const provider = new GoogleAuthProvider();
+        await reauthenticateWithPopup(user, provider);
       }
+
       setDeleteStep('データ削除中...');
       await deleteAccountData(user.uid, (step) => setDeleteStep(`データ削除中: ${step}`));
       setDeleteStep('アカウント削除中...');
@@ -919,7 +936,7 @@ export default function ProfilePage() {
               <input type="checkbox" checked={agreeDelete} onChange={e=> setAgreeDelete(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
               理解しました
             </label>
-            {authProvider === 'password' && (
+            {canReauthWithPassword && (
               <div>
                 <label className="block text-xs fg-muted mb-1">パスワード（再認証）</label>
                 <input type="password" value={pw} onChange={e=> setPw(e.target.value)} className="w-full border-b-2 border-[--accent] bg-transparent p-1 text-sm focus:outline-none" placeholder="現在のパスワード" />
@@ -928,10 +945,15 @@ export default function ProfilePage() {
             {deleting && (<p className="text-xs fg-muted">処理中: {deleteStep || '...'}</p>)}
             <div className="flex justify-end gap-2">
               <button type="button" className="px-3 py-2 text-sm rounded border border-base hover-surface-alt" disabled={deleting} onClick={()=> setShowDeleteAccount(false)}>キャンセル</button>
-              {authProvider === 'google.com' && (
+              {canReauthWithGoogle && (
                 <button type="button" className="px-3 py-2 text-sm rounded border border-base fg-muted hover-surface-alt" disabled={deleting} onClick={reauthGoogle}>Googleで再認証</button>
               )}
-              <button type="button" className="px-3 py-2 text-sm rounded bg-red-600 text-white disabled:opacity-50" disabled={!agreeDelete || deleting || (authProvider==='password' && !pw)} onClick={doDeleteAccount}>削除</button>
+              <button
+                type="button"
+                className="px-3 py-2 text-sm rounded bg-red-600 text-white disabled:opacity-50"
+                disabled={!agreeDelete || deleting || (canReauthWithPassword && !pw)}
+                onClick={doDeleteAccount}
+              >削除</button>
             </div>
           </div>
         </div>
