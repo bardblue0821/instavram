@@ -15,13 +15,23 @@ export async function getCroppedBlob(
   mime: 'image/jpeg' | 'image/webp' = 'image/jpeg',
   quality = 0.9,
 ): Promise<Blob> {
+  return getCroppedBlobSized(imageSrc, cropAreaPixels, { width: outputSize, height: outputSize }, mime, quality);
+}
+
+export async function getCroppedBlobSized(
+  imageSrc: string,
+  cropAreaPixels: { x: number; y: number; width: number; height: number },
+  output: { width: number; height: number },
+  mime: 'image/jpeg' | 'image/webp' = 'image/jpeg',
+  quality = 0.9,
+): Promise<Blob> {
   const image = await loadImage(imageSrc);
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas not supported');
 
-  canvas.width = outputSize;
-  canvas.height = outputSize;
+  canvas.width = output.width;
+  canvas.height = output.height;
 
   const scaleX = image.naturalWidth / image.width;
   const scaleY = image.naturalHeight / image.height;
@@ -35,7 +45,7 @@ export async function getCroppedBlob(
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(image, sx, sy, sWidth, sHeight, 0, 0, outputSize, outputSize);
+  ctx.drawImage(image, sx, sy, sWidth, sHeight, 0, 0, output.width, output.height);
 
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {

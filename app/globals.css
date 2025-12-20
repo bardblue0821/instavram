@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "react-image-crop/dist/ReactCrop.css";
 /* lightGallery core and optional plugins */
 @import "lightgallery/css/lightgallery.css";
 @import "lightgallery/css/lg-zoom.css";

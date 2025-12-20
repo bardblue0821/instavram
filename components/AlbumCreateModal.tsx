@@ -1,11 +1,13 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAuthUser } from '../lib/hooks/useAuthUser';
 import { createAlbumWithImages, AlbumCreateProgress } from '../lib/services/createAlbumWithImages';
 import { useRouter } from 'next/navigation';
 import { translateError } from '../lib/errors';
 import { Paper, Stack, Group, Text, Image as MantineImage, Button, Progress } from '@mantine/core';
 import { Dropzone, IMAGE_MIME_TYPE } from '@mantine/dropzone';
+import AlbumImageCropper from './upload/AlbumImageCropper';
+import { getCroppedBlobSized } from '../lib/services/avatar';
 
 interface Props { onCreated?: (albumId: string) => void }
 
@@ -17,15 +19,25 @@ export default function AlbumCreateModal({ onCreated }: Props) {
   const [comment, setComment] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<{ file: File; url: string }[]>([]);
+  const [croppedPreviews, setCroppedPreviews] = useState<({ file: File; url: string } | null)[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<number>(0);
   const [fileProgress, setFileProgress] = useState<AlbumCreateProgress[]>([]);
   const [loading, setLoading] = useState(false);
+  const [cropIndex, setCropIndex] = useState<number | null>(null);
+  const [cropping, setCropping] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+
+  const previewsRef = useRef(previews);
+  const croppedPreviewsRef = useRef(croppedPreviews);
+  useEffect(() => { previewsRef.current = previews; }, [previews]);
+  useEffect(() => { croppedPreviewsRef.current = croppedPreviews; }, [croppedPreviews]);
 
   // 選択クリア時に Object URL を開放
   useEffect(() => {
     return () => {
-      previews.forEach((p) => URL.revokeObjectURL(p.url));
+      previewsRef.current.forEach((p) => URL.revokeObjectURL(p.url));
+      croppedPreviewsRef.current.forEach((p) => p && URL.revokeObjectURL(p.url));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -40,23 +52,79 @@ export default function AlbumCreateModal({ onCreated }: Props) {
     }
     // 既存のプレビューを解放
     previews.forEach((p) => URL.revokeObjectURL(p.url));
+    croppedPreviews.forEach((p) => p && URL.revokeObjectURL(p.url));
     const nextPreviews = accepted.map((f) => ({ file: f, url: URL.createObjectURL(f) }));
     setPreviews(nextPreviews);
+    setCroppedPreviews(new Array(nextPreviews.length).fill(null));
     setFiles(accepted);
   }
 
   function removeOne(target: File) {
+    const idx = previews.findIndex((p) => p.file === target);
     const next = previews.filter((p) => p.file !== target);
-    const removed = previews.find((p) => p.file === target);
+    const removed = idx >= 0 ? previews[idx] : undefined;
     if (removed) URL.revokeObjectURL(removed.url);
+    if (idx >= 0 && croppedPreviews[idx]) URL.revokeObjectURL(croppedPreviews[idx]!.url);
     setPreviews(next);
+    setCroppedPreviews((prev) => prev.filter((_, i) => i !== idx));
     setFiles(next.map((p) => p.file));
   }
 
   function clearAll() {
     previews.forEach((p) => URL.revokeObjectURL(p.url));
+    croppedPreviews.forEach((p) => p && URL.revokeObjectURL(p.url));
     setPreviews([]);
+    setCroppedPreviews([]);
     setFiles([]);
+  }
+
+  async function applyCrop(
+    idx: number,
+    area: { x: number; y: number; width: number; height: number },
+    aspect: 'square' | 'rect'
+  ) {
+    const p = previews[idx];
+    if (!p) return;
+
+    setCropping(true);
+    try {
+      // 最小要件: 正方形(1:1) / 長方形(4:3)
+      const output = aspect === 'square' ? { width: 1024, height: 1024 } : { width: 1280, height: 960 };
+      // 再編集でも必ず元画像から切り抜けるよう、cropSrc（元File由来）を優先
+      const blob = await getCroppedBlobSized(cropSrc ?? p.url, area, output, 'image/jpeg', 0.9);
+      const nextFile = new File([blob], p.file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+      const nextUrl = URL.createObjectURL(nextFile);
+
+      setCroppedPreviews((prev) => {
+        const copy = [...prev];
+        if (copy[idx]) URL.revokeObjectURL(copy[idx]!.url);
+        copy[idx] = { file: nextFile, url: nextUrl };
+        return copy;
+      });
+    } catch (e: any) {
+      setError(e?.message || '切り抜きに失敗しました');
+    } finally {
+      setCropping(false);
+      setCropIndex(null);
+      if (cropSrc) URL.revokeObjectURL(cropSrc);
+      setCropSrc(null);
+    }
+  }
+
+  function openCrop(idx: number) {
+    if (loading) return;
+    const f = files[idx];
+    if (!f) return;
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(URL.createObjectURL(f));
+    setCropIndex(idx);
+  }
+
+  function closeCrop() {
+    if (cropping) return;
+    setCropIndex(null);
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
   }
 
   function fmtBytes(n: number) {
@@ -71,20 +139,21 @@ export default function AlbumCreateModal({ onCreated }: Props) {
       setError('ログインが必要です');
       return;
     }
-    if (files.length > 4) {
+    if (previews.length > 4) {
       setError('画像は最大4枚までです');
       return;
     }
+    const uploadFiles = previews.map((p, idx) => croppedPreviews[idx]?.file ?? p.file);
     setError(null);
     setLoading(true);
     setProgress(0);
     try {
       // 逐次進捗: files.length が0ならそのまま
-      console.log('[AlbumCreateModal] submit start', { uid: user.uid, files: files.map(f=>({name:f.name,size:f.size})) });
+      console.log('[AlbumCreateModal] submit start', { uid: user.uid, files: uploadFiles.map(f=>({name:f.name,size:f.size})) });
       const albumId = await createAlbumWithImages(
         user.uid,
         { title: title || undefined, placeUrl: placeUrl || undefined, firstComment: comment || undefined },
-        files,
+        uploadFiles,
         (p) => {
           setProgress(p.overallPercent);
           setFileProgress(prev => {
@@ -156,32 +225,74 @@ export default function AlbumCreateModal({ onCreated }: Props) {
                 disabled={loading || !user}
                 multiple
                 maxSize={5 * 1024 * 1024}
+                className="rounded-md border-2 border-dashed border-base hover:border-(--accent) hover-surface-alt transition-colors cursor-pointer py-12"
               >
-                <Group justify="center" mih={120} className="text-center">
-                  <div>
-                    <Text fw={600}>ここにドラッグ＆ドロップ、またはクリックして選択</Text>
-                    <Text size="xs" c="dimmed">PNG / JPEG / GIF、1ファイル最大 5MB（最大 4 件）</Text>
-                  </div>
+                <Group justify="center" mih={140} className="text-center px-2">
+                  <Dropzone.Accept>
+                    <div>
+                      <Text fw={700}>ここにドロップして追加</Text>
+                      <Text size="xs" c="dimmed">最大 4 枚 / 1枚 5MB まで</Text>
+                    </div>
+                  </Dropzone.Accept>
+                  <Dropzone.Reject>
+                    <div>
+                      <Text fw={700} c="red">このファイルは追加できません</Text>
+                      <Text size="xs" c="dimmed">画像のみ（PNG / JPEG / GIF）・1枚 5MB まで</Text>
+                    </div>
+                  </Dropzone.Reject>
+                  <Dropzone.Idle>
+                    <div>
+                      <Text fw={700}>画像をここにドラッグ＆ドロップ</Text>
+                      <Text size="xs" c="dimmed">またはクリックして選択（最大 4 枚 / 1枚 5MB）</Text>
+                    </div>
+                  </Dropzone.Idle>
                 </Group>
               </Dropzone>
 
               {previews.length > 0 && (
                 <Stack gap="xs" mt="sm">
-                  {previews.map((p) => (
-                    <Group key={p.url} justify="space-between" align="center">
-                      <Group>
-                        <MantineImage src={p.url} alt={p.file.name} radius="sm" fit="cover" style={{ height: 80, width: 80, objectFit: 'cover' }} />
-                        <div>
-                          <Text size="sm" fw={500}>{p.file.name}</Text>
-                          <Text size="xs" c="dimmed">{fmtBytes(p.file.size)}</Text>
-                        </div>
-                      </Group>
-                      <Button size="xs" variant="default" onClick={() => removeOne(p.file)} disabled={loading}>削除</Button>
-                    </Group>
-                  ))}
-                  <Group justify="end">
-                    <Button size="sm" variant="default" onClick={clearAll} disabled={loading}>クリア</Button>
+                  <Group justify="space-between" align="center">
+                    <Text size="xs" c="dimmed">選択中: {previews.length} / 4</Text>
+                    <Button type="button" size="xs" variant="default" onClick={clearAll} disabled={loading} className="cursor-pointer disabled:cursor-not-allowed">すべて外す</Button>
                   </Group>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {previews.map((p, idx) => (
+                      <div key={p.url} className="relative rounded-md border border-base surface-alt p-2">
+                        <button
+                          type="button"
+                          aria-label={`${p.file.name} を削除`}
+                          className="absolute top-2 right-2 w-7 h-7 rounded-full bg-red-600 text-white text-lg leading-none flex items-center justify-center hover:bg-red-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          onClick={(e) => { e.stopPropagation(); removeOne(p.file); }}
+                          disabled={loading}
+                        >
+                          ×
+                        </button>
+
+                        <div
+                          className="cursor-pointer"
+                          onClick={() => openCrop(idx)}
+                          role="button"
+                          aria-label={`${p.file.name} を切り抜く`}
+                        >
+                          <MantineImage
+                            src={croppedPreviews[idx]?.url ?? p.url}
+                            alt={p.file.name}
+                            radius="sm"
+                            fit="cover"
+                            className="overflow-hidden"
+                            style={{ height: 120, width: '100%', objectFit: 'cover' }}
+                          />
+                        </div>
+                        <div className="mt-2 min-w-0">
+                          <Text size="xs" fw={600} className="truncate">
+                            {p.file.name}
+                          </Text>
+                          <Text size="xs" c="dimmed">{fmtBytes((croppedPreviews[idx]?.file ?? p.file).size)}</Text>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </Stack>
               )}
             </Stack>
@@ -209,6 +320,35 @@ export default function AlbumCreateModal({ onCreated }: Props) {
           disabled={loading || !user}
         >{loading ? '処理中...' : '作成'}</button>
       </form>
+
+      {cropIndex !== null && previews[cropIndex] && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={closeCrop}
+        >
+          <div
+            className="surface-alt border border-base rounded shadow-lg w-[min(96vw,720px)] p-4 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="absolute top-2 right-2 fg-muted hover-surface-alt rounded px-2 py-1 cursor-pointer disabled:cursor-not-allowed"
+              onClick={closeCrop}
+              aria-label="閉じる"
+              disabled={cropping}
+            >
+              ✕
+            </button>
+            <h2 className="text-sm font-semibold mb-3">画像を切り抜く</h2>
+            <AlbumImageCropper
+              src={cropSrc ?? previews[cropIndex].url}
+              onCancel={closeCrop}
+              onConfirm={(area, _zoom, aspect) => applyCrop(cropIndex, area, aspect)}
+            />
+            {cropping && <p className="text-xs fg-muted mt-2">切り抜き中...</p>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
