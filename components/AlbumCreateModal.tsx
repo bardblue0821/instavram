@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { translateError } from '../lib/errors';
 import { Paper, Stack, Group, Text, Image as MantineImage, Button, Progress } from '@mantine/core';
 import { Dropzone, IMAGE_MIME_TYPE } from '@mantine/dropzone';
+import { notifications } from '@mantine/notifications';
 import AlbumImageCropper from './upload/AlbumImageCropper';
 import { getCroppedBlobSized } from '../lib/services/avatar';
 
@@ -57,6 +58,27 @@ export default function AlbumCreateModal({ onCreated }: Props) {
     setPreviews(nextPreviews);
     setCroppedPreviews(new Array(nextPreviews.length).fill(null));
     setFiles(accepted);
+  }
+
+  function handleReject(fileRejections: any[]) {
+    // maxSize 超過などで onDrop に来ない場合も、理由を伝える
+    const rejected = Array.isArray(fileRejections) ? fileRejections : [];
+    const tooLarge = rejected
+      .map((r) => r?.file as File | undefined)
+      .filter((f): f is File => !!f)
+      .filter((f) => f.size > 5 * 1024 * 1024);
+
+    if (tooLarge.length > 0) {
+      const names = tooLarge.slice(0, 3).map((f) => f.name).join('、');
+      const more = tooLarge.length > 3 ? ` ほか${tooLarge.length - 3}件` : '';
+      const msg = `サイズ上限 5MB を超えています: ${names}${more}`;
+      setError(msg);
+      notifications.show({ color: 'red', message: msg });
+    } else if (rejected.length > 0) {
+      const msg = '追加できないファイルがあります（画像のみ / 1枚 5MB まで）';
+      setError(msg);
+      notifications.show({ color: 'red', message: msg });
+    }
   }
 
   function removeOne(target: File) {
@@ -221,6 +243,7 @@ export default function AlbumCreateModal({ onCreated }: Props) {
             <Stack gap="xs">
               <Dropzone
                 onDrop={handleDrop}
+                onReject={handleReject}
                 accept={IMAGE_MIME_TYPE}
                 disabled={loading || !user}
                 multiple

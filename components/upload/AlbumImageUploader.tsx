@@ -1,17 +1,20 @@
 "use client";
-"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Group, Button, Progress, Text, Stack, Paper, Image as MantineImage } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { notifications } from "@mantine/notifications";
 import { storage } from "@/lib/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { addImage, canUploadMoreImages } from "@/lib/repos/imageRepo";
+import AlbumImageCropper from "./AlbumImageCropper";
+import { getCroppedBlobSized } from "@/lib/services/avatar";
 
 type ItemState = {
   file: File;
   previewUrl: string;
+  croppedFile?: File;
+  croppedPreviewUrl?: string;
   uploading: boolean;
   progress: number; // 0-100
   error?: string;
@@ -31,13 +34,55 @@ export default function AlbumImageUploader({
   const [busy, setBusy] = useState(false);
   const [items, setItems] = useState<ItemState[]>([]);
   const [overall, setOverall] = useState(0);
+  const [cropIndex, setCropIndex] = useState<number | null>(null);
+  const [cropping, setCropping] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+
+  const itemsRef = useRef<ItemState[]>([]);
+  const cropSrcRef = useRef<string | null>(null);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+  useEffect(() => {
+    cropSrcRef.current = cropSrc;
+  }, [cropSrc]);
 
   function clearSelection() {
     setItems((prev) => {
-      prev.forEach((it) => URL.revokeObjectURL(it.previewUrl));
+      prev.forEach((it) => {
+        URL.revokeObjectURL(it.previewUrl);
+        if (it.croppedPreviewUrl) URL.revokeObjectURL(it.croppedPreviewUrl);
+      });
       return [];
     });
     setOverall(0);
+
+    setCropIndex(null);
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
+  }
+
+  function removeOne(idx: number) {
+    if (busy) return;
+
+    setItems((prev) => {
+      const target = prev[idx];
+      if (!target) return prev;
+
+      URL.revokeObjectURL(target.previewUrl);
+      if (target.croppedPreviewUrl) URL.revokeObjectURL(target.croppedPreviewUrl);
+
+      const next = prev.filter((_, i) => i !== idx);
+      return next;
+    });
+
+    // cropIndex の整合性を維持
+    setCropIndex((cur) => {
+      if (cur === null) return null;
+      if (cur === idx) return null;
+      if (cur > idx) return cur - 1;
+      return cur;
+    });
   }
 
   function handleDrop(files: File[]) {
@@ -67,12 +112,83 @@ export default function AlbumImageUploader({
     setItems(next);
   }
 
+  function handleReject(fileRejections: any[]) {
+    // Dropzone の maxSize 超過など、onDrop に来ないケースでもユーザーに伝える
+    const rejected = Array.isArray(fileRejections) ? fileRejections : [];
+    const tooLarge = rejected
+      .map((r) => r?.file as File | undefined)
+      .filter((f): f is File => !!f)
+      .filter((f) => f.size > 5 * 1024 * 1024);
+
+    if (tooLarge.length > 0) {
+      const names = tooLarge.slice(0, 3).map((f) => f.name).join("、");
+      const more = tooLarge.length > 3 ? ` ほか${tooLarge.length - 3}件` : "";
+      notifications.show({ color: "red", message: `サイズ上限 5MB を超えています: ${names}${more}` });
+    } else if (rejected.length > 0) {
+      notifications.show({ color: "red", message: "追加できないファイルがあります（画像のみ / 1枚 5MB まで）" });
+    }
+  }
+
   useEffect(() => {
     return () => {
-      items.forEach((it) => URL.revokeObjectURL(it.previewUrl));
+      itemsRef.current.forEach((it) => {
+        URL.revokeObjectURL(it.previewUrl);
+        if (it.croppedPreviewUrl) URL.revokeObjectURL(it.croppedPreviewUrl);
+      });
+      if (cropSrcRef.current) URL.revokeObjectURL(cropSrcRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function openCrop(idx: number) {
+    if (busy) return;
+    const it = items[idx];
+    if (!it) return;
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(URL.createObjectURL(it.file));
+    setCropIndex(idx);
+  }
+
+  function closeCrop() {
+    if (cropping) return;
+    setCropIndex(null);
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
+  }
+
+  async function applyCrop(
+    idx: number,
+    area: { x: number; y: number; width: number; height: number },
+    aspect: "square" | "rect"
+  ) {
+    const it = items[idx];
+    if (!it) return;
+
+    setCropping(true);
+    try {
+      const output = aspect === "square" ? { width: 1024, height: 1024 } : { width: 1280, height: 960 };
+      const blob = await getCroppedBlobSized(cropSrc ?? it.previewUrl, area, output, "image/jpeg", 0.9);
+      const nextFile = new File([blob], it.file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+      const nextUrl = URL.createObjectURL(nextFile);
+
+      setItems((prev) =>
+        prev.map((x, i) => {
+          if (i !== idx) return x;
+          if (x.croppedPreviewUrl) URL.revokeObjectURL(x.croppedPreviewUrl);
+          return { ...x, croppedFile: nextFile, croppedPreviewUrl: nextUrl };
+        })
+      );
+    } catch (e: any) {
+      const msg = e?.message || "切り抜きに失敗しました";
+      notifications.show({ color: "red", message: msg });
+      setItems((prev) => prev.map((x, i) => (i === idx ? { ...x, error: msg } : x)));
+    } finally {
+      setCropping(false);
+      setCropIndex(null);
+      if (cropSrc) URL.revokeObjectURL(cropSrc);
+      setCropSrc(null);
+    }
+  }
 
   async function fileToCanvasBlob(file: File, maxEdge: number, quality = 0.8): Promise<Blob> {
     const imgUrl = URL.createObjectURL(file);
@@ -137,8 +253,9 @@ export default function AlbumImageUploader({
 
       const prepared = await Promise.all(
         items.map(async (it) => {
-          const mainBlob = await fileToCanvasBlob(it.file, 1600, 0.8);
-          const thumbBlob = await fileToCanvasBlob(it.file, 512, 0.7);
+          const srcFile = it.croppedFile ?? it.file;
+          const mainBlob = await fileToCanvasBlob(srcFile, 1600, 0.8);
+          const thumbBlob = await fileToCanvasBlob(srcFile, 512, 0.7);
           return { it, mainBlob, thumbBlob };
         })
       );
@@ -224,66 +341,156 @@ export default function AlbumImageUploader({
   }
 
   return (
-    <Paper withBorder p="md" radius="md" className="surface">
-      <Stack gap="xs">
-        <Text size="sm" c="dimmed">
-          画像追加（残り {remaining} 枚）
-        </Text>
-        <Dropzone onDrop={handleDrop} accept={IMAGE_MIME_TYPE} disabled={busy || remaining <= 0} multiple maxSize={5 * 1024 * 1024}>
-          <Group justify="center" mih={120} className="text-center">
-            <div>
-              <Text fw={600}>ここにドラッグ＆ドロップ、またはクリックして選択</Text>
-              <Text size="xs" c="dimmed">
-                PNG / JPEG / GIF、1ファイル最大 5MB（最大 {remaining} 件）
-              </Text>
-            </div>
-          </Group>
-        </Dropzone>
+    <>
+      <Paper withBorder p="md" radius="md" className="surface">
+        <Stack gap="xs">
+          
+          <Dropzone
+            onDrop={handleDrop}
+            onReject={handleReject}
+            accept={IMAGE_MIME_TYPE}
+            disabled={busy || remaining <= 0}
+            multiple
+            maxSize={5 * 1024 * 1024}
+            className="rounded-md border-2 border-dashed border-base hover:border-(--accent) hover-surface-alt transition-colors cursor-pointer py-10"
+          >
+            <Group justify="center" mih={120} className="text-center px-2">
+              <Dropzone.Accept>
+                <div>
+                  <Text fw={700}>ここにドロップして追加</Text>
+                  <Text size="xs" c="dimmed">最大 {remaining} 件 / 1枚 5MB まで</Text>
+                </div>
+              </Dropzone.Accept>
+              <Dropzone.Reject>
+                <div>
+                  <Text fw={700} c="red">このファイルは追加できません</Text>
+                  <Text size="xs" c="dimmed">画像のみ（PNG / JPEG / GIF）・1枚 5MB まで</Text>
+                </div>
+              </Dropzone.Reject>
+              <Dropzone.Idle>
+                <div>
+                  <Text fw={700}>画像をここにドラッグ＆ドロップ</Text>
+                  <Text size="xs" c="dimmed">またはクリックして選択（最大 {remaining} 件 / 1枚 5MB）</Text>
+                </div>
+              </Dropzone.Idle>
+            </Group>
+          </Dropzone>
 
-        {items.length > 0 && (
-          <Stack gap="xs" mt="sm">
-            {items.map((it) => (
-              <Group key={it.previewUrl} justify="space-between" align="center">
-                <Group>
-                  <MantineImage src={it.previewUrl} alt={it.file.name} radius="sm" fit="cover" style={{ height: 80, width: 80, objectFit: "cover" }} />
-                  <div>
-                    <Text size="sm" fw={500}>
-                      {it.file.name}
-                    </Text>
-                    <Text size="xs" c="dimmed">
-                      {fmtBytes(it.file.size)}
-                    </Text>
-                    {it.error && (
-                      <Text size="xs" c="red">
-                        {it.error}
+          {items.length > 0 && (
+            <Stack gap="xs" mt="sm">
+              <Group justify="space-between" align="center">
+                <Text size="xs" c="dimmed">
+                  選択中: {items.length} / {Math.max(0, remaining)}
+                </Text>
+                <Button variant="default" size="xs" onClick={clearSelection} disabled={busy}>
+                  すべて外す
+                </Button>
+              </Group>
+
+              <div className="grid grid-cols-2 gap-2">
+                {items.map((it, idx) => (
+                  <div key={it.previewUrl} className="relative rounded-md border border-base surface-alt p-2">
+                    <button
+                      type="button"
+                      aria-label={`${it.file.name} を削除`}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-red-600 text-white text-lg leading-none flex items-center justify-center hover:bg-red-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeOne(idx);
+                      }}
+                      disabled={busy}
+                    >
+                      ×
+                    </button>
+
+                    <div
+                      className="cursor-pointer"
+                      onClick={() => openCrop(idx)}
+                      role="button"
+                      aria-label={`${it.file.name} を切り抜く`}
+                    >
+                      <MantineImage
+                        src={it.croppedPreviewUrl ?? it.previewUrl}
+                        alt={it.file.name}
+                        radius="sm"
+                        fit="cover"
+                        className="overflow-hidden"
+                        style={{ height: 120, width: "100%", objectFit: "cover" }}
+                      />
+                    </div>
+
+                    <div className="mt-2 min-w-0">
+                      <Text size="xs" fw={600} className="truncate">
+                        {it.file.name}
                       </Text>
+                      <Text size="xs" c="dimmed">
+                        {fmtBytes((it.croppedFile ?? it.file).size)}
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        クリックで切り抜き
+                      </Text>
+                      {it.error && (
+                        <Text size="xs" c="red">
+                          {it.error}
+                        </Text>
+                      )}
+                    </div>
+
+                    {(it.uploading || it.progress > 0) && (
+                      <div className="mt-2">
+                        <Progress value={it.progress} color={it.error ? "red" : "teal"} animated={!it.error && it.uploading} />
+                      </div>
                     )}
                   </div>
-                </Group>
-                <div style={{ minWidth: 180 }}>
-                  <Progress value={it.progress} color={it.error ? "red" : "teal"} animated={!it.error && it.uploading} />
+                ))}
+              </div>
+
+              <Group justify="space-between" align="center">
+                <Text size="sm" c="dimmed">
+                  全体進捗
+                </Text>
+                <div style={{ minWidth: 220 }}>
+                  <Progress value={overall} color="teal" animated={busy} />
                 </div>
               </Group>
-            ))}
-            <Group justify="space-between" align="center">
-              <Text size="sm" c="dimmed">
-                全体進捗
-              </Text>
-              <div style={{ minWidth: 220 }}>
-                <Progress value={overall} color="teal" animated={busy} />
-              </div>
-            </Group>
-            <Group justify="end">
-              <Button variant="default" size="sm" onClick={clearSelection} disabled={busy}>
-                クリア
-              </Button>
-              <Button size="sm" onClick={handleUploadAll} loading={busy} disabled={items.length === 0 || remaining <= 0}>
-                まとめてアップロード
-              </Button>
-            </Group>
-          </Stack>
-        )}
-      </Stack>
-    </Paper>
+              <Group justify="end">
+                <Button size="sm" color="teal" onClick={handleUploadAll} loading={busy} disabled={items.length === 0 || remaining <= 0}>
+                  まとめてアップロード
+                </Button>
+              </Group>
+            </Stack>
+          )}
+        </Stack>
+      </Paper>
+
+      {cropIndex !== null && items[cropIndex] && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={closeCrop}
+        >
+          <div
+            className="surface-alt border border-base rounded shadow-lg w-[min(96vw,720px)] p-4 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="absolute top-2 right-2 fg-muted hover-surface-alt rounded px-2 py-1 cursor-pointer disabled:cursor-not-allowed"
+              onClick={closeCrop}
+              aria-label="閉じる"
+              disabled={cropping}
+            >
+              ✕
+            </button>
+            <h2 className="text-sm font-semibold mb-3">画像を切り抜く</h2>
+            <AlbumImageCropper
+              src={cropSrc ?? items[cropIndex].previewUrl}
+              onCancel={closeCrop}
+              onConfirm={(area, _zoom, aspect) => applyCrop(cropIndex, area, aspect)}
+            />
+            {cropping && <p className="text-xs fg-muted mt-2">切り抜き中...</p>}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
