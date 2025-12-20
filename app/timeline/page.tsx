@@ -411,6 +411,7 @@ export default function TimelinePage() {
               reactions={row.reactions}
               onToggleReaction={(emoji) => handleToggleReaction(row.album.id, emoji)}
               owner={row.owner ?? undefined}
+              imageAdded={row.imageAdded}
             />
           ))}
         </div>

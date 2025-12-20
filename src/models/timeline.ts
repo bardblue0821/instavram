@@ -20,6 +20,12 @@ export type CommentPreviewVM = {
   createdAt?: any;
 };
 
+export type ImageAddedVM = {
+  userId: string;
+  user?: UserRef;
+  createdAt?: any;
+};
+
 export type TimelineItemVM = {
   album: AlbumVM;
   images: ImgVM[];
@@ -30,4 +36,5 @@ export type TimelineItemVM = {
   commentsPreview?: CommentPreviewVM[];
   reactions: ReactionVM[];
   owner?: UserRef | null;
+  imageAdded?: ImageAddedVM;
 };

@@ -15,6 +15,12 @@ type CommentPreview = {
   createdAt?: any;
 };
 
+type ImageAdded = {
+  userId: string;
+  user?: { uid: string; handle: string | null; iconURL?: string | null; displayName?: string };
+  createdAt?: any;
+};
+
 export function TimelineItem(props: {
   album: { id: string; ownerId: string; title?: string | null; createdAt?: any };
   images: Img[];
@@ -32,6 +38,7 @@ export function TimelineItem(props: {
   reactions?: Array<{ emoji: string; count: number; mine: boolean }>;
   onToggleReaction?: (emoji: string) => void;
   owner?: { uid: string; handle: string | null; iconURL?: string | null; displayName?: string };
+  imageAdded?: ImageAdded;
 }) {
   const {
     album,
@@ -50,6 +57,7 @@ export function TimelineItem(props: {
     reactions = [],
     onToggleReaction,
     owner,
+    imageAdded,
   } = props;
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -213,9 +221,46 @@ export function TimelineItem(props: {
     );
   }
 
+  function toDate(value: any): Date | null {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value?.toDate === 'function') return value.toDate();
+    if (typeof value === 'object' && typeof value.seconds === 'number') return new Date(value.seconds * 1000);
+    if (typeof value === 'number') return new Date(value > 1e12 ? value : value * 1000);
+    return null;
+  }
+
+  function fmtDateTime(dt: Date | null): string {
+    if (!dt) return '';
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const d = String(dt.getDate()).padStart(2, '0');
+    const hh = String(dt.getHours()).padStart(2, '0');
+    const mm = String(dt.getMinutes()).padStart(2, '0');
+    return `${y}/${m}/${d} ${hh}:${mm}`;
+  }
+
   return (
     <article className="py-4 space-y-3">
       <header className="space-y-2">
+        {imageAdded?.userId && (
+          <div className="flex items-center gap-2">
+            <a href={`/user/${imageAdded.user?.handle || imageAdded.userId}`} className="shrink-0" aria-label="追加者のプロフィールへ">
+              <Avatar src={imageAdded.user?.iconURL || undefined} size={28} interactive={false} withBorder={false} className="rounded-full" />
+            </a>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-sm truncate">
+                  <span className="font-medium">{imageAdded.user?.displayName || (imageAdded.user?.handle ? `@${imageAdded.user.handle}` : imageAdded.userId.slice(0, 6))}</span>
+                  <span className="fg-subtle"> さんが画像を追加しました</span>
+                </span>
+                {fmtDateTime(toDate(imageAdded.createdAt)) && (
+                  <span className="text-xs fg-subtle shrink-0">{fmtDateTime(toDate(imageAdded.createdAt))}</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         <div className="flex items-center gap-3">
           <a href={`/user/${owner?.handle || album.ownerId}`} className="shrink-0" aria-label="プロフィールへ">
             <Avatar src={owner?.iconURL || undefined} size={48} interactive={false} withBorder={false} className="rounded-full" />

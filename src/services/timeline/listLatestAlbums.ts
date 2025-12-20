@@ -8,6 +8,15 @@ import { listComments } from "@/lib/repos/commentRepo";
 import { countLikes, hasLiked } from "@/lib/repos/likeRepo";
 import { listReactionsByAlbum } from "@/lib/repos/reactionRepo";
 
+function toMillis(v: any): number | null {
+  if (!v) return null;
+  if (v instanceof Date) return v.getTime();
+  if (typeof v?.toDate === 'function') return v.toDate().getTime();
+  if (typeof v === 'object' && typeof v.seconds === 'number') return v.seconds * 1000;
+  if (typeof v === 'number') return v > 1e12 ? v : v * 1000;
+  return null;
+}
+
 function toUserRef(u: any | null): UserRef | null {
   if (!u) return null;
   return { uid: u.uid, handle: u.handle || null, iconURL: u.iconURL || null, displayName: u.displayName };
@@ -59,6 +68,30 @@ export async function listLatestAlbumsVMLimited(
         hasLiked(album.id, currentUserId),
         listReactionsByAlbum(album.id, currentUserId),
       ]);
+
+      // 「誰かが画像を追加しました」表示用: 最新画像の uploader が owner 以外のときに表示
+      let imageAdded: any = undefined;
+      try {
+        const latestImg = (imgs || [])
+          .filter((x: any) => x && (x.createdAt || x.updatedAt) && x.uploaderId)
+          .sort((a: any, b: any) => {
+            const am = toMillis(a.createdAt || a.updatedAt) || 0;
+            const bm = toMillis(b.createdAt || b.updatedAt) || 0;
+            return bm - am;
+          })[0];
+
+        if (latestImg?.uploaderId && latestImg.uploaderId !== album.ownerId) {
+          let au = cache.get(latestImg.uploaderId);
+          if (au === undefined) {
+            const u = await getUser(latestImg.uploaderId);
+            au = toUserRef(u);
+            cache.set(latestImg.uploaderId, au);
+          }
+          imageAdded = { userId: latestImg.uploaderId, user: au || undefined, createdAt: latestImg.createdAt || latestImg.updatedAt };
+        }
+      } catch {
+        imageAdded = undefined;
+      }
       const cAsc = [...cmts]
         .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0));
       const latest = cAsc.slice(-1)[0];
@@ -89,6 +122,7 @@ export async function listLatestAlbumsVMLimited(
         commentsPreview,
         reactions,
         owner,
+        imageAdded,
       } as TimelineItemVM;
     })
   );
