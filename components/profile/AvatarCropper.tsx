@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import Cropper, { Area } from 'react-easy-crop';
+import { Button } from "../ui/Button";
 
 type Props = {
   src: string;
@@ -41,15 +42,12 @@ export default function AvatarCropper({ src, onCancel, onConfirm }: Props) {
         />
       </div>
       <div className="flex justify-end gap-2">
-        <button type="button" className="px-3 py-1.5 text-sm rounded surface-alt" onClick={onCancel}>キャンセル</button>
-        <button
-          type="button"
-          className="px-3 py-1.5 text-sm rounded btn-accent disabled:opacity-50"
-          onClick={() => area && onConfirm(area, zoom)}
-          disabled={!area}
-        >
+        <Button type="button" variant="subtle" size="sm" onClick={onCancel}>
+          キャンセル
+        </Button>
+        <Button type="button" variant="accent" size="sm" onClick={() => area && onConfirm(area, zoom)} disabled={!area}>
           切り抜いて保存
-        </button>
+        </Button>
       </div>
     </div>
   );

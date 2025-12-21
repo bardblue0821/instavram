@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { Button } from "../ui/Button";
 
 // Props aligned with existing FieldText usage in app/user/[id]/page.tsx
 export interface InlineTextFieldProps {
@@ -54,22 +55,23 @@ export default function InlineTextField(p: InlineTextFieldProps) {
           <input
             autoFocus
             type={numeric ? "number" : date ? "date" : "text"}
-            className="flex-1 border-b-2 border-blue-500 bg-transparent p-1 text-sm focus:outline-none"
+            className="flex-1 border-b-2 border-[--accent] bg-transparent p-1 text-sm focus:outline-none"
             value={editingValue}
             disabled={saving}
             onChange={(e) => onChange(e.target.value)}
             onBlur={onBlur}
             onKeyDown={onKey}
           />
-          <button
+          <Button
             type="button"
             disabled={saving}
-            className="text-xs px-2 py-1 bg-blue-600 text-white rounded disabled:opacity-50"
+            variant="accent"
+            size="xs"
             onMouseDown={() => setSkipDiscard(true)}
             onClick={onSave}
           >
             保存
-          </button>
+          </Button>
         </div>
       </div>
     );

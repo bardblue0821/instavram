@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { Button } from "../ui/Button";
 
 export type FriendState = "none" | "sent" | "received" | "accepted";
 
@@ -17,34 +18,34 @@ export default function FriendActions({ state, busy = false, onSend, onCancel, o
     <section className="space-y-2">
       <h2 className="text-lg font-medium">フレンド</h2>
       {state === "none" && (
-        <button disabled={busy} onClick={onSend} className="btn-accent text-sm disabled:opacity-50">
+        <Button disabled={busy} onClick={onSend} variant="accent" size="sm">
           フレンド申請
-        </button>
+        </Button>
       )}
       {state === "sent" && (
         <div className="flex gap-2 items-center">
           <span className="text-sm fg-muted">申請中...</span>
-          <button disabled={busy} onClick={onCancel} className="text-xs px-2 py-1 rounded border fg-muted hover-surface-alt disabled:opacity-50">
+          <Button disabled={busy} onClick={onCancel} variant="ghost" size="xs">
             キャンセル
-          </button>
+          </Button>
         </div>
       )}
       {state === "received" && (
         <div className="flex gap-2">
-          <button disabled={busy} onClick={onAccept} className="btn-accent text-sm disabled:opacity-50">
+          <Button disabled={busy} onClick={onAccept} variant="accent" size="sm">
             承認
-          </button>
-          <button disabled={busy} onClick={onCancel} className="rounded bg-red-600 px-3 py-1 text-sm text-white disabled:opacity-50">
+          </Button>
+          <Button disabled={busy} onClick={onCancel} variant="danger" size="sm">
             拒否
-          </button>
+          </Button>
         </div>
       )}
       {state === "accepted" && (
         <div className="flex gap-3 items-center">
           <span className="text-sm text-green-700">フレンドです</span>
-          <button disabled={busy} onClick={onRemove} className="rounded bg-red-600 px-2 py-1 text-xs text-white disabled:opacity-50">
+          <Button disabled={busy} onClick={onRemove} variant="danger" size="xs">
             解除
-          </button>
+          </Button>
         </div>
       )}
     </section>

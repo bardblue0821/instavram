@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { Button } from "../ui/Button";
 
 export interface InlineTextareaFieldProps {
   label: string;
@@ -44,7 +45,7 @@ export default function InlineTextareaField(p: InlineTextareaFieldProps) {
             <textarea
               autoFocus
               rows={5}
-              className="w-full border-b-2 border-blue-500 bg-transparent p-1 text-sm focus:outline-none"
+              className="w-full border-b-2 border-[--accent] bg-transparent p-1 text-sm focus:outline-none"
               value={editingValue}
               disabled={saving}
               onChange={(e) => onChange(e.target.value)}
@@ -59,15 +60,17 @@ export default function InlineTextareaField(p: InlineTextareaFieldProps) {
               /100
             </p>
           </div>
-          <button
+          <Button
             type="button"
             disabled={saving}
-            className="text-xs h-8 px-2 py-1 bg-blue-600 text-white rounded disabled:opacity-50 mt-1"
+            variant="accent"
+            size="xs"
+            className="mt-1"
             onMouseDown={() => setSkipDiscard(true)}
             onClick={onSave}
           >
             保存
-          </button>
+          </Button>
         </div>
       </div>
     );

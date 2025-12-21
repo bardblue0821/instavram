@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth } from '../../lib/firebase';
 import { ensureUser } from '../../lib/authUser';
+import { Button } from '../../components/ui/Button';
 import { isHandleTaken } from '../../lib/repos/userRepo';
 import { getHandleBlockReason, getDisplayNameBlockReason, isHandleBlocked } from '../../lib/constants/userFilters';
 import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, signOut } from 'firebase/auth';
@@ -187,16 +188,24 @@ export default function LoginPage() {
       <div className="max-w-md w-full mx-auto p-6">
       <h1 className="text-4xl font-bold my-8 text-teal-500 text-center">instaVRam</h1>
       <div className="flex gap-2 mb-4">
-        <button
-          className={`${mode === 'login' ? 'btn-accent' : 'px-3 py-1 rounded border'} transition-colors`}
+        <Button
+          type="button"
+          size="sm"
+          variant={mode === 'login' ? 'accent' : 'ghost'}
           onClick={() => { setMode('login'); setConfirmPassword(''); setError(null); setDisplayName(''); setHandle(''); setHandleStatus('idle'); setHandleError(null); }}
           disabled={loading}
-        >ログイン</button>
-        <button
-          className={`${mode === 'register' ? 'btn-accent' : 'px-3 py-1 rounded border'} transition-colors`}
+        >
+          ログイン
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={mode === 'register' ? 'accent' : 'ghost'}
           onClick={() => { setMode('register'); setConfirmPassword(''); setError(null); setDisplayName(''); setHandle(''); setHandleStatus('idle'); setHandleError(null); }}
           disabled={loading}
-        >新規登録</button>
+        >
+          新規登録
+        </Button>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4" aria-live="polite">
         {mode==='register' && (
@@ -226,7 +235,7 @@ export default function LoginPage() {
                 placeholder="例: taro_vr"
                 aria-invalid={handleStatus==='taken'||handleStatus==='invalid'}
               />
-              <span className="text-xs text-gray-600 w-16">
+              <span className="text-xs fg-subtle w-16">
                 {handleStatus==='idle' && ''}
                 {handleStatus==='checking' && '確認中'}
                 {handleStatus==='ok' && '利用可'}
@@ -291,7 +300,7 @@ export default function LoginPage() {
         )}
         {error && <p className="text-red-600 text-sm">{error}</p>}
         {info && (
-          <div className="text-xs text-gray-700 bg-yellow-50 border rounded p-2">
+          <div className="text-xs fg-muted surface-alt border border-base rounded p-2">
             <p>{info}</p>
             {mode==='register' && (
               <div className="mt-2">
@@ -307,18 +316,27 @@ export default function LoginPage() {
             )}
           </div>
         )}
-        <button
-        type="submit"
-        className="w-full btn-accent justify-center disabled:opacity-50"
-        disabled={loading}
-        >{loading ? '処理中...' : (mode === 'login' ? 'ログイン' : '登録')}</button>
+        <Button
+          type="submit"
+          variant="accent"
+          fullWidth
+          isLoading={loading}
+          disabled={loading}
+        >
+          {loading ? '処理中...' : (mode === 'login' ? 'ログイン' : '登録')}
+        </Button>
       </form>
       <div className="mt-6 space-y-2">
-        <button
-        onClick={handleGoogle}
-        className="w-full bg-gray-800 text-white rounded py-2 disabled:opacity-50"
-        disabled={loading}
-        >{loading ? '...' : 'Google で続行'}</button>
+        <Button
+          type="button"
+          variant="ghost"
+          fullWidth
+          isLoading={loading}
+          onClick={handleGoogle}
+          disabled={loading}
+        >
+          {loading ? '...' : 'Google で続行'}
+        </Button>
       </div>
       </div>
     </div>

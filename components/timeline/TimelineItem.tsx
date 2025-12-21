@@ -5,6 +5,7 @@ import { listReactorsByAlbumEmoji, Reactor } from "../../lib/repos/reactionRepo"
 import { REACTION_CATEGORIES, filterReactionEmojis } from "../../lib/constants/reactions";
 import { HeartIcon } from "../icons/HeartIcon";
 import { ChatIcon } from "../icons/ChatIcon";
+import { Button } from "../ui/Button";
 
 type Img = { url: string; thumbUrl?: string; uploaderId?: string };
 type LatestComment = { body: string; userId: string } | undefined;
@@ -517,11 +518,15 @@ export function TimelineItem(props: {
             className="flex-1 input-underline text-sm"
             placeholder="コメントを書く"
           />
-          <button
-            className="btn-accent text-sm disabled:opacity-50"
+          <Button
+            type="button"
+            variant="accent"
+            size="sm"
             onClick={submit}
             disabled={busy || submitting || !text.trim()}
-          >送信</button>
+          >
+            送信
+          </Button>
         </div>
       )}
     </article>

@@ -20,7 +20,7 @@ export default function Home() {
         <div>
           <AuthForm />
           <div className="mt-6">
-            <ThemeSwitch />
+            {/*<ThemeSwitch />*/}
           </div>
         </div>
       </section>

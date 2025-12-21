@@ -9,6 +9,7 @@ import { Dropzone, IMAGE_MIME_TYPE } from '@mantine/dropzone';
 import { notifications } from '@mantine/notifications';
 import AlbumImageCropper from './upload/AlbumImageCropper';
 import { getCroppedBlobSized } from '../lib/services/avatar';
+import { Button as AppButton, IconButton as AppIconButton } from './ui/Button';
 
 interface Props { onCreated?: (albumId: string) => void }
 
@@ -337,11 +338,14 @@ export default function AlbumCreateModal({ onCreated }: Props) {
             </ul>
           </div>
         )}
-        <button
+        <AppButton
           type="submit"
-          className="btn-accent disabled:opacity-50"
+          variant="accent"
+          isLoading={loading}
           disabled={loading || !user}
-        >{loading ? '処理中...' : '作成'}</button>
+        >
+          {loading ? '処理中...' : '作成'}
+        </AppButton>
       </form>
 
       {cropIndex !== null && previews[cropIndex] && (
@@ -353,15 +357,17 @@ export default function AlbumCreateModal({ onCreated }: Props) {
             className="surface-alt border border-base rounded shadow-lg w-[min(96vw,720px)] p-4 relative"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
+            <AppIconButton
               type="button"
-              className="absolute top-2 right-2 fg-muted hover-surface-alt rounded px-2 py-1 cursor-pointer disabled:cursor-not-allowed"
+              variant="ghost"
+              size="xs"
+              className="absolute top-2 right-2 fg-muted hover-surface-alt cursor-pointer disabled:cursor-not-allowed"
               onClick={closeCrop}
               aria-label="閉じる"
               disabled={cropping}
             >
               ✕
-            </button>
+            </AppIconButton>
             <h2 className="text-sm font-semibold mb-3">画像を切り抜く</h2>
             <AlbumImageCropper
               src={cropSrc ?? previews[cropIndex].url}

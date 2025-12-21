@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { Button } from "../ui/Button";
 
 export interface LinksFieldProps {
   profile: any;
@@ -37,7 +38,7 @@ export default function LinksField(p: LinksFieldProps) {
 
   return (
     <div className="text-sm space-y-1">
-      <span className="font-semibold text-gray-700">その他URL:</span>
+      <span className="font-semibold fg-muted">その他URL:</span>
       <ul className="list-disc ml-5 space-y-1">
         {links.map((l, i) => (
           <li key={i} className={isMe ? "cursor-pointer" : ""} onClick={() => isMe && beginEdit("link", l, i)}>
@@ -45,22 +46,23 @@ export default function LinksField(p: LinksFieldProps) {
               <div className="flex items-center gap-2">
                 <input
                   autoFocus
-                  className="flex-1 border-b-2 border-blue-500 bg-transparent p-1 text-xs focus:outline-none"
+                  className="flex-1 border-b-2 border-[--accent] bg-transparent p-1 text-xs focus:outline-none"
                   value={editingValue}
                   disabled={saving}
                   onChange={(e) => onChange(e.target.value)}
                   onBlur={onBlur}
                   onKeyDown={onKey}
                 />
-                <button
+                <Button
                   type="button"
                   disabled={saving}
-                  className="text-[10px] px-2 py-1 bg-blue-600 text-white rounded disabled:opacity-50"
+                  variant="accent"
+                  size="xs"
                   onMouseDown={() => setSkipDiscard(true)}
                   onClick={onSave}
                 >
                   保存
-                </button>
+                </Button>
               </div>
             ) : (
               <a href={l} className="link-accent" target="_blank" rel="noreferrer">
@@ -69,16 +71,18 @@ export default function LinksField(p: LinksFieldProps) {
             )}
           </li>
         ))}
-        {links.length === 0 && <li className="text-gray-500">未設定</li>}
+        {links.length === 0 && <li className="fg-subtle">未設定</li>}
         {isMe && links.length < 3 && !active && (
           <li>
-            <button
+            <Button
               type="button"
-              className="text-xs text-blue-600 underline"
+              variant="ghost"
+              size="xs"
+              className="border-0 bg-transparent hover:bg-transparent px-0! py-0! text-xs link-accent underline"
               onClick={() => beginEdit("link", "", links.length)}
             >
               + 追加
-            </button>
+            </Button>
           </li>
         )}
         {active && editingLinkIndex === links.length && (
@@ -86,22 +90,23 @@ export default function LinksField(p: LinksFieldProps) {
             <div className="flex items-center gap-2">
               <input
                 autoFocus
-                className="flex-1 border-b-2 border-blue-500 bg-transparent p-1 text-xs focus:outline-none"
+                className="flex-1 border-b-2 border-[--accent] bg-transparent p-1 text-xs focus:outline-none"
                 value={editingValue}
                 disabled={saving}
                 onChange={(e) => onChange(e.target.value)}
                 onBlur={onBlur}
                 onKeyDown={onKey}
               />
-              <button
+              <Button
                 type="button"
                 disabled={saving}
-                className="text-[10px] px-2 py-1 bg-blue-600 text-white rounded disabled:opacity-50"
+                variant="accent"
+                size="xs"
                 onMouseDown={() => setSkipDiscard(true)}
                 onClick={onSave}
               >
                 保存
-              </button>
+              </Button>
             </div>
           </li>
         )}

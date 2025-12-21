@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { getUser, UserDoc } from "../../lib/repos/userRepo";
+import { Button, IconButton } from "../ui/Button";
 
 export interface CommentViewModel {
   id: string;
@@ -132,9 +133,12 @@ export function CommentList({
                 <div className="flex gap-2 text-xs">
                   {!isEditing && (
                     <>
-                      <button
+                      <IconButton
+                        type="button"
                         onClick={() => onEditRequest?.(comment.id)}
-                        className="p-1 rounded text-foreground/80 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]"
+                        variant="ghost"
+                        size="xs"
+                        className="border-0 bg-transparent hover:bg-transparent px-1! py-1! text-foreground/80 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]"
                         aria-label="編集"
                         title="編集"
                       >
@@ -142,10 +146,13 @@ export function CommentList({
                           <path d="M12 20h9"/>
                           <path d="M16.5 3.5l4 4L7 21H3v-4L16.5 3.5z"/>
                         </svg>
-                      </button>
-                      <button
+                      </IconButton>
+                      <IconButton
+                        type="button"
                         onClick={() => onDelete?.(comment.id)}
-                        className="p-1 rounded text-red-600 hover:text-red-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]"
+                        variant="ghost"
+                        size="xs"
+                        className="border-0 bg-transparent hover:bg-transparent px-1! py-1! text-red-600 hover:text-red-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]"
                         aria-label="削除"
                         title="削除"
                       >
@@ -156,17 +163,23 @@ export function CommentList({
                           <path d="M14 11v6"/>
                           <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
                         </svg>
-                      </button>
+                      </IconButton>
                     </>
                   )}
                   {isEditing && (
                     <>
-                      <button
+                      <Button
+                        type="button"
                         onClick={() => onEditSave?.(comment.id)}
                         disabled={!editingValue?.trim()}
-                        className="rounded bg-green-600 px-2 py-0.5 text-white disabled:opacity-50"
-                      >保存</button>
-                      <button onClick={() => onEditCancel?.()} className="rounded border px-2 py-0.5 fg-muted hover-surface-alt">キャンセル</button>
+                        variant="accent"
+                        size="xs"
+                      >
+                        保存
+                      </Button>
+                      <Button type="button" onClick={() => onEditCancel?.()} variant="ghost" size="xs">
+                        キャンセル
+                      </Button>
                     </>
                   )}
                 </div>

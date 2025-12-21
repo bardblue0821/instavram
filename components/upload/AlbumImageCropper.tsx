@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useRef, useState } from "react";
+import { Button } from "../ui/Button";
 import ReactCrop, {
   type Crop,
   type PixelCrop,
@@ -102,28 +103,12 @@ export default function AlbumImageCropper({ src, onCancel, onConfirm }: Props) {
     <div className={`space-y-3 ${styles.wrapper ?? ""}`.trim()}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className={
-              aspectKey === "square"
-                ? "px-2 py-1 text-xs rounded btn-accent"
-                : "px-2 py-1 text-xs rounded border border-base hover-surface-alt"
-            }
-            onClick={() => applyAspect("square")}
-          >
+          <Button type="button" size="xs" variant={aspectKey === "square" ? "accent" : "ghost"} onClick={() => applyAspect("square")}>
             正方形
-          </button>
-          <button
-            type="button"
-            className={
-              aspectKey === "rect"
-                ? "px-2 py-1 text-xs rounded btn-accent"
-                : "px-2 py-1 text-xs rounded border border-base hover-surface-alt"
-            }
-            onClick={() => applyAspect("rect")}
-          >
+          </Button>
+          <Button type="button" size="xs" variant={aspectKey === "rect" ? "accent" : "ghost"} onClick={() => applyAspect("rect")}>
             長方形
-          </button>
+          </Button>
         </div>
         <p className="text-xs fg-muted">枠をドラッグ/リサイズできます</p>
       </div>
@@ -145,17 +130,18 @@ export default function AlbumImageCropper({ src, onCancel, onConfirm }: Props) {
       </div>
 
       <div className="flex justify-end gap-2">
-        <button type="button" className="px-3 py-1.5 text-sm rounded surface-alt" onClick={onCancel}>
+        <Button type="button" variant="subtle" size="sm" onClick={onCancel}>
           キャンセル
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className="px-3 py-1.5 text-sm rounded btn-accent disabled:opacity-50"
+          variant="accent"
+          size="sm"
           onClick={confirm}
           disabled={!completedCrop || completedCrop.width <= 0 || completedCrop.height <= 0}
         >
           切り抜いて反映
-        </button>
+        </Button>
       </div>
     </div>
   );

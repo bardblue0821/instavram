@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth } from '../lib/firebase';
 import { ensureUser } from '../lib/authUser';
+import { Button } from './ui/Button';
 import { isHandleTaken } from '../lib/repos/userRepo';
 import { getHandleBlockReason, getDisplayNameBlockReason } from '../lib/constants/userFilters';
 import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, signOut } from 'firebase/auth';
@@ -166,16 +167,24 @@ export default function AuthForm() {
     <div className="w-full max-w-md mx-auto p-6">
       <h1 className="text-3xl font-bold my-6 text-teal-500 text-center">instaVRam</h1>
       <div className="flex gap-2 mb-4">
-        <button
-          className={`${mode === 'login' ? 'btn-accent' : 'px-3 py-1 rounded border'} transition-colors`}
+        <Button
+          type="button"
+          size="sm"
+          variant={mode === 'login' ? 'accent' : 'ghost'}
           onClick={() => { setMode('login'); setConfirmPassword(''); setError(null); setDisplayName(''); setHandle(''); setHandleStatus('idle'); setHandleError(null); }}
           disabled={loading}
-        >ログイン</button>
-        <button
-          className={`${mode === 'register' ? 'btn-accent' : 'px-3 py-1 rounded border'} transition-colors`}
+        >
+          ログイン
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={mode === 'register' ? 'accent' : 'ghost'}
           onClick={() => { setMode('register'); setConfirmPassword(''); setError(null); setDisplayName(''); setHandle(''); setHandleStatus('idle'); setHandleError(null); }}
           disabled={loading}
-        >新規登録</button>
+        >
+          新規登録
+        </Button>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4" aria-live="polite">
         {mode==='register' && (
@@ -218,7 +227,16 @@ export default function AuthForm() {
               disabled={loading}
               aria-invalid={mode === 'login' && hasNonAscii(password)}
             />
-            <button type="button" onClick={()=>setShowPwd(s=>!s)} className="text-xs link-accent w-16" aria-label="パスワード表示切替">{showPwd?'隠す':'表示'}</button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={() => setShowPwd((s) => !s)}
+              className="border-0 bg-transparent hover:bg-transparent px-0! py-0! text-xs link-accent w-16"
+              aria-label="パスワード表示切替"
+            >
+              {showPwd ? '隠す' : '表示'}
+            </Button>
           </div>
           {mode === 'login' && hasNonAscii(password) && (
             <p className="text-xs text-red-600 mt-1" role="alert">パスワードは半角で入力してください</p>
@@ -235,21 +253,34 @@ export default function AuthForm() {
             <label className="block text-sm font-medium mb-1">パスワード（確認）</label>
             <div className="flex items-center gap-2">
               <input type={showConfirm ? 'text':'password'} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className={`input-underline flex-1 ${mismatch ? 'error':''}`} required autoComplete="new-password" disabled={loading} aria-invalid={!!mismatch} />
-              <button type="button" onClick={()=>setShowConfirm(s=>!s)} className="text-xs link-accent w-16" aria-label="確認パスワード表示切替">{showConfirm?'隠す':'表示'}</button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={() => setShowConfirm((s) => !s)}
+                className="border-0 bg-transparent hover:bg-transparent px-0! py-0! text-xs link-accent w-16"
+                aria-label="確認パスワード表示切替"
+              >
+                {showConfirm ? '隠す' : '表示'}
+              </Button>
             </div>
             {mismatch && <p className="text-xs text-red-600 mt-1" role="alert">{mismatch}</p>}
           </div>
         )}
         {error && <p className="text-red-600 text-sm">{error}</p>}
         {info && (
-          <div className="text-xs fg-muted surface-alt border rounded p-2">
+          <div className="text-xs fg-muted surface-alt border border-base rounded p-2">
             <p>{info}</p>
           </div>
         )}
-        <button type="submit" className="w-full btn-accent justify-center disabled:opacity-50" disabled={loading}>{loading ? '処理中...' : (mode === 'login' ? 'ログイン' : '登録')}</button>
+        <Button type="submit" variant="accent" fullWidth isLoading={loading} disabled={loading}>
+          {loading ? '処理中...' : (mode === 'login' ? 'ログイン' : '登録')}
+        </Button>
       </form>
       <div className="mt-6 space-y-2">
-        <button onClick={handleGoogle} className="w-full border rounded py-2 fg-muted hover-surface-alt disabled:opacity-50" disabled={loading}>{loading ? '...' : 'Google で続行'}</button>
+        <Button type="button" variant="ghost" fullWidth isLoading={loading} onClick={handleGoogle} disabled={loading}>
+          {loading ? '...' : 'Google で続行'}
+        </Button>
       </div>
     </div>
   );

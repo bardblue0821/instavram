@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useAuthUser } from "../../../lib/hooks/useAuthUser";
 import { useVerificationGuard } from "../../../lib/hooks/useVerificationGuard";
 import { translateError } from "../../../lib/errors";
+import { Button } from "../../../components/ui/Button";
 
 export default function RegisterCompletePage() {
   // 未検証ユーザー以外はここに来ない想定だが、ガードで最低限の保護
@@ -102,11 +103,15 @@ export default function RegisterCompletePage() {
         </div>
       </div>
 
-      <button
-        className="btn-accent disabled:opacity-50"
+      <Button
+        type="button"
+        variant="accent"
+        isLoading={saving}
         disabled={!displayName.trim() || handleState !== "ok" || !pwMatch || saving}
         onClick={submit}
-      >{saving ? "保存中..." : "保存して完了"}</button>
+      >
+        {saving ? "保存中..." : "保存して完了"}
+      </Button>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>

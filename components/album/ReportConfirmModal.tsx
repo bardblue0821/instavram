@@ -1,4 +1,6 @@
+"use client";
 import React from "react";
+import { Button } from "../ui/Button";
 
 export interface ReportConfirmModalProps {
   open: boolean;
@@ -15,18 +17,12 @@ export default function ReportConfirmModal({ open, busy, onCancel, onConfirm }: 
         <h3 className="text-sm font-semibold">このアルバムを通報しますか？</h3>
         <p className="mt-2 text-xs fg-muted">内容を確認するため、投稿へのリンクを管理者に送信します。</p>
         <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            className="rounded surface-alt px-3 py-1 text-xs"
-            onClick={onCancel}
-            disabled={busy}
-          >キャンセル</button>
-          <button
-            type="button"
-            className="rounded btn-accent px-3 py-1 text-xs disabled:opacity-50"
-            onClick={onConfirm}
-            disabled={busy}
-          >{busy ? "通報中..." : "通報する"}</button>
+          <Button type="button" variant="subtle" size="xs" onClick={onCancel} disabled={busy}>
+            キャンセル
+          </Button>
+          <Button type="button" variant="accent" size="xs" onClick={onConfirm} disabled={busy} isLoading={busy}>
+            {busy ? "通報中..." : "通報する"}
+          </Button>
         </div>
       </div>
     </div>

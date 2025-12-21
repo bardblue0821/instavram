@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useMemo, useRef } from "react";
 import type { CSSProperties } from "react";
 import PhotoAlbum, { type RenderPhotoProps } from "react-photo-album";
+import { IconButton } from "../ui/Button";
 
 // lightGallery はクライアント側のみで読み込む
 const LightGallery = dynamic(() => import("lightgallery/react"), { ssr: false });
@@ -93,11 +94,11 @@ function PhotoRenderer({ photo, imageProps, wrapperStyle, canDelete, onDelete, o
         />
       )}
       {canDelete && onDelete && canDelete(photo as PhotoItem) && (
-        <button
+        <IconButton
           type="button"
           aria-label="画像を削除"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(photo as PhotoItem); }}
-          className="absolute right-1 top-1 rounded bg-red-600 p-1 text-white opacity-80 hover:opacity-100"
+          className="absolute right-1 top-1 bg-red-600 text-white opacity-80 hover:opacity-100"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 6h18" />
@@ -106,7 +107,7 @@ function PhotoRenderer({ photo, imageProps, wrapperStyle, canDelete, onDelete, o
             <path d="M10 11v6" />
             <path d="M14 11v6" />
           </svg>
-        </button>
+        </IconButton>
       )}
       {/* 投稿者アイコン（左下） */}
       {uploaderIconURL && (
@@ -207,11 +208,11 @@ export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDe
                   )}
                 </div>
                 {canDelete && onDelete && canDelete(p) && (
-                  <button
+                  <IconButton
                     type="button"
                     aria-label="画像を削除"
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(p); }}
-                    className="absolute right-1 top-1 rounded bg-red-600 p-1 text-white opacity-80 hover:opacity-100"
+                    className="absolute right-1 top-1 bg-red-600 text-white opacity-80 hover:opacity-100"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M3 6h18" />
@@ -220,7 +221,7 @@ export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDe
                       <path d="M10 11v6" />
                       <path d="M14 11v6" />
                     </svg>
-                  </button>
+                  </IconButton>
                 )}
                 {p.uploaderIconURL && (
                   p.uploaderHandle ? (
@@ -339,11 +340,11 @@ export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDe
                   )}
                 </div>
                 {canDelete && onDelete && canDelete(p) && (
-                  <button
+                  <IconButton
                     type="button"
                     aria-label="画像を削除"
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(p); }}
-                    className="absolute right-1 top-1 rounded bg-red-600 p-1 text-white opacity-80 hover:opacity-100"
+                    className="absolute right-1 top-1 bg-red-600 text-white opacity-80 hover:opacity-100"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M3 6h18" />
@@ -352,7 +353,7 @@ export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDe
                       <path d="M10 11v6" />
                       <path d="M14 11v6" />
                     </svg>
-                  </button>
+                  </IconButton>
                 )}
                 {/* 投稿者アイコン（左下） */}
                 {p.uploaderIconURL && (

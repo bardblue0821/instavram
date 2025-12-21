@@ -3,6 +3,7 @@ import React, { useRef, useState } from 'react';
 import { storage } from '../../lib/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import AvatarCropper from './AvatarCropper';
+import { Button, IconButton } from "../ui/Button";
 import { getCroppedBlob } from '../../lib/services/avatar';
 import { updateUserIcon } from '../../lib/repos/userRepo';
 
@@ -79,7 +80,16 @@ export default function AvatarModal({ open, onClose, uid, src, alt = 'ユーザ�
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="surface-alt border border-base rounded shadow-lg w-[min(96vw,600px)] p-4 relative" onClick={(e)=>e.stopPropagation()}>
-        <button className="absolute top-2 right-2 fg-muted hover-surface-alt rounded px-2 py-1" onClick={onClose} aria-label="閉じる">✕</button>
+        <IconButton
+          type="button"
+          variant="ghost"
+          size="xs"
+          className="absolute top-2 right-2 border-0 bg-transparent hover:bg-transparent fg-muted hover-surface-alt px-2! py-1!"
+          onClick={onClose}
+          aria-label="閉じる"
+        >
+          ✕
+        </IconButton>
         {stage === 'view' && (
           <div className="space-y-3">
             <div className="mx-auto w-64 h-64 overflow-hidden border border-base rounded-lg surface">
@@ -88,14 +98,9 @@ export default function AvatarModal({ open, onClose, uid, src, alt = 'ユーザ�
             </div>
             {editable && (
               <div className="flex justify-center">
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded btn-accent"
-                  onClick={pickFile}
-                  aria-label="アイコンを変更"
-                >
+                <Button type="button" variant="accent" size="sm" onClick={pickFile} aria-label="アイコンを変更">
                   ✎ アイコンを変更
-                </button>
+                </Button>
                 <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e)=> onFile(e.target.files?.[0] || undefined)} />
               </div>
             )}

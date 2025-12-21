@@ -30,6 +30,7 @@ import { countLikes, hasLiked, toggleLike } from '../../../lib/repos/likeRepo';
 import { listReactionsByAlbum, toggleReaction } from '../../../lib/repos/reactionRepo';
 import { addNotification } from '../../../lib/repos/notificationRepo';
 import { getUser } from '../../../lib/repos/userRepo';
+import { Button } from '../../../components/ui/Button';
 
 export default function ProfilePage() {
   const params = useParams();
@@ -751,7 +752,15 @@ export default function ProfilePage() {
           setSkipDiscard={setSkipDiscardNextBlur}
         />
         {!detailsOpen && (
-          <button type="button" onClick={()=> setDetailsOpen(true)} className="text-xs link-accent">詳細を表示</button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            onClick={() => setDetailsOpen(true)}
+            className="border-0 bg-transparent hover:bg-transparent px-0! py-0! text-xs link-accent"
+          >
+            詳細を表示
+          </Button>
         )}
         {detailsOpen && (
           <div className="space-y-2">
@@ -762,7 +771,15 @@ export default function ProfilePage() {
             <InlineTextField label="年齢" value={typeof profile.age === 'number' ? String(profile.age) : ''} placeholder="未設定" field="age" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} numeric onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
             <InlineTextField label="場所" value={profile.location || ''} placeholder="未設定" field="location" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
             <InlineTextField label="生年月日" value={profile.birthDate || ''} placeholder="未設定" field="birthDate" editingField={editingField} editingValue={editingValue} beginEdit={beginEdit} onChange={setEditingValue} onBlur={handleBlur} onKey={onKey} isMe={isMe} saving={saving} date onSave={commitEdit} setSkipDiscard={setSkipDiscardNextBlur} />
-            <button type="button" onClick={()=> setDetailsOpen(false)} className="text-xs link-accent">詳細を隠す</button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={() => setDetailsOpen(false)}
+              className="border-0 bg-transparent hover:bg-transparent px-0! py-0! text-xs link-accent"
+            >
+              詳細を隠す
+            </Button>
           </div>
         )}
         {/*saveMsg && <p className="text-xs text-green-700">{saveMsg}</p>*/}
@@ -785,7 +802,9 @@ export default function ProfilePage() {
 
       {isMe && (
         <section className="space-y-2 pt-4 border-base">
-          <button type="button" onClick={()=> setShowDeleteAccount(true)} className="rounded bg-red-600 px-3 py-1.5 text-sm text-white">アカウントを削除</button>
+          <Button type="button" variant="danger" size="sm" onClick={() => setShowDeleteAccount(true)}>
+            アカウントを削除
+          </Button>
         </section>
       )}
 
@@ -963,16 +982,19 @@ export default function ProfilePage() {
             )}
             {deleting && (<p className="text-xs fg-muted">処理中: {deleteStep || '...'}</p>)}
             <div className="flex justify-end gap-2">
-              <button type="button" className="px-3 py-2 text-sm rounded border border-base hover-surface-alt" disabled={deleting} onClick={()=> setShowDeleteAccount(false)}>キャンセル</button>
+              <Button type="button" variant="ghost" size="md" disabled={deleting} onClick={()=> setShowDeleteAccount(false)}>キャンセル</Button>
               {canReauthWithGoogle && (
-                <button type="button" className="px-3 py-2 text-sm rounded border border-base fg-muted hover-surface-alt" disabled={deleting} onClick={reauthGoogle}>Googleで再認証</button>
+                <Button type="button" variant="ghost" size="md" disabled={deleting} onClick={reauthGoogle}>Googleで再認証</Button>
               )}
-              <button
+              <Button
                 type="button"
-                className="px-3 py-2 text-sm rounded bg-red-600 text-white disabled:opacity-50"
+                variant="danger"
+                size="md"
                 disabled={!agreeDelete || deleting || (canReauthWithPassword && !pw)}
                 onClick={doDeleteAccount}
-              >削除</button>
+              >
+                削除
+              </Button>
             </div>
           </div>
         </div>
@@ -984,9 +1006,9 @@ export default function ProfilePage() {
             <h3 className="text-sm font-semibold">変更を破棄しますか？</h3>
             <p className="text-xs fg-muted">保存せずに編集を終了すると内容は元に戻ります。保存しますか、それとも破棄しますか？</p>
             <div className="flex justify-end gap-2">
-              <button type="button" className="px-2 py-1 text-xs rounded surface-alt" onClick={keepEditing}>編集を続ける</button>
-              <button type="button" className="px-2 py-1 text-xs rounded btn-accent" onClick={saveFromModal}>保存</button>
-              <button type="button" className="px-2 py-1 text-xs rounded bg-red-600 text-white" onClick={discardChanges}>破棄</button>
+              <Button type="button" variant="subtle" size="xs" onClick={keepEditing}>編集を続ける</Button>
+              <Button type="button" variant="accent" size="xs" onClick={saveFromModal}>保存</Button>
+              <Button type="button" variant="danger" size="xs" onClick={discardChanges}>破棄</Button>
             </div>
           </div>
         </div>

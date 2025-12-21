@@ -1,6 +1,7 @@
 "use client";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { IconButton } from "./Button";
 
 type ToastVariant = "info" | "success" | "warning" | "error";
 
@@ -89,14 +90,16 @@ function ToastBubble({ item, onClose }: { item: ToastItem; onClose: () => void }
       <div className={["flex items-start gap-2 px-4 py-3", color.text].join(" ")}>
         <span className={["mt-0.5 inline-block h-2.5 w-2.5 rounded-full", color.dot].join(" ")} aria-hidden="true" />
         <p className="text-sm flex-1">{message}</p>
-        <button
+        <IconButton
           type="button"
-          className="ml-2 text-xs fg-subtle hover-fg-muted"
+          size="xs"
+          variant="ghost"
+          className="ml-2 border-0 bg-transparent hover:bg-transparent text-xs fg-subtle hover-fg-muted px-1! py-0!"
           onClick={onClose}
           aria-label="閉じる"
         >
           ×
-        </button>
+        </IconButton>
       </div>
     </div>
   );

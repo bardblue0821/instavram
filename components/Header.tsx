@@ -7,6 +7,7 @@ import { useNotificationsBadge } from '../lib/hooks/useNotificationsBadge';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import React, { useState, useEffect, useRef } from 'react';
+import { Button } from "./ui/Button";
 
 export default function Header() {
   const { user, loading } = useAuthUser();
@@ -193,12 +194,18 @@ export default function Header() {
               </>
             )}
             <div className="mt-2 pt-2">
-              <button
+              <Button
+                type="button"
+                variant="ghost"
+                size="md"
+                fullWidth
                 onClick={() => { toggleTheme(); closeMenu(); }}
-                className="w-full text-left px-4 py-2 text-sm link-accent"
+                className="justify-start text-left link-accent border-0 hover:opacity-90"
                 role="menuitem"
                 aria-label="テーマ切替"
-              >{theme === 'dark' ? 'ライトモードへ' : 'ダークモードへ'}</button>
+              >
+                {theme === 'dark' ? 'ライトモードへ' : 'ダークモードへ'}
+              </Button>
             </div>
           </div>
         )}
@@ -219,15 +226,12 @@ export default function Header() {
             <h2 id="logout-dialog-title" className="font-semibold mb-2">ログアウトしますか？</h2>
             <p className="text-sm mb-4 text-muted">現在のセッションが終了し、再度ログインが必要になります。</p>
             <div className="flex gap-3 justify-end">
-              <button
-                onClick={cancelLogout}
-                className="px-3 py-2 text-sm rounded border border-base hover-surface-alt"
-              >キャンセル</button>
-              <button
-                ref={confirmBtnRef}
-                onClick={handleLogout}
-                className="px-3 py-2 text-sm rounded btn-accent"
-              >ログアウト</button>
+              <Button type="button" variant="ghost" size="md" onClick={cancelLogout}>
+                キャンセル
+              </Button>
+              <Button type="button" variant="accent" size="md" onClick={handleLogout} ref={confirmBtnRef}>
+                ログアウト
+              </Button>
             </div>
           </div>
         </div>
