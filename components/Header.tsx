@@ -56,7 +56,7 @@ export default function Header() {
 
   async function handleLogout() {
     await signOut(auth);
-    router.push('/login');
+    router.push('/');
     setOpen(false);
     setConfirmLogout(false);
   }

@@ -7,6 +7,12 @@ import { isHandleTaken } from '../lib/repos/userRepo';
 import { getHandleBlockReason, getDisplayNameBlockReason } from '../lib/constants/userFilters';
 import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, signOut } from 'firebase/auth';
 
+function hasNonAscii(input: string): boolean {
+  // Treat any non-ASCII character (e.g. 全角英数/記号、日本語、絵文字) as invalid for login password input.
+  // ASCII printable range: 0x20 (space) .. 0x7E (~)
+  return /[^\x20-\x7E]/.test(input);
+}
+
 function mapAuthError(code: string): string {
   switch (code) {
     case 'auth/invalid-email':
@@ -75,7 +81,11 @@ export default function AuthForm() {
   function basicHandleValid(h:string){ return /^[a-z0-9_]{3,20}$/i.test(h); }
 
   function validate(): boolean {
-    if (!/@.+\./.test(email)) { setError('メールアドレスが不正です'); return false; }
+    if (!/@.+\./.test(email )) { setError('メールアドレスが不正です'); return false; }
+    if (mode === 'login' && hasNonAscii(password)) {
+      setError('パスワードは半角で入力してください');
+      return false;
+    }
     if (password.length < 6) { setError('パスワードは6文字以上にしてください'); return false; }
     if (mode === 'register') {
       if (!displayName.trim()) { setError('ユーザー名を入力してください'); return false; }
@@ -198,12 +208,24 @@ export default function AuthForm() {
         <div>
           <label className="block text-sm font-medium mb-1">パスワード</label>
           <div className="flex items-center gap-2">
-            <input type={showPwd ? 'text':'password'} value={password} onChange={e => setPassword(e.target.value)} className="input-underline flex-1" required autoComplete={mode === 'login' ? 'current-password' : 'new-password'} disabled={loading} />
+            <input
+              type={showPwd ? 'text' : 'password'}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className={`input-underline flex-1 ${(mode === 'login' && hasNonAscii(password)) ? 'error' : ''}`}
+              required
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              disabled={loading}
+              aria-invalid={mode === 'login' && hasNonAscii(password)}
+            />
             <button type="button" onClick={()=>setShowPwd(s=>!s)} className="text-xs link-accent w-16" aria-label="パスワード表示切替">{showPwd?'隠す':'表示'}</button>
           </div>
+          {mode === 'login' && hasNonAscii(password) && (
+            <p className="text-xs text-red-600 mt-1" role="alert">パスワードは半角で入力してください</p>
+          )}
           {mode==='register' && (
             <div className="mt-2 pw-strength-wrapper" aria-live="polite">
-              <div className={`pw-strength-bar ${pwdStrength.cls}`}> <span style={{width: pwdStrength.percent+'%'}}></span> </div>
+              <div className={`pw-strength-bar ${pwdStrength.cls}`}><span style={{width: pwdStrength.percent+'%'}}></span> </div>
               {pwdStrength.label && <p className="pw-strength-label">強度: {pwdStrength.label}</p>}
             </div>
           )}

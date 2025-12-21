@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useAuthUser } from "../hooks/useAuthUser";
 
 /**
- * 未ログイン or 未検証ユーザーを /login へ誘導するクライアントガード。
+ * 未ログイン or 未検証ユーザーをトップ（/）へ誘導するクライアントガード。
  * allowRoot が true の場合、トップ（/）では弾かない。
  */
 export function useVerificationGuard(allowRoot = false) {
@@ -13,14 +13,14 @@ export function useVerificationGuard(allowRoot = false) {
 
   useEffect(() => {
     if (loading) return;
-    // 未ログイン → /login
+    // 未ログイン → /
     if (!user) {
-      router.replace("/login");
+      router.replace("/");
       return;
     }
-    // 未検証（emailVerified=false）→ /login
+    // 未検証（emailVerified=false）→ /
     if (!user.emailVerified) {
-      if (!allowRoot) router.replace("/login");
+      if (!allowRoot) router.replace("/");
     }
   }, [user?.uid, user?.emailVerified, loading]);
 }

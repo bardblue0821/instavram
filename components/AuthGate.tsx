@@ -8,13 +8,13 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   // 公開パス: トップ(/) と /login を許可
-  const publicPaths = new Set<string>(['/','/login']);
+  const publicPaths = new Set<string>(['/', '/login']);
   const isPublic = publicPaths.has(pathname);
 
   useEffect(() => {
     if (loading) return;
-    // 未ログインのみ /login 以外へアクセス不可
-    if (!user && !isPublic) router.replace('/login');
+    // 未ログインのみ公開パス以外へアクセス不可（誘導先はトップ）
+    if (!user && !isPublic) router.replace('/');
   }, [user, loading, isPublic, router]);
 
   if ((loading && !isPublic) || (!loading && !user && !isPublic)) return null;
