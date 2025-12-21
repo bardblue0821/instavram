@@ -100,7 +100,7 @@ function PhotoRenderer({ photo, imageProps, wrapperStyle, canDelete, onDelete, o
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(photo as PhotoItem); }}
           className="absolute right-1 top-1 bg-red-600 text-white opacity-80 hover:opacity-100"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="white" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 6h18" />
             <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
             <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
@@ -122,7 +122,7 @@ function PhotoRenderer({ photo, imageProps, wrapperStyle, canDelete, onDelete, o
             <img
               src={uploaderIconURL}
               alt="uploader"
-              className="h-7 w-7 rounded-full "
+              className="h-10 w-10 rounded-full "
               loading="lazy"
             />
           </a>
@@ -131,7 +131,7 @@ function PhotoRenderer({ photo, imageProps, wrapperStyle, canDelete, onDelete, o
           <img
             src={uploaderIconURL}
             alt="uploader"
-            className="absolute left-1 bottom-1 h-7 w-7 rounded-full "
+            className="absolute left-1 bottom-1 h-10 w-10 rounded-full "
             loading="lazy"
           />
         )
@@ -214,7 +214,7 @@ export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDe
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(p); }}
                     className="absolute right-1 top-1 bg-red-600 text-white opacity-80 hover:opacity-100"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="white" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M3 6h18" />
                       <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                       <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
@@ -235,7 +235,7 @@ export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDe
                       <img
                         src={p.uploaderIconURL}
                         alt="uploader"
-                        className="h-7 w-7 rounded-full object-cover border border-white/50 shadow"
+                        className="h-10 w-10 rounded-full object-cover border border-white/50 shadow"
                         loading="lazy"
                       />
                     </a>
@@ -244,7 +244,7 @@ export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDe
                     <img
                       src={p.uploaderIconURL}
                       alt="uploader"
-                      className="absolute left-1 bottom-1 h-7 w-7 rounded-full object-cover border border-white/50 shadow"
+                      className="absolute left-1 bottom-1 h-10 w-10 rounded-full object-cover border border-white/50 shadow"
                       loading="lazy"
                     />
                   )
@@ -346,7 +346,7 @@ export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDe
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(p); }}
                     className="absolute right-1 top-1 bg-red-600 text-white opacity-80 hover:opacity-100"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="white" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M3 6h18" />
                       <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                       <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
@@ -368,7 +368,7 @@ export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDe
                       <img
                         src={p.uploaderIconURL}
                         alt="uploader"
-                        className="h-7 w-7 rounded-full object-cover border border-white/50 shadow"
+                        className="h-10 w-10 rounded-full object-cover border border-white/50 shadow"
                         loading="lazy"
                       />
                     </a>
@@ -377,7 +377,7 @@ export default function GalleryGrid({ photos, rowHeight = 260, margin = 4, canDe
                     <img
                       src={p.uploaderIconURL}
                       alt="uploader"
-                      className="absolute left-1 bottom-1 h-7 w-7 rounded-full object-cover border border-white/50 shadow"
+                      className="absolute left-1 bottom-1 h-10 w-10 rounded-full object-cover border border-white/50 shadow"
                       loading="lazy"
                     />
                   )

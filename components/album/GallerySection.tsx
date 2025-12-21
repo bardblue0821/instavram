@@ -20,7 +20,7 @@ export interface GallerySectionProps {
 }
 
 export default function GallerySection(props: GallerySectionProps) {
-  const { photos, imagesLength, visibleCount, onSeeMore, canDelete, onDelete, showUploader, albumId, userId, remaining, onUploaded, rowHeight = 240, margin = 6, columns = 4 } = props;
+  const { photos, imagesLength, visibleCount, onSeeMore, canDelete, onDelete, showUploader, albumId, userId, remaining, onUploaded, rowHeight = 240, margin = 6 } = props;
 
   return (
     <section>
@@ -31,7 +31,7 @@ export default function GallerySection(props: GallerySectionProps) {
           rowHeight={rowHeight}
           margin={margin}
           layoutType="grid"
-          columns={columns}
+          columns={3}
           visibleCount={visibleCount}
           canDelete={canDelete}
           onDelete={onDelete}
