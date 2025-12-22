@@ -302,6 +302,9 @@ export function TimelineItem(props: {
                 )}
               </div>
               <span className="text-sm text-muted/80">{owner?.handle ? `@${owner.handle}` : 'ハンドル未設定'}</span>
+              {fmtDateTime(toDate(album.createdAt)) && (
+                <span className="text-xs text-muted/80">{fmtDateTime(toDate(album.createdAt))}</span>
+              )}
             </a>
           </div>
 
@@ -355,9 +358,6 @@ export function TimelineItem(props: {
         {album.title && (
           <h3 className="text-base font-semibold flex items-center gap-2">
             <a href={`/album/${album.id}`}>{album.title}</a>
-            {fmtDateTime(toDate(album.createdAt)) && (
-              <span className="text-xs text-muted/80 shrink-0" title="投稿日時">{fmtDateTime(toDate(album.createdAt))}</span>
-            )}
           </h3>
         )}
       </header>
