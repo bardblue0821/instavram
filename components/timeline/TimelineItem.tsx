@@ -97,14 +97,22 @@ export function TimelineItem(props: {
     }
   }
 
+  async function refreshReactorList(emoji: string) {
+    if (reactorLoading[emoji]) return;
+    setReactorLoading((s) => ({ ...s, [emoji]: true }));
+    try {
+      const list = await listReactorsByAlbumEmoji(album.id, emoji, 20);
+      setReactorMap((m) => ({ ...m, [emoji]: list }));
+    } finally {
+      setReactorLoading((s) => ({ ...s, [emoji]: false }));
+    }
+  }
+
   function onChipEnter(emoji: string) {
     setHoveredEmoji(emoji);
-    if (!reactorMap[emoji] && !reactorLoading[emoji]) {
-      setReactorLoading((s) => ({ ...s, [emoji]: true }));
-      listReactorsByAlbumEmoji(album.id, emoji, 20)
-        .then((list) => setReactorMap((m) => ({ ...m, [emoji]: list })))
-        .catch(() => {})
-        .finally(() => setReactorLoading((s) => ({ ...s, [emoji]: false })));
+    if (!reactorMap[emoji]) {
+      // 初回ホバー時に取得
+      refreshReactorList(emoji);
     }
   }
   function onChipLeave() { setHoveredEmoji(null); }
@@ -147,6 +155,14 @@ export function TimelineItem(props: {
       window.removeEventListener('keydown', onKey);
     };
   }, [menuOpen]);
+
+  // リアクション状態が変わったら、ホバー中の絵文字のリストをリフレッシュ（自分の追加/解除を即時反映）
+  useEffect(() => {
+    if (hoveredEmoji) {
+      refreshReactorList(hoveredEmoji);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reactions]);
 
   function renderGrid(imgs: Img[]) {
     const n = Math.min(imgs.length, 4);
@@ -383,7 +399,13 @@ export function TimelineItem(props: {
                 type="button"
                 aria-label={`リアクション ${r.emoji}`}
                 aria-pressed={r.mine}
-                onClick={() => onToggleReaction?.(r.emoji)}
+                onClick={() => { 
+                  onToggleReaction?.(r.emoji);
+                  // 現在ホバー表示中ならリストも更新
+                  if (hoveredEmoji === r.emoji) {
+                    refreshReactorList(r.emoji);
+                  }
+                }}
                 className={`rounded border px-2 py-1 text-sm ${r.mine ? "border-blue-600 bg-background text-blue-700" : "border-line bg-background text-muted"}`}
               >{r.emoji} <span className="text-xs">{r.count}</span></button>
               {hoveredEmoji === r.emoji && (
