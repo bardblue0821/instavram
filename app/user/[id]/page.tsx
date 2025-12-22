@@ -7,8 +7,8 @@ import { listAlbumsByOwner } from '../../../lib/repos/albumRepo';
 import { listAlbumIdsByUploader } from '../../../lib/repos/imageRepo';
 import { listCommentsByUser } from '../../../lib/repos/commentRepo';
 import { getAlbum } from '../../../lib/repos/albumRepo';
-import { getFriendStatus, sendFriendRequest, acceptFriend, cancelFriendRequest, removeFriend } from '../../../lib/repos/friendRepo';
-import { isWatched, addWatch, removeWatch } from '../../../lib/repos/watchRepo';
+import { getFriendStatus, sendFriendRequest, acceptFriend, cancelFriendRequest, removeFriend, listAcceptedFriends } from '../../../lib/repos/friendRepo';
+import { isWatched, addWatch, removeWatch, listWatchers } from '../../../lib/repos/watchRepo';
 import { translateError } from '../../../lib/errors';
 import { useToast } from '../../../components/ui/Toast';
 import { deleteAccountData } from '../../../lib/services/deleteAccount';
@@ -53,6 +53,17 @@ export default function ProfilePage() {
   const [joinedAlbums, setJoinedAlbums] = useState<any[] | null>(null);
   const [userComments, setUserComments] = useState<any[] | null>(null);
   const [stats, setStats] = useState<{ ownCount: number; joinedCount: number; commentCount: number } | null>(null);
+  // Social counts & lists
+  const [watchersCount, setWatchersCount] = useState<number>(0);
+  const [friendsCount, setFriendsCount] = useState<number>(0);
+  const watchersIdsRef = useRef<string[] | null>(null);
+  const friendsOtherIdsRef = useRef<string[] | null>(null);
+  const [watchersOpen, setWatchersOpen] = useState(false);
+  const [friendsOpen, setFriendsOpen] = useState(false);
+  const [watchersLoading, setWatchersLoading] = useState(false);
+  const [friendsLoading, setFriendsLoading] = useState(false);
+  const [watchersUsers, setWatchersUsers] = useState<any[] | null>(null);
+  const [friendsUsers, setFriendsUsers] = useState<any[] | null>(null);
   const [loadingExtra, setLoadingExtra] = useState(false);
   const [extraError, setExtraError] = useState<string | null>(null);
   // Tab state for lists
@@ -147,11 +158,25 @@ export default function ProfilePage() {
         const filteredIds = joinedIds.filter(id => !own.some(a => a.id === id));
         const joined = await Promise.all(filteredIds.map(id => getAlbum(id)));
         const comments = await listCommentsByUser(profile.uid, 50);
+        // watchers/friends counts
+        let watcherIds: string[] = [];
+        let friendOtherIds: string[] = [];
+        try {
+          watcherIds = await listWatchers(profile.uid);
+        } catch {}
+        try {
+          const fdocs = await listAcceptedFriends(profile.uid);
+          friendOtherIds = fdocs.map(fd => (fd.userId === profile.uid ? fd.targetId : fd.userId)).filter(Boolean);
+        } catch {}
         if (active) {
           setOwnAlbums(own);
           setJoinedAlbums(joined.filter(a => !!a));
           setUserComments(comments);
           setStats({ ownCount: own.length, joinedCount: filteredIds.length, commentCount: comments.length });
+          setWatchersCount(watcherIds.length);
+          setFriendsCount(friendOtherIds.length);
+          watchersIdsRef.current = watcherIds;
+          friendsOtherIdsRef.current = friendOtherIds;
           // profile が変わったら投稿画像タブは未ロード状態に戻す
           setUploadedPhotos(null);
           setUploadedError(null);
@@ -170,6 +195,36 @@ export default function ProfilePage() {
     })();
     return () => { active = false; };
   }, [profile?.uid]);
+
+  async function openWatchersModal() {
+    setWatchersOpen(true);
+    if (watchersUsers !== null) return;
+    const ids = watchersIdsRef.current || [];
+    setWatchersLoading(true);
+    try {
+      const users = await Promise.all(ids.map(async (uid) => {
+        try { return await getUser(uid); } catch { return null; }
+      }));
+      setWatchersUsers(users.filter(Boolean));
+    } finally {
+      setWatchersLoading(false);
+    }
+  }
+
+  async function openFriendsModal() {
+    setFriendsOpen(true);
+    if (friendsUsers !== null) return;
+    const ids = friendsOtherIdsRef.current || [];
+    setFriendsLoading(true);
+    try {
+      const users = await Promise.all(ids.map(async (uid) => {
+        try { return await getUser(uid); } catch { return null; }
+      }));
+      setFriendsUsers(users.filter(Boolean));
+    } finally {
+      setFriendsLoading(false);
+    }
+  }
 
   function escapeHtml(text: string) {
     return String(text)
@@ -734,6 +789,23 @@ export default function ProfilePage() {
                 </span>
               )}
             </div>
+            {/* watcher/friend counts */}
+            <div className="flex items-center gap-3 mt-1">
+              <button
+                type="button"
+                className="text-xs px-2 py-0.5 rounded bg-sky-500 text-white hover:bg-sky-600 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]/40"
+                onClick={openWatchersModal}
+              >
+                ウォッチャー {watchersCount}
+              </button>
+              <button
+                type="button"
+                className="text-xs px-2 py-0.5 rounded bg-orange-500 text-white hover:bg-orange-600 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]/40"
+                onClick={openFriendsModal}
+              >
+                フレンド {friendsCount}
+              </button>
+            </div>
           </div>
         </div>
         <InlineTextareaField
@@ -1011,6 +1083,66 @@ export default function ProfilePage() {
               <Button type="button" variant="subtle" size="xs" onClick={keepEditing}>編集を続ける</Button>
               <Button type="button" variant="accent" size="xs" onClick={saveFromModal}>保存</Button>
               <Button type="button" variant="danger" size="xs" onClick={discardChanges}>破棄</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Watchers list modal */}
+      {watchersOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={()=> setWatchersOpen(false)}>
+          <div className="relative surface-alt border border-base rounded shadow-lg max-w-sm w-[90%] p-5 space-y-3" onClick={(e)=> e.stopPropagation()}>
+            <h3 className="text-sm font-semibold">ウォッチャー（{watchersCount}）</h3>
+            {watchersLoading && <p className="text-xs fg-subtle">読み込み中...</p>}
+            {!watchersLoading && (watchersUsers?.length ? (
+              <ul className="max-h-80 overflow-auto divide-y divide-base">
+                {watchersUsers!.map((u:any)=> (
+                  <li key={u.uid} className="py-2">
+                    <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 hover-surface-alt px-1">
+                      <Avatar src={u.iconURL || undefined} size={28} />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate">{u.displayName || '名前未設定'}</div>
+                        <div className="text-[11px] fg-subtle truncate">@{u.handle || u.uid.slice(0,6)}</div>
+                      </div>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs fg-subtle">ウォッチャーはいません</p>
+            ))}
+            <div className="flex justify-end">
+              <Button type="button" size="xs" variant="ghost" onClick={()=> setWatchersOpen(false)}>閉じる</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Friends list modal */}
+      {friendsOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={()=> setFriendsOpen(false)}>
+          <div className="relative surface-alt border border-base rounded shadow-lg max-w-sm w-[90%] p-5 space-y-3" onClick={(e)=> e.stopPropagation()}>
+            <h3 className="text-sm font-semibold">フレンド（{friendsCount}）</h3>
+            {friendsLoading && <p className="text-xs fg-subtle">読み込み中...</p>}
+            {!friendsLoading && (friendsUsers?.length ? (
+              <ul className="max-h-80 overflow-auto divide-y divide-base">
+                {friendsUsers!.map((u:any)=> (
+                  <li key={u.uid} className="py-2">
+                    <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 hover-surface-alt px-1">
+                      <Avatar src={u.iconURL || undefined} size={28} />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate">{u.displayName || '名前未設定'}</div>
+                        <div className="text-[11px] fg-subtle truncate">@{u.handle || u.uid.slice(0,6)}</div>
+                      </div>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs fg-subtle">フレンドはいません</p>
+            ))}
+            <div className="flex justify-end">
+              <Button type="button" size="xs" variant="ghost" onClick={()=> setFriendsOpen(false)}>閉じる</Button>
             </div>
           </div>
         </div>

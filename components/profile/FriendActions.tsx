@@ -16,34 +16,35 @@ interface FriendActionsProps {
 export default function FriendActions({ state, busy = false, onSend, onCancel, onAccept, onRemove }: FriendActionsProps) {
   return (
     <section className="space-y-2">
-      <h2 className="text-lg font-medium">フレンド</h2>
       {state === "none" && (
-        <Button disabled={busy} onClick={onSend} variant="accent" size="sm">
+        <Button disabled={busy} onClick={onSend} variant="ghost" size="sm" className="text-foreground min-w-[7rem] h-8">
           フレンド申請
         </Button>
       )}
       {state === "sent" && (
         <div className="flex gap-2 items-center">
           <span className="text-sm fg-muted">申請中...</span>
-          <Button disabled={busy} onClick={onCancel} variant="ghost" size="xs">
+          <Button disabled={busy} onClick={onCancel} variant="ghost" size="sm" className="text-foreground min-w-[7rem] h-8">
             キャンセル
           </Button>
         </div>
       )}
       {state === "received" && (
         <div className="flex gap-2">
-          <Button disabled={busy} onClick={onAccept} variant="accent" size="sm">
+          <Button disabled={busy} onClick={onAccept} variant="ghost" size="sm" className="text-foreground min-w-[7rem] h-8">
             承認
           </Button>
-          <Button disabled={busy} onClick={onCancel} variant="danger" size="sm">
+          <Button disabled={busy} onClick={onCancel} variant="danger" size="sm" className="min-w-[7rem] h-8">
             拒否
           </Button>
         </div>
       )}
       {state === "accepted" && (
-        <div className="flex gap-3 items-center">
-          <span className="text-sm text-green-700">フレンドです</span>
-          <Button disabled={busy} onClick={onRemove} variant="danger" size="xs">
+        <div className="flex gap-2 items-center">
+          <Button disabled={true} variant="accent" size="sm" className="text-foreground border border-[--accent] min-w-[7rem] h-8">
+            フレンド
+          </Button>
+          <Button disabled={busy} onClick={onRemove} variant="danger" size="sm" className="min-w-[7rem] h-8">
             解除
           </Button>
         </div>

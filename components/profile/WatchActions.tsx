@@ -12,16 +12,15 @@ interface WatchActionsProps {
 export default function WatchActions({ watching, busy = false, onToggle, disabled = false }: WatchActionsProps) {
   return (
     <div className="space-y-1">
-      <h3 className="text-sm font-medium">ウォッチ</h3>
       <Button
         type="button"
         onClick={onToggle}
         disabled={busy || disabled}
-        size="xs"
-        variant={watching ? "ghost" : "accent"}
-        className={watching ? "bg-gray-600 text-white hover:bg-gray-700 border-transparent" : undefined}
+        size="sm"
+        variant={watching ? "accent" : "ghost"}
+        className={(watching ? "text-foreground border border-[--accent] " : "text-foreground ") + "min-w-[7rem] h-8"}
       >
-        {busy ? "処理中..." : watching ? "ウォッチ解除" : "ウォッチ"}
+        {busy ? "処理中..." : watching ? "ウォッチ中" : "未ウォッチ"}
       </Button>
     </div>
   );
