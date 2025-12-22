@@ -10,6 +10,7 @@ import { subscribeComments } from "../../lib/repos/commentRepo";
 import { toggleLike, subscribeLikes } from "../../lib/repos/likeRepo";
 import { toggleReaction } from "../../lib/repos/reactionRepo";
 import { addNotification } from "../../lib/repos/notificationRepo";
+import { toggleRepost, subscribeReposts } from "../../lib/repos/repostRepo";
 import { translateError } from "../../lib/errors";
 import { notifications } from "@mantine/notifications";
 import DeleteConfirmModal from "../../components/album/DeleteConfirmModal";
@@ -32,6 +33,8 @@ export default function TimelinePage() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [reportTargetAlbumId, setReportTargetAlbumId] = useState<string | null>(null);
   const [reportBusy, setReportBusy] = useState(false);
+  const [undoRepostTargetAlbumId, setUndoRepostTargetAlbumId] = useState<string | null>(null);
+  const [undoRepostBusy, setUndoRepostBusy] = useState(false);
 
   const PAGE_SIZE = 20;
 
@@ -48,6 +51,26 @@ export default function TimelinePage() {
   useEffect(() => {
     rowsRef.current = rows;
   }, [rows]);
+
+  function toMillis(v: any): number {
+    if (!v) return 0;
+    if (v instanceof Date) return v.getTime();
+    if (typeof v?.toDate === 'function') return v.toDate().getTime();
+    if (typeof v === 'object' && typeof v.seconds === 'number') return v.seconds * 1000;
+    if (typeof v === 'number') return v > 1e12 ? v : v * 1000;
+    return 0;
+  }
+
+  function resortTimeline() {
+    setRows((prev) => {
+      const sorted = prev.slice().sort((a, b) => {
+        const ak = toMillis(a.repostedBy?.createdAt) || toMillis(a.album.createdAt) || 0;
+        const bk = toMillis(b.repostedBy?.createdAt) || toMillis(b.album.createdAt) || 0;
+        return bk - ak;
+      });
+      return sorted;
+    });
+  }
 
   useEffect(() => {
     hasMoreRef.current = hasMore;
@@ -139,6 +162,19 @@ export default function TimelinePage() {
       list.push(lUnsub);
       map.set(albumId, list);
     }
+
+    // reposts: 件数と自分の reposted を更新
+    const rpUnsub = await subscribeReposts(albumId, (list) => {
+      const cnt = list.length;
+      const me = list.some(x => x.userId === currentUid);
+      updateRowByAlbumId(albumId, (r) => ({ ...r, repostCount: cnt, reposted: me } as any));
+    }, (err) => console.warn("reposts subscribe error", err));
+    {
+      const map = unsubsByAlbumIdRef.current;
+      const list = map.get(albumId) ?? [];
+      list.push(rpUnsub);
+      map.set(albumId, list);
+    }
   }
 
   async function loadMore() {
@@ -196,6 +232,96 @@ export default function TimelinePage() {
       setLoading(false);
       setLoadingMore(false);
       inFlightRef.current = false;
+    }
+  }
+
+  async function handleToggleRepost(albumId: string) {
+    if (!user) return;
+    const row = rowsRef.current.find(r => r.album.id === albumId);
+    const currentlyReposted = !!row?.reposted;
+
+    // 取り消し時は確認モーダル
+    if (currentlyReposted) {
+      setUndoRepostTargetAlbumId(albumId);
+      return;
+    }
+
+    // 楽観更新（追加）
+    updateRowByAlbumId(albumId, (r) => ({
+      ...r,
+      reposted: true,
+      repostCount: (r.repostCount || 0) + 1,
+      // バナーも即時反映（ユーザー情報は省略可）
+      repostedBy: { userId: user.uid, createdAt: new Date() },
+    } as any));
+    // 並び順も即時反映（最新リポスト優先）
+    resortTimeline();
+
+    // バナー内のユーザー情報（アイコン/表示名）を即時補完
+    (async () => {
+      try {
+        let cu = userCacheRef.current.get(user.uid);
+        if (cu === undefined) {
+          const u = await getUser(user.uid);
+          cu = u ? { uid: u.uid, handle: u.handle || null, iconURL: u.iconURL || null, displayName: u.displayName } : null;
+          userCacheRef.current.set(user.uid, cu);
+        }
+        const fallbackIcon = (user as any).photoURL || undefined;
+        const enriched = cu || { uid: user.uid, handle: null, iconURL: (fallbackIcon || null) as any, displayName: user.displayName || undefined };
+        updateRowByAlbumId(albumId, (r) => ({
+          ...r,
+          repostedBy: { ...(r.repostedBy as any), user: enriched },
+        } as any));
+      } catch { /* noop */ }
+    })();
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/reposts/toggle', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
+        body: JSON.stringify({ albumId, userId: user.uid }),
+      });
+      if (!res.ok) {
+        await toggleRepost(albumId, user.uid);
+      }
+    } catch {
+      // rollback
+      updateRowByAlbumId(albumId, (r) => ({ ...r, reposted: false, repostCount: Math.max(0, (r.repostCount || 0) - 1) } as any));
+      resortTimeline();
+    }
+  }
+
+  async function handleConfirmUndoRepost() {
+    const albumId = undoRepostTargetAlbumId;
+    if (!albumId) return;
+    if (!user) return;
+    setUndoRepostBusy(true);
+    // 楽観反転（取り消し）
+    updateRowByAlbumId(albumId, (r) => ({
+      ...r,
+      reposted: false,
+      repostCount: Math.max(0, (r.repostCount || 0) - 1),
+      repostedBy: (r.repostedBy && (r.repostedBy as any).userId === user.uid) ? undefined : r.repostedBy,
+    } as any));
+    resortTimeline();
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/reposts/toggle', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
+        body: JSON.stringify({ albumId, userId: user.uid }),
+      });
+      if (!res.ok) {
+        await toggleRepost(albumId, user.uid);
+      }
+      setUndoRepostTargetAlbumId(null);
+    } catch {
+      // rollback（戻して閉じる）
+      updateRowByAlbumId(albumId, (r) => ({ ...r, reposted: true, repostCount: (r.repostCount || 0) + 1 } as any));
+      resortTimeline();
+      setUndoRepostTargetAlbumId(null);
+    } finally {
+      setUndoRepostBusy(false);
     }
   }
 
@@ -419,6 +545,9 @@ export default function TimelinePage() {
               likeCount={row.likeCount}
               liked={row.liked}
               onLike={() => handleToggleLike(row.album.id)}
+              repostCount={row.repostCount}
+              reposted={row.reposted}
+              onToggleRepost={() => handleToggleRepost(row.album.id)}
               currentUserId={user?.uid || undefined}
               onRequestDelete={(albumId) => setDeleteTargetAlbumId(albumId)}
               onRequestReport={(albumId) => setReportTargetAlbumId(albumId)}
@@ -430,6 +559,7 @@ export default function TimelinePage() {
               onToggleReaction={(emoji) => handleToggleReaction(row.album.id, emoji)}
               owner={row.owner ?? undefined}
               imageAdded={row.imageAdded}
+              repostedBy={row.repostedBy}
               isFriend={!!(row.owner?.uid && friendSet.has(row.owner.uid))}
               isWatched={!!(row.owner?.uid && watchSet.has(row.owner.uid))}
             />
@@ -457,6 +587,29 @@ export default function TimelinePage() {
         onCancel={() => { if (!reportBusy) setReportTargetAlbumId(null); }}
         onConfirm={() => { if (!reportBusy) handleConfirmReport(); }}
       />
+      {/* リポスト取り消し確認モーダル */}
+      {undoRepostTargetAlbumId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-80 rounded bg-background border border-line p-4 shadow-lg">
+            <h3 className="text-sm font-semibold">リポストを取り消しますか？</h3>
+            <p className="mt-2 text-xs text-muted/80">この操作はいつでもやり直せます。</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded bg-surface-weak border border-line px-3 py-1 text-xs"
+                onClick={() => { if (!undoRepostBusy) setUndoRepostTargetAlbumId(null); }}
+                disabled={undoRepostBusy}
+              >キャンセル</button>
+              <button
+                type="button"
+                className="rounded bg-emerald-600 px-3 py-1 text-xs text-white disabled:opacity-50"
+                onClick={() => { if (!undoRepostBusy) handleConfirmUndoRepost(); }}
+                disabled={undoRepostBusy}
+              >{undoRepostBusy ? "処理中..." : "取り消す"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

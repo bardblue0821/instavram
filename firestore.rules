@@ -89,6 +89,17 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    // reposts/{repostId} （ID = albumId_userId）
+    match /reposts/{repostId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && repostId == request.resource.data.albumId + '_' + request.resource.data.userId
+        && request.resource.data.keys().hasAll(['albumId','userId','createdAt']);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow update: if false;
+    }
+
     // friends/{relationId} （ID = userId_targetId）
     match /friends/{relationId} {
       // 読み取りはログインユーザーなら許可（プロフィール閲覧や申請状態確認を簡易化）

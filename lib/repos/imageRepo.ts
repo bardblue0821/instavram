@@ -34,6 +34,20 @@ export async function listImages(albumId: string) {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
 }
 
+// アルバムに画像を追加したユーザーの UID 一覧（重複なし）
+export async function listUploaderIdsByAlbum(albumId: string): Promise<string[]> {
+  const q = query(collection(db, COL.albumImages), where('albumId', '==', albumId))
+  const { getDocs } = await import('firebase/firestore')
+  const snap = await getDocs(q)
+  const set = new Set<string>()
+  for (const d of snap.docs) {
+    const data: any = d.data()
+    const uid = data?.uploaderId
+    if (typeof uid === 'string' && uid) set.add(uid)
+  }
+  return Array.from(set)
+}
+
 // ユーザーが投稿した画像一覧（アルバム横断）
 export async function listImagesByUploader(userId: string, limitCount = 200) {
   const q = query(

@@ -26,15 +26,24 @@ export type ImageAddedVM = {
   createdAt?: any;
 };
 
+export type RepostedVM = {
+  userId: string;
+  user?: UserRef;
+  createdAt?: any;
+};
+
 export type TimelineItemVM = {
   album: AlbumVM;
   images: ImgVM[];
   likeCount: number;
   liked: boolean;
+  repostCount?: number;
+  reposted?: boolean;
   commentCount?: number;
   latestComment?: LatestCommentVM;
   commentsPreview?: CommentPreviewVM[];
   reactions: ReactionVM[];
   owner?: UserRef | null;
   imageAdded?: ImageAddedVM;
+  repostedBy?: RepostedVM;
 };

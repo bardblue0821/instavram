@@ -2,10 +2,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Avatar from "../profile/Avatar";
 import { listReactorsByAlbumEmoji, Reactor } from "../../lib/repos/reactionRepo";
+import { listLikersByAlbum } from "../../lib/repos/likeRepo";
+import { listRepostersByAlbum } from "../../lib/repos/repostRepo";
+import { getUser } from "../../lib/repos/userRepo";
 import { REACTION_CATEGORIES, filterReactionEmojis } from "../../lib/constants/reactions";
 import { HeartIcon } from "../icons/HeartIcon";
 import { ChatIcon } from "../icons/ChatIcon";
 import { Button } from "../ui/Button";
+import { RepostIcon } from "../icons/RepostIcon";
 
 type Img = { url: string; thumbUrl?: string; uploaderId?: string };
 type LatestComment = { body: string; userId: string } | undefined;
@@ -28,6 +32,9 @@ export function TimelineItem(props: {
   likeCount: number;
   liked: boolean;
   onLike: () => Promise<void> | void;
+  repostCount?: number;
+  reposted?: boolean;
+  onToggleRepost?: () => Promise<void> | void;
   currentUserId?: string;
   onRequestDelete?: (albumId: string) => void;
   onRequestReport?: (albumId: string) => void;
@@ -40,6 +47,7 @@ export function TimelineItem(props: {
   onToggleReaction?: (emoji: string) => void;
   owner?: { uid: string; handle: string | null; iconURL?: string | null; displayName?: string };
   imageAdded?: ImageAdded;
+  repostedBy?: { userId: string; user?: { uid: string; handle: string | null; iconURL?: string | null; displayName?: string }; createdAt?: any };
   isFriend?: boolean;
   isWatched?: boolean;
 }) {
@@ -49,6 +57,9 @@ export function TimelineItem(props: {
     likeCount,
     liked,
     onLike,
+    repostCount = 0,
+    reposted = false,
+    onToggleRepost,
     currentUserId,
     onRequestDelete,
     onRequestReport,
@@ -61,6 +72,7 @@ export function TimelineItem(props: {
     onToggleReaction,
     owner,
     imageAdded,
+    repostedBy,
     isFriend,
     isWatched,
   } = props;
@@ -73,6 +85,39 @@ export function TimelineItem(props: {
   const [hoveredEmoji, setHoveredEmoji] = useState<string | null>(null);
   const [reactorMap, setReactorMap] = useState<Record<string, Reactor[] | undefined>>({});
   const [reactorLoading, setReactorLoading] = useState<Record<string, boolean>>({});
+  const [likersOpen, setLikersOpen] = useState(false);
+  const [likersLoading, setLikersLoading] = useState(false);
+  const [likers, setLikers] = useState<Reactor[] | undefined>(undefined);
+  const [repostersOpen, setRepostersOpen] = useState(false);
+  const [repostersLoading, setRepostersLoading] = useState(false);
+  const [reposters, setReposters] = useState<Reactor[] | undefined>(undefined);
+  const [me, setMe] = useState<{ uid: string; displayName?: string | null; handle?: string | null; iconURL?: string | null } | null>(null);
+
+  async function ensureMe() {
+    if (!currentUserId || me) return;
+    try {
+      const u = await getUser(currentUserId);
+      setMe(u ? { uid: currentUserId, displayName: u.displayName ?? null, handle: u.handle ?? null, iconURL: u.iconURL ?? null } : { uid: currentUserId });
+    } catch {
+      // ignore
+    }
+  }
+
+  // 楽観表示: 直後のホバーでまだ取得前でも、自分のアクションを表示に反映
+  const viewLikers = useMemo(() => {
+    const base = likers ? [...likers] : [];
+    if (liked && currentUserId && !base.some(u => u.uid === currentUserId)) {
+      base.unshift({ uid: currentUserId, displayName: me?.displayName || 'あなた', handle: me?.handle ?? null, iconURL: me?.iconURL || undefined });
+    }
+    return base;
+  }, [likers, liked, currentUserId, me]);
+  const viewReposters = useMemo(() => {
+    const base = reposters ? [...reposters] : [];
+    if (reposted && currentUserId && !base.some(u => u.uid === currentUserId)) {
+      base.unshift({ uid: currentUserId, displayName: me?.displayName || 'あなた', handle: me?.handle ?? null, iconURL: me?.iconURL || undefined });
+    }
+    return base;
+  }, [reposters, reposted, currentUserId, me]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [emojiQuery, setEmojiQuery] = useState("");
   const [activeCat, setActiveCat] = useState(REACTION_CATEGORIES[0]?.key || 'faces');
@@ -116,6 +161,36 @@ export function TimelineItem(props: {
     }
   }
   function onChipLeave() { setHoveredEmoji(null); }
+
+  async function ensureLikers() {
+    if (likers || likersLoading) return;
+    setLikersLoading(true);
+    try {
+      const list = await listLikersByAlbum(album.id, 20);
+      setLikers(list);
+    } finally {
+      setLikersLoading(false);
+    }
+  }
+
+  async function ensureReposters() {
+    if (reposters || repostersLoading) return;
+    setRepostersLoading(true);
+    try {
+      const list = await listRepostersByAlbum(album.id, 20);
+      setReposters(list);
+    } finally {
+      setRepostersLoading(false);
+    }
+  }
+
+  // アクション直後に自分のプロフィールを用意しておく（楽観表示に本名/アイコンを反映）
+  useEffect(() => {
+    if ((liked || reposted) && currentUserId && !me) {
+      ensureMe();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liked, reposted, currentUserId]);
 
   // ピッカー外クリック/ESCで閉じる
   useEffect(() => {
@@ -264,6 +339,33 @@ export function TimelineItem(props: {
   return (
     <article className="py-4 space-y-3">        
       <header className="space-y-2">
+        {repostedBy?.userId && (
+          <div className="flex items-center gap-2">
+            <a href={`/user/${repostedBy.user?.handle || repostedBy.userId}`} className="shrink-0" aria-label="リポスターのプロフィールへ">
+              <Avatar src={repostedBy.user?.iconURL || undefined} size={28} interactive={false} withBorder={false} className="rounded-full" />
+            </a>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-sm truncate">
+                  {currentUserId && repostedBy.userId === currentUserId ? (
+                    <>
+                      <span className="font-medium">あなた</span>
+                      <span className="text-muted/80"> がリポストしました</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-medium">{repostedBy.user?.displayName || (repostedBy.user?.handle ? `@${repostedBy.user.handle}` : repostedBy.userId.slice(0, 6))}</span>
+                      <span className="text-muted/80"> さんがリポストしました</span>
+                    </>
+                  )}
+                </span>
+                {fmtDateTime(toDate(repostedBy.createdAt)) && (
+                  <span className="text-xs text-muted/80 shrink-0">{fmtDateTime(toDate(repostedBy.createdAt))}</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         {imageAdded?.userId && (
           <div className="flex items-center gap-2">
             <a href={`/user/${imageAdded.user?.handle || imageAdded.userId}`} className="shrink-0" aria-label="追加者のプロフィールへ">
@@ -367,15 +469,103 @@ export function TimelineItem(props: {
       </div>
 
       <div className="flex items-center gap-3">
-        <button
-          aria-label={liked ? "いいね済み" : "いいね"}
-          aria-pressed={liked}
-          className={`${liked ? "text-pink-600" : "text-muted"}`}
-          onClick={() => onLike?.()}
+        {/* Like with hover popover */}
+        <div
+          className="relative flex items-center gap-1"
+          onMouseEnter={() => { setLikersOpen(true); ensureLikers(); ensureMe(); }}
+          onMouseLeave={() => setLikersOpen(false)}
         >
-          <HeartIcon filled={liked} size={20} />
-        </button>
-  <span className="text-xs text-muted/80">{likeCount}</span>
+          <button
+            aria-label={liked ? "いいね済み" : "いいね"}
+            aria-pressed={liked}
+            className={`${liked ? "text-pink-600" : "text-muted"}`}
+            onClick={() => onLike?.()}
+          >
+            <HeartIcon filled={liked} size={20} />
+          </button>
+          <span className="text-xs text-muted/80">{likeCount}</span>
+          {likersOpen && (
+            <div className="absolute left-0 top-full mt-1 w-64 rounded border border-line bg-background shadow-lg z-40">
+              <div className="p-2">
+                <p className="text-[11px] text-muted/80 mb-1">いいねした人</p>
+                {likersLoading && <p className="text-xs text-muted/80">読み込み中...</p>}
+                {!likersLoading && (
+                  (viewLikers && viewLikers.length > 0) ? (
+                    <ul className="max-h-64 overflow-auto divide-y divide-line">
+                      {viewLikers.map((u) => {
+                        const name = u.displayName || '名前未設定';
+                        return (
+                        <li key={u.uid}>
+                          <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 px-2 py-1 hover:bg-surface-weak">
+                            {u.iconURL ? (
+                              <img src={u.iconURL} alt="" className="h-5 w-5 rounded-full object-cover" />
+                            ) : (
+                              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-surface-weak text-[10px] text-muted">{u.displayName?.[0] || '?'}</span>
+                            )}
+                            <span className="text-sm font-medium">{name}</span>
+                            {u.handle && <span className="text-[11px] text-muted/80">@{u.handle}</span>}
+                          </a>
+                        </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-muted/80">まだいません</p>
+                  )
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Repost with hover popover */}
+        <div
+          className="relative flex items-center gap-1"
+          onMouseEnter={() => { setRepostersOpen(true); ensureReposters(); ensureMe(); }}
+          onMouseLeave={() => setRepostersOpen(false)}
+        >
+          <button
+            aria-label={reposted ? "リポスト済み" : "リポスト"}
+            aria-pressed={reposted}
+            className={`${reposted ? "text-green-600" : "text-muted"}`}
+            onClick={() => onToggleRepost?.()}
+          >
+            <RepostIcon filled={reposted} size={20} />
+          </button>
+          <span className="text-xs text-muted/80">{repostCount}</span>
+          {repostersOpen && (
+            <div className="absolute left-0 top-full mt-1 w-64 rounded border border-line bg-background shadow-lg z-40">
+              <div className="p-2">
+                <p className="text-[11px] text-muted/80 mb-1">リポストした人</p>
+                {repostersLoading && <p className="text-xs text-muted/80">読み込み中...</p>}
+                {!repostersLoading && (
+                  (viewReposters && viewReposters.length > 0) ? (
+                    <ul className="max-h-64 overflow-auto divide-y divide-line">
+                      {viewReposters.map((u) => {
+                        const name = u.displayName || '名前未設定';
+                        return (
+                        <li key={u.uid}>
+                          <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 px-2 py-1 hover:bg-surface-weak">
+                            {u.iconURL ? (
+                              <img src={u.iconURL} alt="" className="h-5 w-5 rounded-full object-cover" />
+                            ) : (
+                              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-surface-weak text-[10px] text-muted">{u.displayName?.[0] || '?'}</span>
+                            )}
+                            <span className="text-sm font-medium">{name}</span>
+                            {u.handle && <span className="text-[11px] text-muted/80">@{u.handle}</span>}
+                          </a>
+                        </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-muted/80">まだいません</p>
+                  )
+                )}
+              </div>
+            </div>
+          )}
+        </div>
         {onCommentSubmit && (
           <button
             type="button"
@@ -416,20 +606,23 @@ export function TimelineItem(props: {
                     {!reactorLoading[r.emoji] && (
                       (reactorMap[r.emoji] && reactorMap[r.emoji]!.length > 0) ? (
                         <ul className="max-h-64 overflow-auto divide-y divide-line">
-                          {reactorMap[r.emoji]!.map((u) => (
-                            <li key={u.uid}>
-                              <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 px-2 py-1 hover:bg-surface-weak">
-                                {u.iconURL ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={u.iconURL} alt="" className="h-5 w-5 rounded-full object-cover" />
-                                ) : (
-                                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-surface-weak text-[10px] text-muted">{u.displayName?.[0] || '?'}</span>
-                                )}
-                                <span className="text-sm font-medium">{u.displayName}</span>
-                                <span className="text-[11px] text-muted/80">@{u.handle || u.uid.slice(0,6)}</span>
-                              </a>
-                            </li>
-                          ))}
+                          {reactorMap[r.emoji]!.map((u) => {
+                            const name = u.displayName || '名前未設定';
+                            return (
+                              <li key={u.uid}>
+                                <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 px-2 py-1 hover:bg-surface-weak">
+                                  {u.iconURL ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={u.iconURL} alt="" className="h-5 w-5 rounded-full object-cover" />
+                                  ) : (
+                                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-surface-weak text-[10px] text-muted">{u.displayName?.[0] || '?'}</span>
+                                  )}
+                                  <span className="text-sm font-medium">{name}</span>
+                                  {u.handle && <span className="text-[11px] text-muted/80">@{u.handle}</span>}
+                                </a>
+                              </li>
+                            );
+                          })}
                         </ul>
                       ) : (
                         <p className="text-xs text-muted/80">まだいません</p>
