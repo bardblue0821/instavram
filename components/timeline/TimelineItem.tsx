@@ -257,10 +257,10 @@ export function TimelineItem(props: {
               <div className="flex items-center gap-2">
                 <span className="text-sm truncate">
                   <span className="font-medium">{imageAdded.user?.displayName || (imageAdded.user?.handle ? `@${imageAdded.user.handle}` : imageAdded.userId.slice(0, 6))}</span>
-                  <span className="fg-subtle"> さんが画像を追加しました</span>
+                  <span className="text-muted/80"> さんが画像を追加しました</span>
                 </span>
                 {fmtDateTime(toDate(imageAdded.createdAt)) && (
-                  <span className="text-xs fg-subtle shrink-0">{fmtDateTime(toDate(imageAdded.createdAt))}</span>
+                  <span className="text-xs text-muted/80 shrink-0">{fmtDateTime(toDate(imageAdded.createdAt))}</span>
                 )}
               </div>
             </div>
@@ -285,7 +285,7 @@ export function TimelineItem(props: {
                   <span className="text-[11px] px-2 py-0.5 rounded bg-sky-500 text-white shrink-0" title="ウォッチ中">ウォッチ中</span>
                 )}
               </div>
-              <span className="text-sm fg-subtle">{owner?.handle ? `@${owner.handle}` : 'ハンドル未設定'}</span>
+              <span className="text-sm text-muted/80">{owner?.handle ? `@${owner.handle}` : 'ハンドル未設定'}</span>
             </a>
           </div>
 
@@ -296,7 +296,7 @@ export function TimelineItem(props: {
               aria-label="メニュー"
               aria-haspopup="menu"
               aria-expanded={menuOpen}
-              className="w-8 h-8 rounded border border-base hover-surface-alt fg-muted"
+              className="w-8 h-8 rounded border border-line hover:bg-surface-weak text-muted"
               onClick={() => setMenuOpen((o) => !o)}
             >
               ⋯
@@ -305,13 +305,13 @@ export function TimelineItem(props: {
               <div
                 ref={menuRef}
                 role="menu"
-                className="absolute right-0 top-full mt-2 w-40 rounded border border-base bg-page shadow-lg z-50 overflow-hidden"
+                className="absolute right-0 top-full mt-2 w-40 rounded border border-line bg-background shadow-lg z-50 overflow-hidden"
               >
                 {currentUserId && currentUserId === album.ownerId && (
                   <button
                     type="button"
                     role="menuitem"
-                    className="w-full text-left px-3 py-2 text-sm hover-surface-alt"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-surface-weak"
                     onClick={() => {
                       setMenuOpen(false);
                       onRequestDelete?.(album.id);
@@ -324,7 +324,7 @@ export function TimelineItem(props: {
                 <button
                   type="button"
                   role="menuitem"
-                  className="w-full text-left px-3 py-2 text-sm hover-surface-alt"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-surface-weak"
                   onClick={() => {
                     setMenuOpen(false);
                     onRequestReport?.(album.id);
@@ -340,7 +340,7 @@ export function TimelineItem(props: {
           <h3 className="text-base font-semibold flex items-center gap-2">
             <a href={`/album/${album.id}`}>{album.title}</a>
             {fmtDateTime(toDate(album.createdAt)) && (
-              <span className="text-xs fg-subtle shrink-0" title="投稿日時">{fmtDateTime(toDate(album.createdAt))}</span>
+              <span className="text-xs text-muted/80 shrink-0" title="投稿日時">{fmtDateTime(toDate(album.createdAt))}</span>
             )}
           </h3>
         )}
@@ -354,23 +354,23 @@ export function TimelineItem(props: {
         <button
           aria-label={liked ? "いいね済み" : "いいね"}
           aria-pressed={liked}
-          className={`${liked ? "text-pink-600" : "fg-muted"}`}
+          className={`${liked ? "text-pink-600" : "text-muted"}`}
           onClick={() => onLike?.()}
         >
           <HeartIcon filled={liked} size={20} />
         </button>
-        <span className="text-xs fg-subtle">{likeCount}</span>
+  <span className="text-xs text-muted/80">{likeCount}</span>
         {onCommentSubmit && (
           <button
             type="button"
             aria-label="コメント入力を開閉"
-            className={`fg-muted ${showCommentBox ? 'opacity-100' : 'opacity-80'}`}
+            className={`text-muted ${showCommentBox ? 'opacity-100' : 'opacity-80'}`}
             onClick={() => setShowCommentBox((v) => !v)}
           >
             <ChatIcon size={20} />
           </button>
         )}
-        <span className="text-xs fg-subtle">{commentCount}</span>
+  <span className="text-xs text-muted/80">{commentCount}</span>
       </div>
 
       {/* リアクション（簡易版：1以上のみ表示、クリックでトグル、ホバーでユーザー一覧） */}
@@ -384,33 +384,33 @@ export function TimelineItem(props: {
                 aria-label={`リアクション ${r.emoji}`}
                 aria-pressed={r.mine}
                 onClick={() => onToggleReaction?.(r.emoji)}
-                className={`rounded border px-2 py-1 text-sm ${r.mine ? "border-blue-600 bg-page text-blue-700" : "border-base bg-page fg-muted"}`}
+                className={`rounded border px-2 py-1 text-sm ${r.mine ? "border-blue-600 bg-background text-blue-700" : "border-line bg-background text-muted"}`}
               >{r.emoji} <span className="text-xs">{r.count}</span></button>
               {hoveredEmoji === r.emoji && (
-                <div className="absolute left-0 top-full mt-1 w-64 rounded border border-base bg-page shadow-lg z-40">
+                <div className="absolute left-0 top-full mt-1 w-64 rounded border border-line bg-background shadow-lg z-40">
                   <div className="p-2">
-                    <p className="text-[11px] fg-subtle mb-1">このリアクションをした人</p>
-                    {reactorLoading[r.emoji] && <p className="text-xs fg-subtle">読み込み中...</p>}
+                    <p className="text-[11px] text-muted/80 mb-1">このリアクションをした人</p>
+                    {reactorLoading[r.emoji] && <p className="text-xs text-muted/80">読み込み中...</p>}
                     {!reactorLoading[r.emoji] && (
                       (reactorMap[r.emoji] && reactorMap[r.emoji]!.length > 0) ? (
-                        <ul className="max-h-64 overflow-auto divide-y divide-base">
+                        <ul className="max-h-64 overflow-auto divide-y divide-line">
                           {reactorMap[r.emoji]!.map((u) => (
                             <li key={u.uid}>
-                              <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 px-2 py-1 hover-surface-alt">
+                              <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 px-2 py-1 hover:bg-surface-weak">
                                 {u.iconURL ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img src={u.iconURL} alt="" className="h-5 w-5 rounded-full object-cover" />
                                 ) : (
-                                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full surface-alt text-[10px] fg-muted">{u.displayName?.[0] || '?'}</span>
+                                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-surface-weak text-[10px] text-muted">{u.displayName?.[0] || '?'}</span>
                                 )}
                                 <span className="text-sm font-medium">{u.displayName}</span>
-                                <span className="text-[11px] fg-subtle">@{u.handle || u.uid.slice(0,6)}</span>
+                                <span className="text-[11px] text-muted/80">@{u.handle || u.uid.slice(0,6)}</span>
                               </a>
                             </li>
                           ))}
                         </ul>
                       ) : (
-                        <p className="text-xs fg-subtle">まだいません</p>
+                        <p className="text-xs text-muted/80">まだいません</p>
                       )
                     )}
                   </div>
@@ -427,11 +427,11 @@ export function TimelineItem(props: {
           aria-label="リアクションを追加"
           disabled={!onToggleReaction}
           onClick={() => setPickerOpen((o) => !o)}
-          className="px-1 text-lg leading-none fg-muted disabled:opacity-50"
+          className="px-1 text-lg leading-none text-muted disabled:opacity-50"
         >＋</button>
         {pickerOpen && (
-          <div ref={pickerRef} className="absolute top-full left-0 mt-2 w-80 bg-page border border-base rounded shadow-lg p-2 z-50">
-            <p className="text-xs fg-muted mb-2">絵文字を選択してください（再選択で解除）</p>
+          <div ref={pickerRef} className="absolute top-full left-0 mt-2 w-80 bg-background border border-line rounded shadow-lg p-2 z-50">
+            <p className="text-xs text-muted mb-2">絵文字を選択してください（再選択で解除）</p>
             <input
               autoFocus
               value={emojiQuery}
@@ -449,7 +449,7 @@ export function TimelineItem(props: {
                     aria-label={cat.label}
                     title={cat.label}
                     onClick={() => setActiveCat(cat.key)}
-                    className={`flex items-center justify-center w-8 h-8 text-lg rounded border ${activeCat===cat.key ? 'bg-blue-600 text-white border-blue-600' : 'bg-page fg-muted border-base'}`}
+                    className={`flex items-center justify-center w-8 h-8 text-lg rounded border ${activeCat===cat.key ? 'bg-blue-600 text-white border-blue-600' : 'bg-background text-muted border-line'}`}
                   >{cat.icon}</button>
                 ))}
               </div>
@@ -466,7 +466,7 @@ export function TimelineItem(props: {
                     aria-label={`リアクション ${e}`}
                     aria-pressed={mine}
                     onClick={() => { onToggleReaction?.(e); setPickerOpen(false); }}
-                    className={`rounded border px-2 py-1 text-sm ${mine ? "border-blue-600 bg-blue-600 text-white" : "border-base bg-page fg-muted"}`}
+                    className={`rounded border px-2 py-1 text-sm ${mine ? "border-blue-600 bg-blue-600 text-white" : "border-line bg-background text-muted"}`}
                   >{e}</button>
                 );
               })}
@@ -477,7 +477,7 @@ export function TimelineItem(props: {
       </div>
 
       {commentsPreview && commentsPreview.length > 0 && (
-  <div className="mt-2 border-l border-base pl-3 space-y-2">
+  <div className="mt-2 border-l border-line pl-3 space-y-2">
           {commentsPreview.slice(0, 3).map((c, idx) => {
             const u = c.user;
             const name = u?.displayName || '名前未設定';
@@ -511,8 +511,8 @@ export function TimelineItem(props: {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 truncate">
                     <a href={`/user/${u?.handle || c.userId}`} className="text-sm font-medium truncate">{name}</a>
-                    {u?.handle && <span className="text-xs fg-subtle shrink-0">@{u.handle}</span>}
-                    {timeText && <span className="text-xs fg-subtle shrink-0">{timeText}</span>}
+                    {u?.handle && <span className="text-xs text-muted/80 shrink-0">@{u.handle}</span>}
+                    {timeText && <span className="text-xs text-muted/80 shrink-0">{timeText}</span>}
                   </div>
                   <p className="text-sm truncate">{text}</p>
                 </div>

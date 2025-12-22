@@ -140,14 +140,14 @@ function SideNavInner() {
   const iconColorClass = currentTheme === 'dark' ? 'text-white' : 'text-black';
 
   return (
-    <nav ref={navRef as React.RefObject<HTMLElement | null>} aria-label="メインナビ" className="hidden sm:flex w-20 shrink-0 flex-col items-center gap-3 py-3 border-r border-base sticky top-0 h-dvh sidenav-bg">
+    <nav ref={navRef as React.RefObject<HTMLElement | null>} aria-label="メインナビ" className="hidden sm:flex w-20 shrink-0 flex-col items-center gap-3 py-3 border-r border-line sticky top-0 h-dvh sidenav-bg">
       {/* Profile on top */}
       <div className="">
         <Link
           href={user && handle ? `/user/${handle}` : (user ? `/user/${user.uid}` : '/login')}
           title="プロフィール"
           aria-label="プロフィール"
-          className="flex items-center justify-center w-15 h-15 rounded-lg border-2 border-transparent hover:border-(--accent) transition-colors"
+          className="flex items-center justify-center w-15 h-15 rounded-lg border-2 border-transparent hover:border-[--accent] transition-colors"
         >
           <Avatar size={56} src={profileDoc?.iconURL || undefined} alt="プロフィール" interactive={false} withBorder={false} />
         </Link>
@@ -163,7 +163,7 @@ function SideNavInner() {
             aria-label={it.label}
             data-href={it.href}
             data-new={isNew ? 'true' : 'false'}
-            className={`relative flex items-center justify-center w-12 h-12 rounded-lg ${isNew ? 'btn-accent-square' : 'hover-surface-alt'}`}
+            className={`relative flex items-center justify-center w-12 h-12 rounded-lg ${isNew ? 'btn-accent-square' : 'hover:bg-surface-weak'}`}
           >
             <span className={`text-xl leading-none ${iconClass}`} aria-hidden>
               {it.icon}
@@ -183,7 +183,7 @@ function SideNavInner() {
         <button
           type="button"
           ref={gearBtnRef}
-          className="relative flex items-center justify-center w-12 h-12 rounded-lg hover-surface-alt"
+          className="relative flex items-center justify-center w-12 h-12 rounded-lg hover:bg-surface-weak"
           aria-label="設定"
           title="設定"
           onClick={() => setMenuOpen(o => !o)}
@@ -191,7 +191,7 @@ function SideNavInner() {
           <span className={`text-xl ${iconColorClass}`} aria-hidden><IconGear /></span>
         </button>
         {menuOpen && (
-          <div ref={menuRef} className="absolute bottom-14 left-0 z-50 surface border border-base rounded-md shadow-md min-w-40 p-2">
+          <div ref={menuRef} className="absolute bottom-14 left-0 z-50 bg-background border border-line rounded-md shadow-md min-w-40 p-2">
             {user && (
               <Button
                 type="button"
@@ -241,9 +241,9 @@ function PathHighlighter({ navRef, items }: { navRef: React.RefObject<HTMLElemen
       const active = path.startsWith(href);
       if (!isNew) {
         if (active) {
-          a.classList.add('surface-alt');
+          a.classList.add('bg-surface-weak');
         } else {
-          a.classList.remove('surface-alt');
+          a.classList.remove('bg-surface-weak');
         }
       }
     });

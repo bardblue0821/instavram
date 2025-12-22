@@ -402,15 +402,15 @@ export default function TimelinePage() {
     }
   }
 
-  if (loading && rows.length === 0) return <div className="text-sm fg-subtle">読み込み中...</div>;
+  if (loading && rows.length === 0) return <div className="text-sm text-muted/80">読み込み中...</div>;
   if (error && rows.length === 0) return <div className="text-sm text-red-600">{error}</div>;
 
   return (
     <div className="max-w-2xl mx-auto p-4">
-      <h1 className="text-xl font-semibold mb-4">タイムライン</h1>
-  {rows.length === 0 && <p className="text-sm fg-subtle">対象アルバムがありません</p>}
+    <h1 className="text-xl font-semibold mb-4">タイムライン</h1>
+  {rows.length === 0 && <p className="text-sm text-muted/80">対象アルバムがありません</p>}
       {rows.length > 0 && (
-        <div className="divide-y divide-base *:pb-12">
+  <div className="divide-y divide-line *:pb-12">
           {rows.map((row, i) => (
             <TimelineItem
               key={row.album.id}
@@ -441,7 +441,7 @@ export default function TimelinePage() {
         <div className="mt-4 text-sm text-red-600">{error}</div>
       )}
       {loadingMore && (
-        <div className="mt-4 text-sm fg-subtle">読み込み中...</div>
+        <div className="mt-4 text-sm text-muted/80">読み込み中...</div>
       )}
       <div ref={sentinelRef} className="h-px" />
 

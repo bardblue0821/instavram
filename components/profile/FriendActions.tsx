@@ -23,7 +23,7 @@ export default function FriendActions({ state, busy = false, onSend, onCancel, o
       )}
       {state === "sent" && (
         <div className="flex gap-2 items-center">
-          <span className="text-sm fg-muted">申請中...</span>
+          <span className="text-sm text-muted">申請中...</span>
           <Button disabled={busy} onClick={onCancel} variant="ghost" size="sm" className="text-foreground min-w-[7rem] h-8">
             キャンセル
           </Button>

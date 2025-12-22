@@ -333,7 +333,7 @@ export default function ProfilePage() {
           const safeOwnerIconURL = ownerIconURL ? escapeHtml(ownerIconURL) : '';
 
           const subHtml = albumId
-            ? `<span class="inline-flex items-center gap-2">${ownerIconURL ? `<img src="${safeOwnerIconURL}" alt="" class="h-6 w-6 rounded-full object-cover" loading="lazy" />` : ''}<a href="/album/${safeAlbumId}" class="link-accent">${safeTitle}</a>${dateText ? ` <span class=\"text-xs fg-subtle\">${escapeHtml(dateText)}</span>` : ''}</span>`
+            ? `<span class="inline-flex items-center gap-2">${ownerIconURL ? `<img src="${safeOwnerIconURL}" alt="" class="h-6 w-6 rounded-full object-cover" loading="lazy" />` : ''}<a href="/album/${safeAlbumId}" class="link-accent">${safeTitle}</a>${dateText ? ` <span class=\"text-xs text-muted/80\">${escapeHtml(dateText)}</span>` : ''}</span>`
             : undefined;
 
           return {
@@ -667,8 +667,8 @@ export default function ProfilePage() {
   async function reauthGoogle() { try { const provider = new GoogleAuthProvider(); await reauthenticateWithPopup(auth.currentUser!, provider); } catch {} }
 
   // Guard
-  if (loading) return <div className="p-4 text-sm fg-subtle">読み込み中...</div>;
-  if (!profile) return <div className="p-4 text-sm fg-muted">ユーザーが見つかりません (handle)</div>;
+  if (loading) return <div className="p-4 text-sm text-muted/80">読み込み中...</div>;
+  if (!profile) return <div className="p-4 text-sm text-muted">ユーザーが見つかりません (handle)</div>;
 
   const isMe = user && profile && user.uid === profile.uid;
 
@@ -767,7 +767,7 @@ export default function ProfilePage() {
 
               {isMe && editingField === 'handle' ? (
                 <div className="flex items-baseline gap-1">
-                  <span className="text-sm fg-subtle">@</span>
+                  <span className="text-sm text-muted/80">@</span>
                   <input
                     autoFocus
                     type="text"
@@ -781,7 +781,7 @@ export default function ProfilePage() {
                 </div>
               ) : (
                 <span
-                  className={isMe ? "text-sm fg-muted truncate cursor-pointer" : "text-sm fg-muted truncate"}
+                  className={isMe ? "text-sm text-muted truncate cursor-pointer" : "text-sm text-muted truncate"}
                   title={profile.handle ? `@${profile.handle}` : 'ハンドル未設定'}
                   onClick={()=> isMe && beginEdit('handle', profile.handle || '')}
                 >
@@ -873,7 +873,7 @@ export default function ProfilePage() {
       />
 
       {isMe && (
-        <section className="space-y-2 pt-4 border-base">
+  <section className="space-y-2 pt-4 border-line">
           <Button type="button" variant="danger" size="sm" onClick={() => setShowDeleteAccount(true)}>
             アカウントを削除
           </Button>
@@ -883,17 +883,17 @@ export default function ProfilePage() {
       {!isMe && user && (
         <div className="space-y-2">
           <FriendActions state={friendState} busy={busy} onSend={doSend} onCancel={doCancel} onAccept={doAccept} onRemove={doRemove} />
-          <div className="pt-2 border-t border-base mt-3">
+          <div className="pt-2 border-t border-line mt-3">
             <WatchActions watching={watching} busy={watchBusy} onToggle={doWatchToggle} disabled={!user || (user && profile && user.uid === profile.uid)} />
           </div>
-          {!user && <p className="text-sm fg-muted">ログインすると操作できます</p>}
+          {!user && <p className="text-sm text-muted">ログインすると操作できます</p>}
         </div>
       )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-  <section className="space-y-4 pt-4 border-t border-base">
-        {loadingExtra && <p className="text-sm fg-subtle">読み込み中...</p>}
+  <section className="space-y-4 pt-4 border-t border-line">
+  {loadingExtra && <p className="text-sm text-muted/80">読み込み中...</p>}
         {extraError && <p className="text-sm text-red-600">{extraError}</p>}
 
         <div className="space-y-4 mt-4">
@@ -903,40 +903,40 @@ export default function ProfilePage() {
               type="button"
               role="tab"
               aria-selected={listTab==='own'}
-              className={`${listTab==='own' ? 'border-b-2 border-[--accent] text-foreground' : 'text-foreground/70 hover-surface-alt'} px-3 py-2`}
+              className={`${listTab==='own' ? 'border-b-2 border-[--accent] text-foreground' : 'text-foreground/70 hover:bg-surface-weak'} px-3 py-2`}
               onClick={()=> setListTab('own')}
-            >作成アルバム <span className="text-xs fg-muted ml-1">({ownAlbums?.length ?? stats?.ownCount ?? 0})</span></button>
+            >作成アルバム <span className="text-xs text-muted ml-1">({ownAlbums?.length ?? stats?.ownCount ?? 0})</span></button>
             <button
               type="button"
               role="tab"
               aria-selected={listTab==='joined'}
-              className={`${listTab==='joined' ? 'border-b-2 border-[--accent] text-foreground' : 'text-foreground/70 hover-surface-alt'} px-3 py-2`}
+              className={`${listTab==='joined' ? 'border-b-2 border-[--accent] text-foreground' : 'text-foreground/70 hover:bg-surface-weak'} px-3 py-2`}
               onClick={()=> setListTab('joined')}
-            >参加アルバム <span className="text-xs fg-muted ml-1">({joinedAlbums?.length ?? stats?.joinedCount ?? 0})</span></button>
+            >参加アルバム <span className="text-xs text-muted ml-1">({joinedAlbums?.length ?? stats?.joinedCount ?? 0})</span></button>
             <button
               type="button"
               role="tab"
               aria-selected={listTab==='comments'}
-              className={`${listTab==='comments' ? 'border-b-2 border-[--accent] text-foreground' : 'text-foreground/70 hover-surface-alt'} px-3 py-2`}
+              className={`${listTab==='comments' ? 'border-b-2 border-[--accent] text-foreground' : 'text-foreground/70 hover:bg-surface-weak'} px-3 py-2`}
               onClick={()=> setListTab('comments')}
-            >コメント <span className="text-xs fg-muted ml-1">({userComments?.length ?? stats?.commentCount ?? 0})</span></button>
+            >コメント <span className="text-xs text-muted ml-1">({userComments?.length ?? stats?.commentCount ?? 0})</span></button>
 
             <button
               type="button"
               role="tab"
               aria-selected={listTab==='images'}
-              className={`${listTab==='images' ? 'border-b-2 border-[--accent] text-foreground' : 'text-foreground/70 hover-surface-alt'} px-3 py-2`}
+              className={`${listTab==='images' ? 'border-b-2 border-[--accent] text-foreground' : 'text-foreground/70 hover:bg-surface-weak'} px-3 py-2`}
               onClick={()=> setListTab('images')}
-            >投稿画像 <span className="text-xs fg-muted ml-1">({uploadedLoading ? '…' : (uploadedPhotos ? uploadedPhotos.length : '-')})</span></button>
+            >投稿画像 <span className="text-xs text-muted ml-1">({uploadedLoading ? '…' : (uploadedPhotos ? uploadedPhotos.length : '-')})</span></button>
           </div>
 
           {/* Panels */}
           {listTab==='own' && (
             <div role="tabpanel" aria-label="作成アルバム">
-              {!ownAlbums && <p className="text-sm fg-subtle">-</p>}
-              {ownAlbums && ownAlbums.length === 0 && <p className="text-sm fg-subtle">まだアルバムがありません</p>}
+              {!ownAlbums && <p className="text-sm text-muted/80">-</p>}
+              {ownAlbums && ownAlbums.length === 0 && <p className="text-sm text-muted/80">まだアルバムがありません</p>}
               {ownRows && ownRows.length > 0 && (
-                <div className="divide-y divide-base *:pb-12">
+                <div className="divide-y divide-line *:pb-12">
                   {ownRows.map((row, i) => (
                     <TimelineItem
                       key={row.album.id}
@@ -963,13 +963,13 @@ export default function ProfilePage() {
 
           {listTab==='joined' && (
             <div role="tabpanel" aria-label="参加アルバム">
-              {!joinedAlbums && <p className="text-sm fg-subtle">-</p>}
-              {joinedAlbums && joinedAlbums.length === 0 && <p className="text-sm fg-subtle">参加アルバムはまだありません</p>}
-              <ul className="divide-y divide-base">
+              {!joinedAlbums && <p className="text-sm text-muted/80">-</p>}
+              {joinedAlbums && joinedAlbums.length === 0 && <p className="text-sm text-muted/80">参加アルバムはまだありません</p>}
+              <ul className="divide-y divide-line">
                 {joinedAlbums && joinedAlbums.map((a: any, i: number) => (
                   <li key={i} className="py-2">
                     <a href={`/album/${a.id}`} className="link-accent text-sm font-medium">{a.title || '無題'}</a>
-                    <p className="text-xs fg-subtle">{a.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
+                    <p className="text-xs text-muted/80">{a.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
                   </li>
                 ))}
               </ul>
@@ -978,14 +978,14 @@ export default function ProfilePage() {
 
           {listTab==='comments' && (
             <div role="tabpanel" aria-label="コメント">
-              {!userComments && <p className="text-sm fg-subtle">-</p>}
-              {userComments && userComments.length === 0 && <p className="text-sm fg-subtle">コメントはまだありません</p>}
-              <ul className="divide-y divide-base">
+              {!userComments && <p className="text-sm text-muted/80">-</p>}
+              {userComments && userComments.length === 0 && <p className="text-sm text-muted/80">コメントはまだありません</p>}
+              <ul className="divide-y divide-line">
                 {userComments && userComments.map(c => (
                   <li key={c.id} className="py-2 text-sm">
                     <p className="whitespace-pre-line">{c.body}</p>
                     <a href={`/album/${c.albumId}`} className="text-xs link-accent">アルバムへ</a>
-                    <p className="text-[10px] fg-subtle">{c.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
+                    <p className="text-[10px] text-muted/80">{c.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
                   </li>
                 ))}
               </ul>
@@ -994,7 +994,7 @@ export default function ProfilePage() {
 
           {listTab==='images' && (
             <div role="tabpanel" aria-label="投稿画像" className="space-y-2">
-              {uploadedLoading && <p className="text-sm fg-subtle">読み込み中...</p>}
+              {uploadedLoading && <p className="text-sm text-muted/80">読み込み中...</p>}
               {uploadedError && (
                 <div className="space-y-1">
                   <p className="text-sm text-red-600">{uploadedError}</p>
@@ -1009,7 +1009,7 @@ export default function ProfilePage() {
                 </div>
               )}
               {uploadedPhotos && uploadedPhotos.length === 0 && !uploadedLoading && (
-                <p className="text-sm fg-subtle">投稿画像はまだありません</p>
+                <p className="text-sm text-muted/80">投稿画像はまだありません</p>
               )}
               {uploadedPhotos && uploadedPhotos.length > 0 && (
                 <GalleryGrid
@@ -1030,16 +1030,16 @@ export default function ProfilePage() {
 
       {showDeleteAccount && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="relative surface-alt border border-base rounded shadow-lg max-w-sm w-[90%] p-5 space-y-3">
+          <div className="relative bg-surface-weak border border-line rounded shadow-lg max-w-sm w-[90%] p-5 space-y-3">
             <h3 className="text-sm font-semibold text-red-600">アカウント削除の確認</h3>
-            <p className="text-xs fg-muted">この操作は元に戻せません。作成したアルバム/コメント/いいね/フレンド/ウォッチは削除されます（通知は残る場合があります）。</p>
-            <label className="flex items-center gap-2 text-xs fg-muted">
+            <p className="text-xs text-muted">この操作は元に戻せません。作成したアルバム/コメント/いいね/フレンド/ウォッチは削除されます（通知は残る場合があります）。</p>
+            <label className="flex items-center gap-2 text-xs text-muted">
               <input type="checkbox" checked={agreeDelete} onChange={e=> setAgreeDelete(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
               理解しました
             </label>
             {canReauthWithPassword && (
               <div>
-                <label className="block text-xs fg-muted mb-1">パスワード（再認証）</label>
+                <label className="block text-xs text-muted mb-1">パスワード（再認証）</label>
                 <input
                   type="password"
                   value={pw}
@@ -1054,7 +1054,7 @@ export default function ProfilePage() {
                 />
               </div>
             )}
-            {deleting && (<p className="text-xs fg-muted">処理中: {deleteStep || '...'}</p>)}
+            {deleting && (<p className="text-xs text-muted">処理中: {deleteStep || '...'}</p>)}
             <div className="flex justify-end gap-2">
               <Button type="button" variant="ghost" size="md" disabled={deleting} onClick={()=> setShowDeleteAccount(false)}>キャンセル</Button>
               {canReauthWithGoogle && (
@@ -1076,9 +1076,9 @@ export default function ProfilePage() {
 
       {showDiscardConfirm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="surface rounded shadow-lg p-4 w-80 space-y-4">
+          <div className="bg-background rounded shadow-lg p-4 w-80 space-y-4">
             <h3 className="text-sm font-semibold">変更を破棄しますか？</h3>
-            <p className="text-xs fg-muted">保存せずに編集を終了すると内容は元に戻ります。保存しますか、それとも破棄しますか？</p>
+            <p className="text-xs text-muted">保存せずに編集を終了すると内容は元に戻ります。保存しますか、それとも破棄しますか？</p>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="subtle" size="xs" onClick={keepEditing}>編集を続ける</Button>
               <Button type="button" variant="accent" size="xs" onClick={saveFromModal}>保存</Button>
@@ -1091,25 +1091,25 @@ export default function ProfilePage() {
       {/* Watchers list modal */}
       {watchersOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={()=> setWatchersOpen(false)}>
-          <div className="relative surface-alt border border-base rounded shadow-lg max-w-sm w-[90%] p-5 space-y-3" onClick={(e)=> e.stopPropagation()}>
+          <div className="relative bg-surface-weak border border-line rounded shadow-lg max-w-sm w-[90%] p-5 space-y-3" onClick={(e)=> e.stopPropagation()}>
             <h3 className="text-sm font-semibold">ウォッチャー（{watchersCount}）</h3>
-            {watchersLoading && <p className="text-xs fg-subtle">読み込み中...</p>}
+            {watchersLoading && <p className="text-xs text-muted/80">読み込み中...</p>}
             {!watchersLoading && (watchersUsers?.length ? (
-              <ul className="max-h-80 overflow-auto divide-y divide-base">
+              <ul className="max-h-80 overflow-auto divide-y divide-line">
                 {watchersUsers!.map((u:any)=> (
                   <li key={u.uid} className="py-2">
-                    <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 hover-surface-alt px-1">
+                    <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 hover:bg-surface-weak px-1">
                       <Avatar src={u.iconURL || undefined} size={28} />
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate">{u.displayName || '名前未設定'}</div>
-                        <div className="text-[11px] fg-subtle truncate">@{u.handle || u.uid.slice(0,6)}</div>
+                        <div className="text-[11px] text-muted/80 truncate">@{u.handle || u.uid.slice(0,6)}</div>
                       </div>
                     </a>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-xs fg-subtle">ウォッチャーはいません</p>
+              <p className="text-xs text-muted/80">ウォッチャーはいません</p>
             ))}
             <div className="flex justify-end">
               <Button type="button" size="xs" variant="ghost" onClick={()=> setWatchersOpen(false)}>閉じる</Button>
@@ -1121,25 +1121,25 @@ export default function ProfilePage() {
       {/* Friends list modal */}
       {friendsOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={()=> setFriendsOpen(false)}>
-          <div className="relative surface-alt border border-base rounded shadow-lg max-w-sm w-[90%] p-5 space-y-3" onClick={(e)=> e.stopPropagation()}>
+          <div className="relative bg-surface-weak border border-line rounded shadow-lg max-w-sm w-[90%] p-5 space-y-3" onClick={(e)=> e.stopPropagation()}>
             <h3 className="text-sm font-semibold">フレンド（{friendsCount}）</h3>
-            {friendsLoading && <p className="text-xs fg-subtle">読み込み中...</p>}
+            {friendsLoading && <p className="text-xs text-muted/80">読み込み中...</p>}
             {!friendsLoading && (friendsUsers?.length ? (
-              <ul className="max-h-80 overflow-auto divide-y divide-base">
+              <ul className="max-h-80 overflow-auto divide-y divide-line">
                 {friendsUsers!.map((u:any)=> (
                   <li key={u.uid} className="py-2">
-                    <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 hover-surface-alt px-1">
+                    <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 hover:bg-surface-weak px-1">
                       <Avatar src={u.iconURL || undefined} size={28} />
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate">{u.displayName || '名前未設定'}</div>
-                        <div className="text-[11px] fg-subtle truncate">@{u.handle || u.uid.slice(0,6)}</div>
+                        <div className="text-[11px] text-muted/80 truncate">@{u.handle || u.uid.slice(0,6)}</div>
                       </div>
                     </a>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-xs fg-subtle">フレンドはいません</p>
+              <p className="text-xs text-muted/80">フレンドはいません</p>
             ))}
             <div className="flex justify-end">
               <Button type="button" size="xs" variant="ghost" onClick={()=> setFriendsOpen(false)}>閉じる</Button>

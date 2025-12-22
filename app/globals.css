@@ -20,12 +20,17 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* stylelint-disable at-rule-no-unknown */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-line: var(--border);
+  --color-muted: var(--muted);
+  --color-surface-weak: #484848;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
+/* stylelint-enable at-rule-no-unknown */
 
 body {
   background: var(--background);
@@ -33,29 +38,11 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* --------------------------------------
-  Headings (global)
-  目的: 画面ごとの h1/h2 のばらつきを減らし、見出しを統一する
-  NOTE: 個別画面でサイズを変えたい場合は className で上書きする
---------------------------------------- */
 h1 { font-size: 1.5rem; line-height: 2rem; font-weight: 600; }
 h2 { font-size: 1.125rem; line-height: 1.75rem; font-weight: 500; }
 h3 { font-size: 1rem; line-height: 1.5rem; font-weight: 600; }
 
-/* --------------------------------------
-  Surface / text / border utilities
-  目的: 既存の bg-white / bg-gray-50 / text-gray-* / border-gray-* を
-      テーマ変数依存へ段階的に移行するための薄いラッパ
---------------------------------------- */
-.surface { background-color: var(--background); }
-.surface-alt { background-color: #484848; }
-.fg-muted { color: var(--muted); }
-.fg-subtle { color: var(--muted); opacity: 0.8; }
-.border-base { border-color: var(--border); }
-.hover-surface-alt:hover { background-color: #484848; }
-.bg-page { background-color: var(--background); }
-.divide-base { border-color: var(--border); --tw-divide-color: var(--border); }
-.divide-y.divide-base > :not(:last-child) { border-color: var(--border); }
+
 
 /* --------------------------------------
    Accent utility classes (最小ユーティリティ)
@@ -71,13 +58,13 @@ h3 { font-size: 1rem; line-height: 1.5rem; font-weight: 600; }
   align-items: center;
   gap: 0.5rem;
   line-height: 1.25;
-  transition: background-color .15s, box-shadow .15s;
+  transition: background-color 0.15s, box-shadow 0.15s;
 }
 .btn-accent:hover {
   background-color: var(--accent-hover);
 }
 .btn-accent:disabled {
-  opacity: .5;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 .btn-accent:focus-visible {
@@ -92,7 +79,7 @@ h3 { font-size: 1rem; line-height: 1.5rem; font-weight: 600; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background-color .15s, box-shadow .15s;
+  transition: background-color 0.15s, box-shadow 0.15s;
 }
 .btn-accent-square:hover { background-color: var(--accent-hover); }
 .btn-accent-square:focus-visible {
@@ -129,10 +116,6 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Optional focus ring helper (Tailwind の ring を使わない場面向け) */
 .accent-ring:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Hover helpers for foreground colors */
-.hover-fg-muted:hover { color: var(--muted); }
-.hover-fg-subtle:hover { color: var(--muted); opacity: 0.85; }
-
 /* --------------------------------------
    Underline input style
    目的: 四角枠ではなく下線のみのミニマルな入力UI。
@@ -146,7 +129,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   padding: 0.5rem 0.75rem 0.4rem; /* 下線との距離を若干詰める */
   /* font-size: 0.95rem;*/
   line-height: 1.4;
-  transition: border-color .15s, box-shadow .15s, background-color .15s;
+  transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
 }
 .input-underline:focus-visible {
   outline: none;
@@ -155,10 +138,9 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 }
 .input-underline::placeholder { color: var(--muted); opacity: 0.7; }
 .input-underline:disabled {
-  opacity: .5;
+  opacity: 0.5;
   cursor: not-allowed;
 }
-/* エラー表示用バリアント（必要時に className へ追加） */
 .input-underline.error {
   border-bottom-color: #dc2626; /* red-600 */
   box-shadow: 0 1px 0 0 #dc2626;
@@ -183,9 +165,9 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   height:100%;
   background: var(--accent);
   width:0%;
-  transition: width .25s ease, background-color .25s ease;
+  transition: width 0.25s ease, background-color 0.25s ease;
 }
-.pw-strength-label { font-size: 0.65rem; letter-spacing: .5px; color: var(--muted); }
+.pw-strength-label { font-size: 0.65rem; letter-spacing: 0.5px; color: var(--muted); }
 .pw-strength-weak span { background:#dc2626; }
 .pw-strength-fair span { background:#f59e0b; }
 .pw-strength-good span { background:#0d9488; }
