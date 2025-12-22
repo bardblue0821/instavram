@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 
-type Variant = "primary" | "secondary" | "ghost" | "accent" | "accentSky" | "accentOrange" | "subtle" | "danger";
+type Variant = "primary" | "secondary" | "ghost" | "ghostFriend" | "ghostWatch" | "accent" | "accentSky" | "accentOrange" | "subtle" | "danger";
 type Size = "xs" | "sm" | "md" | "lg";
 
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -27,6 +27,9 @@ const variantClass: Record<Variant, string> = {
   secondary: "bg-background text-foreground hover:bg-surface-weak",
   // Ghost: 枠線 + muted テキスト + ホバーで弱い面
   ghost: "border border-line text-muted hover:bg-surface-weak",
+  // Ghost (feature-specific borders)
+  ghostFriend: "border border-friend text-foreground hover:bg-surface-weak",
+  ghostWatch: "border border-watch text-foreground hover:bg-surface-weak",
   // Subtle: 弱い面 + 枠線 + muted テキスト
   subtle: "bg-surface-weak border border-line text-muted hover:opacity-90",
   danger: "bg-red-600 text-white hover:bg-red-700",

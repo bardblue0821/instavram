@@ -881,7 +881,7 @@ export default function ProfilePage() {
       )}
 
       {!isMe && user && (
-        <div className="space-y-2 flex">
+        <div className="flex gap-3">
           <FriendActions state={friendState} busy={busy} onSend={doSend} onCancel={doCancel} onAccept={doAccept} onRemove={doRemove} />
           <WatchActions watching={watching} busy={watchBusy} onToggle={doWatchToggle} disabled={!user || (user && profile && user.uid === profile.uid)} />
           {!user && <p className="text-sm text-muted">ログインすると操作できます</p>}

@@ -20,9 +20,9 @@ export default function FriendActions({ state, busy = false, onSend, onCancel, o
         <Button
           disabled={busy}
           onClick={state === "none" ? onSend : onCancel}
-          variant="ghost"
+          variant="ghostFriend"
           size="sm"
-          className="text-foreground border-line min-w-[7rem] h-8"
+          className="min-w-[7rem] h-8"
         >
           {busy ? "処理中..." : state === "none" ? "フレンド申請" : "申請中"}
         </Button>

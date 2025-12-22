@@ -17,10 +17,8 @@ export default function WatchActions({ watching, busy = false, onToggle, disable
         onClick={onToggle}
         disabled={busy || disabled}
         size="sm"
-        variant={watching ? "accentSky" : "ghost"}
-        className={(watching 
-          ? "text-foreground "
-          : "text-foreground border-line ") + "min-w-[7rem] h-8"}
+        variant={watching ? "accentSky" : "ghostWatch"}
+        className={"min-w-[7rem] h-8"}
       >
         {busy ? "処理中..." : watching ? "ウォッチ中" : "未ウォッチ"}
       </Button>
