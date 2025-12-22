@@ -82,7 +82,7 @@ export async function listLatestAlbumsVMLimited(
   const missingAlbums = await Promise.all(missingIds.map(id => getAlbum(id)));
   const mergedAlbums = [...albums, ...missingAlbums.filter(a => !!a)];
 
-  const enriched: TimelineItemVM[] = await Promise.all(
+  const perAlbumRows: TimelineItemVM[][] = await Promise.all(
     mergedAlbums.map(async (album: any) => {
       let owner = cache.get(album.ownerId);
       if (owner === undefined) {
@@ -176,7 +176,7 @@ export async function listLatestAlbumsVMLimited(
         }
       }
 
-      return {
+      const base: Omit<TimelineItemVM, 'imageAdded'|'repostedBy'> & { imageAdded?: any; repostedBy?: any } = {
         album,
         images: imgRows,
         likeCount: likeCnt,
@@ -188,16 +188,30 @@ export async function listLatestAlbumsVMLimited(
         commentsPreview,
         reactions,
         owner,
-        imageAdded,
-        repostedBy,
-      } as TimelineItemVM;
+      } as any;
+
+      const rows: TimelineItemVM[] = [];
+      // 画像追加エントリ
+      if (imageAdded) {
+        rows.push({ ...base, imageAdded, repostedBy: undefined } as TimelineItemVM);
+      }
+      // リポストエントリ
+      if (repostedBy) {
+        rows.push({ ...base, repostedBy, imageAdded: undefined } as TimelineItemVM);
+      }
+      // どちらも無い場合のみベースを追加
+      if (!imageAdded && !repostedBy) {
+        rows.push({ ...base, imageAdded: undefined, repostedBy: undefined } as TimelineItemVM);
+      }
+      return rows;
     })
   );
+  const enriched: TimelineItemVM[] = ([] as TimelineItemVM[]).concat(...perAlbumRows);
 
-  // Sort by latest activity: prefer latest repost time if exists, else album.createdAt
+  // Sort by latest activity: prefer repost time, then image-added time, else album.createdAt
   const sorted = enriched.slice().sort((a, b) => {
-    const aKey = toMillis(a.repostedBy?.createdAt) || toMillis(a.album.createdAt) || 0;
-    const bKey = toMillis(b.repostedBy?.createdAt) || toMillis(b.album.createdAt) || 0;
+    const aKey = toMillis(a.repostedBy?.createdAt) || toMillis((a as any).imageAdded?.createdAt) || toMillis(a.album.createdAt) || 0;
+    const bKey = toMillis(b.repostedBy?.createdAt) || toMillis((b as any).imageAdded?.createdAt) || toMillis(b.album.createdAt) || 0;
     return bKey - aKey;
   });
 

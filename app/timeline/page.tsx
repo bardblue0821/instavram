@@ -64,8 +64,8 @@ export default function TimelinePage() {
   function resortTimeline() {
     setRows((prev) => {
       const sorted = prev.slice().sort((a, b) => {
-        const ak = toMillis(a.repostedBy?.createdAt) || toMillis(a.album.createdAt) || 0;
-        const bk = toMillis(b.repostedBy?.createdAt) || toMillis(b.album.createdAt) || 0;
+        const ak = toMillis(a.repostedBy?.createdAt) || toMillis((a as any).imageAdded?.createdAt) || toMillis(a.album.createdAt) || 0;
+        const bk = toMillis(b.repostedBy?.createdAt) || toMillis((b as any).imageAdded?.createdAt) || toMillis(b.album.createdAt) || 0;
         return bk - ak;
       });
       return sorted;
@@ -97,18 +97,14 @@ export default function TimelinePage() {
   }
 
   function updateRowByAlbumId(albumId: string, updater: (row: TimelineItemVM) => TimelineItemVM) {
-    setRows((prev) => {
-      const idx = prev.findIndex((r) => r.album.id === albumId);
-      if (idx < 0) return prev;
-      const next = [...prev];
-      next[idx] = updater(next[idx]);
-      return next;
-    });
+    setRows((prev) => prev.map((r) => (r.album.id === albumId ? updater(r) : r)));
   }
 
   async function subscribeForRow(row: TimelineItemVM, currentUid: string) {
     const albumId = row.album.id;
     if (!albumId) return;
+    // 重複購読を避ける（同じアルバムIDの行が複数存在するため）
+    if (unsubsByAlbumIdRef.current.has(albumId)) return;
 
     // comments: 最新コメントのみ更新
     const cUnsub = await subscribeComments(albumId, (list) => {
@@ -196,9 +192,12 @@ export default function TimelinePage() {
 
       if (prev.length === 0) {
         setRows(enriched);
-        // 初回は全件購読
-        for (let i = 0; i < enriched.length; i++) {
-          await subscribeForRow(enriched[i], currentUid);
+        // 初回はアルバムごとに一回のみ購読
+        const uniqAlbumIds = Array.from(new Set(enriched.map(r => r.album.id)));
+        for (let i = 0; i < uniqAlbumIds.length; i++) {
+          const id = uniqAlbumIds[i];
+          const row = enriched.find(r => r.album.id === id)!;
+          await subscribeForRow(row, currentUid);
         }
         // 初回にフレンド/ウォッチの関係をまとめて取得
         try {
@@ -219,8 +218,11 @@ export default function TimelinePage() {
         const appended = enriched.filter(r => r?.album?.id && !existingIds.has(r.album.id));
         if (appended.length > 0) {
           setRows(p => [...p, ...appended]);
-          for (let j = 0; j < appended.length; j++) {
-            await subscribeForRow(appended[j], currentUid);
+          const uniqNewIds = Array.from(new Set(appended.map(r => r.album.id))).filter(id => !unsubsByAlbumIdRef.current.has(id));
+          for (let j = 0; j < uniqNewIds.length; j++) {
+            const id = uniqNewIds[j];
+            const row = appended.find(r => r.album.id === id)!;
+            await subscribeForRow(row, currentUid);
           }
         }
       }
@@ -246,18 +248,23 @@ export default function TimelinePage() {
       return;
     }
 
-    // 楽観更新（追加）
-    updateRowByAlbumId(albumId, (r) => ({
-      ...r,
-      reposted: true,
-      repostCount: (r.repostCount || 0) + 1,
-      // バナーも即時反映（ユーザー情報は省略可）
-      repostedBy: { userId: user.uid, createdAt: new Date() },
-    } as any));
-    // 並び順も即時反映（最新リポスト優先）
+    // 楽観更新（追加）: 件数/フラグを全行に反映しつつ、リポスト専用の行を新規追加
+    setRows((prev) => {
+      const bumped = prev.map(r => r.album.id === albumId ? ({ ...r, reposted: true, repostCount: (r.repostCount || 0) + 1 } as any) : r);
+      if (!row) return bumped;
+      const newCreatedAt = new Date();
+      const newRow: TimelineItemVM = {
+        ...row,
+        reposted: true,
+        repostCount: (row.repostCount || 0) + 1,
+        repostedBy: { userId: user.uid, createdAt: newCreatedAt },
+        imageAdded: undefined,
+      } as any;
+      return [newRow, ...bumped];
+    });
     resortTimeline();
 
-    // バナー内のユーザー情報（アイコン/表示名）を即時補完
+    // バナー内のユーザー情報（アイコン/表示名）を即時補完（新規行の先頭を差し替え）
     (async () => {
       try {
         let cu = userCacheRef.current.get(user.uid);
@@ -268,10 +275,14 @@ export default function TimelinePage() {
         }
         const fallbackIcon = (user as any).photoURL || undefined;
         const enriched = cu || { uid: user.uid, handle: null, iconURL: (fallbackIcon || null) as any, displayName: user.displayName || undefined };
-        updateRowByAlbumId(albumId, (r) => ({
-          ...r,
-          repostedBy: { ...(r.repostedBy as any), user: enriched },
-        } as any));
+        setRows((prev) => {
+          const next = [...prev];
+          const idx = next.findIndex(r => r.album.id === albumId && (r.repostedBy as any)?.userId === user.uid && !(r as any).imageAdded);
+          if (idx >= 0) {
+            next[idx] = { ...next[idx], repostedBy: { ...(next[idx].repostedBy as any), user: enriched } } as any;
+          }
+          return next;
+        });
       } catch { /* noop */ }
     })();
     try {
@@ -296,13 +307,11 @@ export default function TimelinePage() {
     if (!albumId) return;
     if (!user) return;
     setUndoRepostBusy(true);
-    // 楽観反転（取り消し）
-    updateRowByAlbumId(albumId, (r) => ({
-      ...r,
-      reposted: false,
-      repostCount: Math.max(0, (r.repostCount || 0) - 1),
-      repostedBy: (r.repostedBy && (r.repostedBy as any).userId === user.uid) ? undefined : r.repostedBy,
-    } as any));
+    // 楽観反転（取り消し）: 自分のリポスト行を削除し、他の行の件数/フラグを反映
+    setRows((prev) => {
+      const removed = prev.filter(r => !(r.album.id === albumId && (r.repostedBy as any)?.userId === user.uid));
+      return removed.map(r => r.album.id === albumId ? ({ ...r, reposted: false, repostCount: Math.max(0, (r.repostCount || 0) - 1) } as any) : r);
+    });
     resortTimeline();
     try {
       const token = await user.getIdToken();
@@ -539,7 +548,11 @@ export default function TimelinePage() {
   <div className="divide-y divide-line *:pb-12">
           {rows.map((row, i) => (
             <TimelineItem
-              key={row.album.id}
+              key={row.repostedBy?.createdAt
+                ? `repost:${row.album.id}:${toMillis(row.repostedBy?.createdAt)}`
+                : (row as any).imageAdded?.createdAt
+                  ? `image:${row.album.id}:${toMillis((row as any).imageAdded?.createdAt)}`
+                  : `base:${row.album.id}`}
               album={row.album}
               images={row.images}
               likeCount={row.likeCount}
