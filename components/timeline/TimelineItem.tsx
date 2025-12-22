@@ -262,7 +262,7 @@ export function TimelineItem(props: {
   }
 
   return (
-    <article className={`py-4 space-y-3 ${isFriend ? 'border border-friend/50 rounded-md' : isWatched ? 'border border-watch/50 rounded-md' : ''}`}>        
+    <article className="py-4 space-y-3">        
       <header className="space-y-2">
         {imageAdded?.userId && (
           <div className="flex items-center gap-2">
