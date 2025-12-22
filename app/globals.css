@@ -38,6 +38,16 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Ensure all buttons show pointer cursor when interactive */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+button:disabled,
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
 h1 { font-size: 1.5rem; line-height: 2rem; font-weight: 600; }
 h2 { font-size: 1.125rem; line-height: 1.75rem; font-weight: 500; }
 h3 { font-size: 1rem; line-height: 1.5rem; font-weight: 600; }

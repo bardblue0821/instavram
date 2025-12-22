@@ -11,7 +11,7 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   fullWidth?: boolean;
 };
 
-const base = "inline-flex items-center justify-center rounded-lg font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
+const base = "inline-flex items-center justify-center rounded-lg font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
 
 function cn(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
@@ -20,9 +20,12 @@ function cn(...values: Array<string | false | null | undefined>) {
 const variantClass: Record<Variant, string> = {
   primary: "btn-accent", // legacy primary -> accent
   accent: "btn-accent",
-  secondary: "surface text-white hover:opacity-90",
-  ghost: "border border-base fg-muted hover-surface-alt",
-  subtle: "surface-alt border border-base fg-muted hover:opacity-90",
+  // Secondary: 落ち着いた面 + 前景色、ホバーで弱い面
+  secondary: "bg-background text-foreground hover:bg-surface-weak",
+  // Ghost: 枠線 + muted テキスト + ホバーで弱い面
+  ghost: "border border-line text-muted hover:bg-surface-weak",
+  // Subtle: 弱い面 + 枠線 + muted テキスト
+  subtle: "bg-surface-weak border border-line text-muted hover:opacity-90",
   danger: "bg-red-600 text-white hover:bg-red-700",
 };
 
