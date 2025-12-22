@@ -94,7 +94,7 @@ export default function AvatarModal({ open, onClose, uid, src, alt = 'ユーザ�
           <div className="space-y-3">
             <div className="mx-auto w-64 h-64 overflow-hidden border border-base rounded-lg surface">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={src || ''} alt={alt} className="object-cover w-full h-full" />
+              <img src={src || undefined} alt={alt} className="object-cover w-full h-full" />
             </div>
             {editable && (
               <div className="flex justify-center">

@@ -69,6 +69,7 @@ export default function ProfilePage() {
   // Tab state for lists
   const [listTab, setListTab] = useState<'own'|'joined'|'comments'|'images'>('own');
   const [ownRows, setOwnRows] = useState<any[]>([]);
+  const [joinedRows, setJoinedRows] = useState<any[]>([]);
 
   // Uploaded images tab
   const [uploadedPhotos, setUploadedPhotos] = useState<PhotoItem[] | null>(null);
@@ -473,6 +474,173 @@ export default function ProfilePage() {
     })();
     return () => { cancelled = true; };
   }, [ownAlbums, user?.uid, profile?.uid]);
+
+  // Build timeline-like rows for joined albums
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!joinedAlbums) { if (!cancelled) setJoinedRows([]); return; }
+        const cache = new Map<string, any>();
+        const rows = await Promise.all(joinedAlbums.map(async (album) => {
+          const [imgs, cmts, likeCnt, likedFlag, reactions, ownerUser] = await Promise.all([
+            listImages(album.id),
+            listComments(album.id),
+            countLikes(album.id),
+            user?.uid ? hasLiked(album.id, user.uid) : Promise.resolve(false),
+            listReactionsByAlbum(album.id, user?.uid || ''),
+            getUser(album.ownerId).catch(()=>null),
+          ]);
+          const cAsc = [...cmts]
+            .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0));
+          const latest = cAsc.slice(-1)[0];
+          const previewDesc = cAsc.slice(-3).reverse();
+          const commentsPreview = await Promise.all(previewDesc.map(async (c) => {
+            let cu = cache.get(c.userId);
+            if (cu === undefined) {
+              const u = await getUser(c.userId).catch(()=>null);
+              cu = u ? { uid: u.uid, handle: u.handle || null, iconURL: u.iconURL || null, displayName: u.displayName } : null;
+              cache.set(c.userId, cu);
+            }
+            return { body: c.body, userId: c.userId, user: cu || undefined, createdAt: c.createdAt };
+          }));
+          const imgRows = (imgs || [])
+            .map((x: any) => ({ url: x.url || x.downloadUrl || "", thumbUrl: x.thumbUrl || x.url || x.downloadUrl || "", uploaderId: x.uploaderId }))
+            .filter((x: any) => x.url);
+          const ownerRef = ownerUser ? { uid: ownerUser.uid, handle: ownerUser.handle || null, iconURL: ownerUser.iconURL || null, displayName: ownerUser.displayName } : undefined;
+          return {
+            album,
+            images: imgRows,
+            likeCount: likeCnt,
+            liked: !!likedFlag,
+            commentCount: (cmts || []).length,
+            latestComment: latest ? { body: latest.body, userId: latest.userId } : undefined,
+            commentsPreview,
+            reactions,
+            owner: ownerRef,
+          };
+        }));
+        if (!cancelled) setJoinedRows(rows);
+      } catch (e) {
+        if (!cancelled) setJoinedRows([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [joinedAlbums, user?.uid]);
+
+  // Like toggle for joined rows (optimistic)
+  async function handleToggleLikeJoined(index: number) {
+    if (!user) return;
+    const albumId = joinedRows[index]?.album?.id;
+    if (!albumId) return;
+    setJoinedRows((prev) => {
+      const next = [...prev];
+      const row = next[index];
+      if (!row) return prev;
+      const likedPrev = row.liked;
+      row.liked = !likedPrev;
+      row.likeCount = likedPrev ? row.likeCount - 1 : row.likeCount + 1;
+      return next;
+    });
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/likes/toggle', {
+        method: 'POST', headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
+        body: JSON.stringify({ albumId, userId: user.uid }),
+      });
+      if (!res.ok) {
+        await toggleLike(albumId, user.uid);
+      }
+    } catch {
+      // rollback
+      setJoinedRows((prev) => {
+        const next = [...prev];
+        const row = next[index];
+        if (!row) return prev;
+        row.liked = !row.liked;
+        row.likeCount = row.liked ? row.likeCount + 1 : row.likeCount - 1;
+        return next;
+      });
+    }
+  }
+
+  // Reaction toggle for joined rows (optimistic + notification)
+  async function handleToggleReactionJoined(index: number, emoji: string) {
+    if (!user) return;
+    const albumId = joinedRows[index]?.album?.id;
+    if (!albumId) return;
+    setJoinedRows((prev) => {
+      const next = [...prev];
+      const row = next[index];
+      if (!row) return prev;
+      const list = row.reactions.slice();
+      const idx = list.findIndex((x: any) => x.emoji === emoji);
+      if (idx >= 0) {
+        const item = { ...list[idx] };
+        if (item.mine) { item.mine = false; item.count = Math.max(0, item.count - 1); }
+        else { item.mine = true; item.count += 1; }
+        list[idx] = item;
+      } else {
+        list.push({ emoji, count: 1, mine: true });
+      }
+      row.reactions = list;
+      next[index] = { ...row };
+      return next;
+    });
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/reactions/toggle', {
+        method: 'POST', headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
+        body: JSON.stringify({ albumId, userId: user.uid, emoji }),
+      });
+      let added = false;
+      if (res.ok) {
+        const data = await res.json().catch(()=>({}));
+        added = !!data?.added;
+      } else {
+        const result = await toggleReaction(albumId, user.uid, emoji);
+        added = !!(result as any)?.added;
+      }
+      const row = joinedRows[index];
+      if (added && row && row.album.ownerId !== user.uid) {
+        addNotification({ userId: row.album.ownerId, actorId: user.uid, type: 'reaction', albumId, message: 'アルバムにリアクション: ' + emoji }).catch(()=>{});
+      }
+    } catch {
+      setJoinedRows((prev) => {
+        const next = [...prev];
+        const row = next[index];
+        if (!row) return prev;
+        const list = row.reactions.slice();
+        const idx = list.findIndex((x: any) => x.emoji === emoji);
+        if (idx >= 0) {
+          const item = { ...list[idx] };
+          if (item.mine) { item.mine = false; item.count = Math.max(0, item.count - 1); }
+          else { item.mine = true; item.count += 1; }
+          list[idx] = item;
+        }
+        row.reactions = list;
+        next[index] = { ...row };
+        return next;
+      });
+    }
+  }
+
+  async function handleSubmitCommentJoined(index: number, text: string) {
+    if (!user) return;
+    const albumId = joinedRows[index]?.album?.id;
+    if (!albumId) return;
+    const { addComment } = await import('../../../lib/repos/commentRepo');
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/comments/add', {
+        method: 'POST', headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
+        body: JSON.stringify({ albumId, userId: user.uid, body: text }),
+      });
+      if (!res.ok) { await addComment(albumId, user.uid, text); }
+    } catch {
+      await addComment(albumId, user.uid, text);
+    }
+  }
 
   // Like toggle for own rows (optimistic)
   async function handleToggleLikeOwn(index: number) {
@@ -963,14 +1131,29 @@ export default function ProfilePage() {
             <div role="tabpanel" aria-label="参加アルバム">
               {!joinedAlbums && <p className="text-sm text-muted/80">-</p>}
               {joinedAlbums && joinedAlbums.length === 0 && <p className="text-sm text-muted/80">参加アルバムはまだありません</p>}
-              <ul className="divide-y divide-line">
-                {joinedAlbums && joinedAlbums.map((a: any, i: number) => (
-                  <li key={i} className="py-2">
-                    <a href={`/album/${a.id}`} className="link-accent text-sm font-medium">{a.title || '無題'}</a>
-                    <p className="text-xs text-muted/80">{a.createdAt?.toDate?.().toLocaleString?.() || ''}</p>
-                  </li>
-                ))}
-              </ul>
+              {joinedRows && joinedRows.length > 0 && (
+                <div className="divide-y divide-line *:pb-12">
+                  {joinedRows.map((row, i) => (
+                    <TimelineItem
+                      key={row.album.id}
+                      album={row.album}
+                      images={row.images}
+                      likeCount={row.likeCount}
+                      liked={row.liked}
+                      onLike={user ? () => handleToggleLikeJoined(i) : () => {}}
+                      commentCount={row.commentCount}
+                      latestComment={row.latestComment}
+                      commentsPreview={row.commentsPreview}
+                      onCommentSubmit={user ? (text) => handleSubmitCommentJoined(i, text) : undefined}
+                      reactions={row.reactions}
+                      onToggleReaction={user ? (emoji) => handleToggleReactionJoined(i, emoji) : undefined}
+                      owner={row.owner}
+                      isFriend={false}
+                      isWatched={false}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
