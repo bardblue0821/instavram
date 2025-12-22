@@ -700,9 +700,7 @@ export default function AlbumDetailPage() {
       )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <div className="space-y-1 text-xs fg-subtle">
-        {!canAddImages && <p>※ 操作にはログインが必要です。</p>}
-      </div>
+      {/* ログイン必須の注意文は非表示に変更 */}
 
       <DeleteConfirmModal
         open={showDeleteConfirm}
