@@ -17,7 +17,7 @@ export default function WatchActions({ watching, busy = false, onToggle, disable
         onClick={onToggle}
         disabled={busy || disabled}
         size="sm"
-        variant={watching ? "accent" : "ghost"}
+        variant={watching ? "accentSky" : "ghost"}
         className={(watching 
           ? "text-foreground "
           : "text-foreground border-line ") + "min-w-[7rem] h-8"}

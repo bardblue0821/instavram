@@ -793,14 +793,14 @@ export default function ProfilePage() {
             <div className="flex items-center gap-3 mt-1">
               <button
                 type="button"
-                className="text-xs px-2 py-0.5 rounded bg-sky-500 text-white hover:bg-sky-600 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]/40"
+                className="text-xs px-2 py-0.5 rounded bg-watch text-white hover:bg-watch/90 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]/40"
                 onClick={openWatchersModal}
               >
                 ウォッチャー {watchersCount}
               </button>
               <button
                 type="button"
-                className="text-xs px-2 py-0.5 rounded bg-orange-500 text-white hover:bg-orange-600 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]/40"
+                className="text-xs px-2 py-0.5 rounded bg-friend text-white hover:bg-friend/90 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]/40"
                 onClick={openFriendsModal}
               >
                 フレンド {friendsCount}
@@ -881,11 +881,9 @@ export default function ProfilePage() {
       )}
 
       {!isMe && user && (
-        <div className="space-y-2">
+        <div className="space-y-2 flex">
           <FriendActions state={friendState} busy={busy} onSend={doSend} onCancel={doCancel} onAccept={doAccept} onRemove={doRemove} />
-          <div className="pt-2 border-t border-line mt-3">
-            <WatchActions watching={watching} busy={watchBusy} onToggle={doWatchToggle} disabled={!user || (user && profile && user.uid === profile.uid)} />
-          </div>
+          <WatchActions watching={watching} busy={watchBusy} onToggle={doWatchToggle} disabled={!user || (user && profile && user.uid === profile.uid)} />
           {!user && <p className="text-sm text-muted">ログインすると操作できます</p>}
         </div>
       )}

@@ -16,18 +16,16 @@ interface FriendActionsProps {
 export default function FriendActions({ state, busy = false, onSend, onCancel, onAccept, onRemove }: FriendActionsProps) {
   return (
     <section className="space-y-2">
-      {state === "none" && (
-        <Button disabled={busy} onClick={onSend} variant="ghost" size="sm" className="text-foreground border-line min-w-[7rem] h-8">
-          フレンド申請
+      {(state === "none" || state === "sent") && (
+        <Button
+          disabled={busy}
+          onClick={state === "none" ? onSend : onCancel}
+          variant="ghost"
+          size="sm"
+          className="text-foreground border-line min-w-[7rem] h-8"
+        >
+          {busy ? "処理中..." : state === "none" ? "フレンド申請" : "申請中"}
         </Button>
-      )}
-      {state === "sent" && (
-        <div className="flex gap-2 items-center">
-          <span className="text-sm text-muted">申請中...</span>
-          <Button disabled={busy} onClick={onCancel} variant="ghost" size="sm" className="text-foreground border-line min-w-[7rem] h-8">
-            キャンセル
-          </Button>
-        </div>
       )}
       {state === "received" && (
         <div className="flex gap-2">
@@ -41,7 +39,7 @@ export default function FriendActions({ state, busy = false, onSend, onCancel, o
       )}
       {state === "accepted" && (
         <div className="flex gap-2 items-center">
-          <Button disabled={true} variant="accent" size="sm" className="text-foreground min-w-[7rem] h-8">
+          <Button disabled={true} variant="accentOrange" size="sm" className="text-foreground min-w-[7rem] h-8">
             フレンド
           </Button>
           <Button disabled={busy} onClick={onRemove} variant="danger" size="sm" className="min-w-[7rem] h-8">
@@ -52,3 +50,4 @@ export default function FriendActions({ state, busy = false, onSend, onCancel, o
     </section>
   );
 }
+ 

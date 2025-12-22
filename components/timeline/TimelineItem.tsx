@@ -262,7 +262,7 @@ export function TimelineItem(props: {
   }
 
   return (
-    <article className="py-4 space-y-3">
+    <article className={`py-4 space-y-3 ${isFriend ? 'border border-friend/50 rounded-md' : isWatched ? 'border border-watch/50 rounded-md' : ''}`}>        
       <header className="space-y-2">
         {imageAdded?.userId && (
           <div className="flex items-center gap-2">
@@ -295,10 +295,10 @@ export function TimelineItem(props: {
               <div className="flex items-center gap-2">
                 <span className="text-base font-semibold truncate">{owner?.displayName || '名前未設定'}</span>
                 {isFriend && (
-                  <span className="text-[11px] px-2 py-0.5 rounded bg-orange-500 text-white shrink-0" title="フレンド">フレンド</span>
+                  <span className="text-[11px] px-2 py-0.5 rounded bg-friend text-white shrink-0" title="フレンド">フレンド</span>
                 )}
                 {isWatched && (
-                  <span className="text-[11px] px-2 py-0.5 rounded bg-sky-500 text-white shrink-0" title="ウォッチ中">ウォッチ中</span>
+                  <span className="text-[11px] px-2 py-0.5 rounded bg-watch text-white shrink-0" title="ウォッチ中">ウォッチ中</span>
                 )}
               </div>
               <span className="text-sm text-muted/80">{owner?.handle ? `@${owner.handle}` : 'ハンドル未設定'}</span>
@@ -362,7 +362,7 @@ export function TimelineItem(props: {
         )}
       </header>
 
-      <div className="overflow-hidden rounded">
+      <div className={`overflow-hidden rounded ${isFriend ? 'bg-friend/10 p-1' : isWatched ? 'bg-watch/10 p-1' : ''}`}>
         {renderGrid(images)}
       </div>
 

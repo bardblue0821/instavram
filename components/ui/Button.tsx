@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 
-type Variant = "primary" | "secondary" | "ghost" | "accent" | "subtle" | "danger";
+type Variant = "primary" | "secondary" | "ghost" | "accent" | "accentSky" | "accentOrange" | "subtle" | "danger";
 type Size = "xs" | "sm" | "md" | "lg";
 
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -20,6 +20,9 @@ function cn(...values: Array<string | false | null | undefined>) {
 const variantClass: Record<Variant, string> = {
   primary: "btn-accent", // legacy primary -> accent
   accent: "btn-accent",
+  // Feature accents
+  accentSky: "bg-watch text-white hover:bg-watch/90",
+  accentOrange: "bg-friend text-white hover:bg-friend/90",
   // Secondary: 落ち着いた面 + 前景色、ホバーで弱い面
   secondary: "bg-background text-foreground hover:bg-surface-weak",
   // Ghost: 枠線 + muted テキスト + ホバーで弱い面

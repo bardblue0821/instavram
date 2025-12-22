@@ -13,6 +13,9 @@
   --accent: #0d9488; /* base teal (Tailwind teal-600 付近) */
   --accent-hover: #0f766e; /* hover/darker */
   --accent-fg: #dfdfdf; /* text/icon color on accent */
+  /* Feature accents */
+  --watch: #0ea5e9; /* sky-500 */
+  --friend: #f97316; /* orange-500 */
 }
 
 /* スクロールバー出現/消失による横ズレ（特にWindows）を防ぐ */
@@ -27,6 +30,9 @@ html {
   --color-line: var(--border);
   --color-muted: var(--muted);
   --color-surface-weak: #484848;
+  /* Feature accents (tokens) */
+  --color-watch: var(--watch);
+  --color-friend: var(--friend);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
