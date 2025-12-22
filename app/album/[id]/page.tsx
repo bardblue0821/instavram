@@ -38,6 +38,7 @@ import { useThumbBackfill } from "@/src/hooks/useThumbBackfill";
 import { useAlbumAccess } from "@/src/hooks/useAlbumAccess";
 import { addNotification } from "../../../lib/repos/notificationRepo";
 import { REACTION_EMOJIS, REACTION_CATEGORIES, filterReactionEmojis } from "../../../lib/constants/reactions";
+import Avatar from "../../../components/profile/Avatar";
 // アクセス判定はフックで実施
 // いいねアイコンは ReactionsBar 内で使用
 import { getAlbumDetailVM } from "@/src/services/album/getAlbumDetail";
@@ -619,6 +620,30 @@ export default function AlbumDetailPage() {
         onPlaceUrlBlur={savePlaceUrlIfChanged}
         onInputKeyDownBlurOnEnter={handleInputKeyDownBlurOnEnter}
       />
+
+      {/* 参加ユーザーのアイコン一覧（タイトル・URLブロックの下） */}
+      {images.length > 0 && (
+        (() => {
+          const ids = Array.from(new Set(images.map(img => img.uploaderId).filter(Boolean)));
+          if (ids.length === 0) return null;
+          return (
+            <section aria-label="参加ユーザー" className="-mt-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {ids.map((uid) => {
+                  const icon = uploaderMap[uid!]?.iconURL || null;
+                  const handle = uploaderMap[uid!]?.handle || null;
+                  const href = `/user/${handle || uid}`;
+                  return (
+                    <a key={uid as string} href={href} aria-label="プロフィールへ" className="shrink-0">
+                      <Avatar src={icon || undefined} size={28} interactive={false} withBorder={false} className="rounded-full" />
+                    </a>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })()
+      )}
 
       <ReactionsBar
         liked={liked}
