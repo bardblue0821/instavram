@@ -789,21 +789,21 @@ export default function ProfilePage() {
                 </span>
               )}
             </div>
-            {/* watcher/friend counts */}
+            {/* friend/watcher counts (order: friend, watcher) */}
             <div className="flex items-center gap-3 mt-1">
               <button
                 type="button"
-                className="text-xs px-2 py-0.5 rounded bg-watch text-white hover:bg-watch/90 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]/40"
-                onClick={openWatchersModal}
-              >
-                ウォッチャー {watchersCount}
-              </button>
-              <button
-                type="button"
-                className="text-xs px-2 py-0.5 rounded bg-friend text-white hover:bg-friend/90 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]/40"
+                className="text-xs text-foreground cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]/40"
                 onClick={openFriendsModal}
               >
                 フレンド {friendsCount}
+              </button>
+              <button
+                type="button"
+                className="text-xs text-foreground cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]/40"
+                onClick={openWatchersModal}
+              >
+                ウォッチャー {watchersCount}
               </button>
             </div>
           </div>
