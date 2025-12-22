@@ -880,6 +880,8 @@ export default function ProfilePage() {
                       reactions={row.reactions}
                       onToggleReaction={user ? (emoji) => handleToggleReactionOwn(i, emoji) : undefined}
                       owner={row.owner}
+                      isFriend={friendState==='accepted'}
+                      isWatched={watching}
                     />
                   ))}
                 </div>

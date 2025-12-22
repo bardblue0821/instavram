@@ -40,6 +40,8 @@ export function TimelineItem(props: {
   onToggleReaction?: (emoji: string) => void;
   owner?: { uid: string; handle: string | null; iconURL?: string | null; displayName?: string };
   imageAdded?: ImageAdded;
+  isFriend?: boolean;
+  isWatched?: boolean;
 }) {
   const {
     album,
@@ -59,6 +61,8 @@ export function TimelineItem(props: {
     onToggleReaction,
     owner,
     imageAdded,
+    isFriend,
+    isWatched,
   } = props;
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -272,7 +276,15 @@ export function TimelineItem(props: {
               className="flex flex-col leading-tight"
               title={`${owner?.displayName || '名前未設定'} ${owner?.handle ? `@${owner.handle}` : ''}`.trim()}
             >
-              <span className="text-base font-semibold truncate">{owner?.displayName || '名前未設定'}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-base font-semibold truncate">{owner?.displayName || '名前未設定'}</span>
+                {isFriend && (
+                  <span className="text-[11px] px-2 py-0.5 rounded bg-orange-500 text-white shrink-0" title="フレンド">フレンド</span>
+                )}
+                {isWatched && (
+                  <span className="text-[11px] px-2 py-0.5 rounded bg-sky-500 text-white shrink-0" title="ウォッチ中">ウォッチ中</span>
+                )}
+              </div>
               <span className="text-sm fg-subtle">{owner?.handle ? `@${owner.handle}` : 'ハンドル未設定'}</span>
             </a>
           </div>
@@ -325,10 +337,11 @@ export function TimelineItem(props: {
           </div>
         </div>
         {album.title && (
-          <h3 className="text-base font-semibold">
-            <a
-              href={`/album/${album.id}`}
-            >{album.title}</a>
+          <h3 className="text-base font-semibold flex items-center gap-2">
+            <a href={`/album/${album.id}`}>{album.title}</a>
+            {fmtDateTime(toDate(album.createdAt)) && (
+              <span className="text-xs fg-subtle shrink-0" title="投稿日時">{fmtDateTime(toDate(album.createdAt))}</span>
+            )}
           </h3>
         )}
       </header>

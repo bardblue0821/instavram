@@ -15,6 +15,8 @@ import { notifications } from "@mantine/notifications";
 import DeleteConfirmModal from "../../components/album/DeleteConfirmModal";
 import ReportConfirmModal from "../../components/album/ReportConfirmModal";
 import { deleteAlbum } from "../../lib/repos/albumRepo";
+import { listAcceptedFriends } from "../../lib/repos/friendRepo";
+import { listWatchedOwnerIds } from "../../lib/repos/watchRepo";
 
 
 export default function TimelinePage() {
@@ -40,6 +42,8 @@ export default function TimelinePage() {
   const userCacheRef = useRef<Map<string, UserRef | null>>(new Map());
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const loadMoreRef = useRef<() => void>(() => {});
+  const [friendSet, setFriendSet] = useState<Set<string>>(new Set());
+  const [watchSet, setWatchSet] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     rowsRef.current = rows;
@@ -152,7 +156,7 @@ export default function TimelinePage() {
     else setLoadingMore(true);
 
     try {
-      const enriched = await listLatestAlbumsVMLimited(currentUid, nextLimit, userCacheRef.current);
+  const enriched = await listLatestAlbumsVMLimited(currentUid, nextLimit, userCacheRef.current);
 
       if (prev.length === 0) {
         setRows(enriched);
@@ -160,6 +164,20 @@ export default function TimelinePage() {
         for (let i = 0; i < enriched.length; i++) {
           await subscribeForRow(enriched[i], currentUid);
         }
+        // 初回にフレンド/ウォッチの関係をまとめて取得
+        try {
+          const [friends, watchedOwners] = await Promise.all([
+            listAcceptedFriends(currentUid),
+            listWatchedOwnerIds(currentUid),
+          ]);
+          const fset = new Set<string>();
+          for (const fd of friends) {
+            const otherId = fd.userId === currentUid ? fd.targetId : fd.userId;
+            if (otherId) fset.add(otherId);
+          }
+          setFriendSet(fset);
+          setWatchSet(new Set(watchedOwners || []));
+        } catch {}
       } else {
         const existingIds = new Set(prev.map(r => r.album.id));
         const appended = enriched.filter(r => r?.album?.id && !existingIds.has(r.album.id));
@@ -412,6 +430,8 @@ export default function TimelinePage() {
               onToggleReaction={(emoji) => handleToggleReaction(row.album.id, emoji)}
               owner={row.owner ?? undefined}
               imageAdded={row.imageAdded}
+              isFriend={!!(row.owner?.uid && friendSet.has(row.owner.uid))}
+              isWatched={!!(row.owner?.uid && watchSet.has(row.owner.uid))}
             />
           ))}
         </div>
