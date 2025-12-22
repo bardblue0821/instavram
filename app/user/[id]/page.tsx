@@ -21,6 +21,7 @@ import InlineTextareaField from '../../../components/form/InlineTextareaField';
 import LinksField from '../../../components/form/LinksField';
 import FriendActions from '../../../components/profile/FriendActions';
 import WatchActions from '../../../components/profile/WatchActions';
+import FriendRemoveConfirmModal from '../../../components/profile/FriendRemoveConfirmModal';
 import { buildProfilePatch } from '../../../src/services/profile/buildPatch';
 import { TimelineItem } from '../../../components/timeline/TimelineItem';
 import GalleryGrid, { type PhotoItem } from '../../../components/gallery/GalleryGrid';
@@ -114,6 +115,8 @@ export default function ProfilePage() {
     return providerIds.includes('google.com');
   }, [user, providerIds]);
   const [avatarOpen, setAvatarOpen] = useState(false);
+  const [friendRemoveOpen, setFriendRemoveOpen] = useState(false);
+  const [friendRemoveBusy, setFriendRemoveBusy] = useState(false);
 
   // Load profile and social flags
   useEffect(() => {
@@ -780,13 +783,15 @@ export default function ProfilePage() {
     catch (e:any) { setError(translateError(e)); }
     finally { setBusy(false); }
   }
-  async function doRemove() {
+  function openFriendRemove() {
+    setFriendRemoveOpen(true);
+  }
+  async function confirmFriendRemove() {
     if (!user || !profile?.uid) return;
-    if (!confirm('フレンドを解除しますか？')) return;
-    setBusy(true); setError(null);
-    try { await removeFriend(user.uid, profile.uid); setFriendState('none'); }
+    setFriendRemoveBusy(true); setError(null);
+    try { await removeFriend(user.uid, profile.uid); setFriendState('none'); setFriendRemoveOpen(false); }
     catch (e:any) { setError(translateError(e)); }
-    finally { setBusy(false); }
+    finally { setFriendRemoveBusy(false); }
   }
 
   // Watch toggle
@@ -1050,13 +1055,21 @@ export default function ProfilePage() {
 
       {!isMe && user && (
         <div className="flex gap-3">
-          <FriendActions state={friendState} busy={busy} onSend={doSend} onCancel={doCancel} onAccept={doAccept} onRemove={doRemove} />
+          <FriendActions state={friendState} busy={busy} onSend={doSend} onCancel={doCancel} onAccept={doAccept} onRemove={openFriendRemove} />
           <WatchActions watching={watching} busy={watchBusy} onToggle={doWatchToggle} disabled={!user || (user && profile && user.uid === profile.uid)} />
           {!user && <p className="text-sm text-muted">ログインすると操作できます</p>}
         </div>
       )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
+
+      {/* フレンド解除確認モーダル */}
+      <FriendRemoveConfirmModal
+        open={friendRemoveOpen}
+        busy={friendRemoveBusy}
+        onCancel={() => { if (!friendRemoveBusy) setFriendRemoveOpen(false); }}
+        onConfirm={() => { if (!friendRemoveBusy) confirmFriendRemove(); }}
+      />
 
   <section className="space-y-4 pt-4 border-t border-line">
   {loadingExtra && <p className="text-sm text-muted/80">読み込み中...</p>}

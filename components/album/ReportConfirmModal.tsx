@@ -13,7 +13,7 @@ export default function ReportConfirmModal({ open, busy, onCancel, onConfirm }: 
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-80 rounded surface p-4 shadow-lg">
+      <div className="w-80 rounded bg-background border border-line p-4 shadow-lg">
         <h3 className="text-sm font-semibold">このアルバムを通報しますか？</h3>
         <p className="mt-2 text-xs fg-muted">内容を確認するため、投稿へのリンクを管理者に送信します。</p>
         <div className="mt-4 flex justify-end gap-2">

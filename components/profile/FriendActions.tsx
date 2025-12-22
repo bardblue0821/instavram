@@ -39,11 +39,8 @@ export default function FriendActions({ state, busy = false, onSend, onCancel, o
       )}
       {state === "accepted" && (
         <div className="flex gap-2 items-center">
-          <Button disabled={true} variant="accentOrange" size="sm" className="text-foreground min-w-[7rem] h-8">
+          <Button disabled={busy} onClick={onRemove} variant="accentOrange" size="sm" className="text-foreground min-w-[7rem] h-8">
             フレンド
-          </Button>
-          <Button disabled={busy} onClick={onRemove} variant="danger" size="sm" className="min-w-[7rem] h-8">
-            解除
           </Button>
         </div>
       )}
