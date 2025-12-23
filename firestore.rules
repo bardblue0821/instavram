@@ -6,6 +6,11 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isUser(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // フレンド関係およびアルバム可視性の簡易チェック
     function isFriendWith(otherId) {
       return isSignedIn() && (
         get(/databases/$(database)/documents/friends/$(request.auth.uid + '_' + otherId)).data.status == 'accepted' ||
@@ -13,28 +18,13 @@ service cloud.firestore {
       );
     }
 
+    // friends 限定アルバムの場合は、オーナーまたはフレンドのみを「可視」とみなす
     function canReadAlbum(albumId) {
-      // Public: everyone can read. Friends-only: only owner or friends can read.
       let a = get(/databases/$(database)/documents/albums/$(albumId)).data;
       return (
         a.visibility != 'friends' ||
         (isSignedIn() && (a.ownerId == request.auth.uid || isFriendWith(a.ownerId)))
       );
-    }
-
-    // reactions/{rid} （ID = albumId:userId:emoji）
-    match /reactions/{rid} {
-      allow read: if true;
-      allow create: if isSignedIn()
-        && request.resource.data.userId == request.auth.uid
-        && rid == request.resource.data.albumId + ':' + request.resource.data.userId + ':' + request.resource.data.emoji
-        && request.resource.data.keys().hasAll(['albumId','userId','emoji','createdAt']);
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow update: if false;
-    }
-
-    function isUser(uid) {
-      return isSignedIn() && request.auth.uid == uid;
     }
 
     // users/{uid}
@@ -43,10 +33,22 @@ service cloud.firestore {
       allow create: if isUser(uid);
       allow update, delete: if isUser(uid);
     }
+    
+    // reactions/{rid} （ID = albumId:userId:emoji）
+    match /reactions/{rid} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && rid == request.resource.data.albumId + ':' + request.resource.data.userId + ':' + request.resource.data.emoji
+        && request.resource.data.keys().hasAll(['albumId','userId','emoji','createdAt'])
+        && canReadAlbum(request.resource.data.albumId);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow update: if false;
+    }
 
     // albums/{albumId}
     match /albums/{albumId} {
-      allow read: if resource.data.visibility != 'friends' || (isSignedIn() && (resource.data.ownerId == request.auth.uid || isFriendWith(resource.data.ownerId)));
+      allow read: if true;
       allow create: if isSignedIn()
         && request.resource.data.ownerId == request.auth.uid;
       allow update: if isSignedIn()
@@ -58,10 +60,11 @@ service cloud.firestore {
 
     // albumImages/{imageId}
     match /albumImages/{imageId} {
-      allow read: if canReadAlbum(resource.data.albumId);
+      allow read: if true;
       allow create: if isSignedIn()
         && request.resource.data.keys().hasAll(['albumId','uploaderId','url'])
-        && request.resource.data.uploaderId == request.auth.uid;
+        && request.resource.data.uploaderId == request.auth.uid
+        && canReadAlbum(request.resource.data.albumId);
       allow delete: if isSignedIn()
         && (
           resource.data.uploaderId == request.auth.uid ||
@@ -78,7 +81,7 @@ service cloud.firestore {
 
     // comments/{commentId}
     match /comments/{commentId} {
-      allow read: if canReadAlbum(resource.data.albumId);
+      allow read: if true;
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.body is string
@@ -87,7 +90,10 @@ service cloud.firestore {
         && canReadAlbum(request.resource.data.albumId);
       allow update: if isSignedIn()
         && resource.data.userId == request.auth.uid
-        && request.resource.data.keys().hasOnly(['albumId','userId','body','createdAt','id']);
+        && request.resource.data.keys().hasOnly(['albumId','userId','body','createdAt','id'])
+        && request.resource.data.albumId == resource.data.albumId
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.createdAt == resource.data.createdAt;
       allow delete: if isSignedIn()
         && (
           resource.data.userId == request.auth.uid ||
@@ -97,7 +103,7 @@ service cloud.firestore {
 
     // likes/{likeId} （ID = albumId_userId）
     match /likes/{likeId} {
-      allow read: if canReadAlbum(resource.data.albumId);
+      allow read: if true;
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
         && likeId == request.resource.data.albumId + '_' + request.resource.data.userId
@@ -106,10 +112,10 @@ service cloud.firestore {
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow update: if false;
     }
-
+    
     // reposts/{repostId} （ID = albumId_userId）
     match /reposts/{repostId} {
-      allow read: if canReadAlbum(resource.data.albumId);
+      allow read: if true;
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
         && repostId == request.resource.data.albumId + '_' + request.resource.data.userId
@@ -121,7 +127,6 @@ service cloud.firestore {
 
     // friends/{relationId} （ID = userId_targetId）
     match /friends/{relationId} {
-      // 読み取りはログインユーザーなら許可（プロフィール閲覧や申請状態確認を簡易化）
       allow read: if isSignedIn();
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
@@ -137,7 +142,6 @@ service cloud.firestore {
 
     // watches/{watchId} （ID = userId_ownerId）
     match /watches/{watchId} {
-      // 読み取りはログインユーザーなら許可（プロフィール閲覧やウォッチ状態確認を簡易化）
       allow read: if isSignedIn();
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
@@ -146,13 +150,11 @@ service cloud.firestore {
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow update: if false;
     }
-
+    
+    
     // notifications/{nid}
-    // 本人のみ閲覧・作成・既読化（readAt 追加）。書込は userId == auth.uid に限定。
     match /notifications/{nid} {
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      // 作成は「行為者が自分であること（actorId == auth.uid）」を条件に許可し、
-      // 受信者 userId は他者でも可（通知先）。初期作成時は readAt は null 固定。
       allow create: if isSignedIn()
         && request.resource.data.actorId == request.auth.uid
         && request.resource.data.keys().hasAll(['userId','actorId','type','message','createdAt','readAt'])
@@ -160,7 +162,6 @@ service cloud.firestore {
         && request.resource.data.type in ['comment','like','image','friend_request','watch','repost','reaction'];
       allow update: if isSignedIn()
         && resource.data.userId == request.auth.uid
-        // 既読化のみ許可: readAt を null→Timestamp に変更し他フィールド不変
         && request.resource.data.keys().hasOnly(['userId','actorId','type','message','createdAt','readAt','albumId','imageId','commentId','friendRequestId','watchId','id'])
         && request.resource.data.userId == resource.data.userId
         && request.resource.data.actorId == resource.data.actorId
@@ -168,8 +169,8 @@ service cloud.firestore {
         && request.resource.data.message == resource.data.message
         && request.resource.data.createdAt == resource.data.createdAt
         && resource.data.readAt == null
-        && request.resource.data.readAt != null; // null 以外（既読化）
-      allow delete: if false; // 履歴保持（必要なら本人のみ許可へ変更可）
+        && request.resource.data.readAt != null;
+      allow delete: if false; 
     }
 
     // その他のパスは閉じる

@@ -217,18 +217,16 @@ export async function listLatestAlbumsVMLimited(
       } as any;
 
       const rows: TimelineItemVM[] = [];
-      // 画像追加エントリ
+      // 画像追加エントリ（最新の参加者アクティビティ）
       if (imageAdded) {
         rows.push({ ...base, imageAdded, repostedBy: undefined } as TimelineItemVM);
       }
-      // リポストエントリ
+      // リポストエントリ（友人/ウォッチ/自分の最新リポスト）
       if (repostedBy) {
         rows.push({ ...base, repostedBy, imageAdded: undefined } as TimelineItemVM);
       }
-      // どちらも無い場合のみベースを追加
-      if (!imageAdded && !repostedBy) {
-        rows.push({ ...base, imageAdded: undefined, repostedBy: undefined } as TimelineItemVM);
-      }
+      // ベース行は常に追加しておく（リロード後に「元の投稿が消える」事象を防ぐ）
+      rows.push({ ...base, imageAdded: undefined, repostedBy: undefined } as TimelineItemVM);
       return rows;
     })
   );
