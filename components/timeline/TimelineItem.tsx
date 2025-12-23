@@ -11,6 +11,7 @@ import { ChatIcon } from "../icons/ChatIcon";
 import { Button } from "../ui/Button";
 import { RepostIcon } from "../icons/RepostIcon";
 import AlbumActionsMenu from "../album/AlbumActionsMenu";
+import ShareMenu from "../album/ShareMenu";
 
 type Img = { url: string; thumbUrl?: string; uploaderId?: string };
 type LatestComment = { body: string; userId: string } | undefined;
@@ -393,13 +394,16 @@ export function TimelineItem(props: {
             </a>
           </div>
 
-          <AlbumActionsMenu
-            albumId={album.id}
-            albumOwnerId={album.ownerId}
-            currentUserId={currentUserId}
-            onRequestDelete={onRequestDelete}
-            onRequestReport={onRequestReport}
-          />
+          <div className="ml-auto flex items-center gap-2">
+            <ShareMenu albumId={album.id} albumTitle={album.title || null} />
+            <AlbumActionsMenu
+              albumId={album.id}
+              albumOwnerId={album.ownerId}
+              currentUserId={currentUserId}
+              onRequestDelete={onRequestDelete}
+              onRequestReport={onRequestReport}
+            />
+          </div>
         </div>
         {album.title && (
           <h3 className="text-base font-semibold flex items-center gap-2">
