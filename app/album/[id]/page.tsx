@@ -435,6 +435,33 @@ export default function AlbumDetailPage() {
     }
   }
 
+  async function handleChangeVisibility(v: 'public' | 'friends') {
+    if (!albumId || !album) return;
+    setSavingAlbum(true);
+    setAlbumSavedMsg("");
+    setError(null);
+    try {
+      await updateAlbum(albumId, { visibility: v });
+  // 公開→フレンド限定へ切り替え時は既存のリポストを無効化（削除）
+      if (v === 'friends') {
+        try {
+          const { deleteRepostsByAlbum } = await import("../../../lib/repos/repostRepo");
+          await deleteRepostsByAlbum(albumId);
+        } catch (e) {
+          console.warn('deleteRepostsByAlbum failed', e);
+        }
+      }
+      const updated = await getAlbumSafe(albumId);
+      if (updated) setAlbum(updated as AlbumRecord);
+      setAlbumSavedMsg("保存しました");
+      setTimeout(() => setAlbumSavedMsg(""), 2500);
+    } catch (e: any) {
+      setError(translateError(e));
+    } finally {
+      setSavingAlbum(false);
+    }
+  }
+
   // 入力フィールドのオートセーブ（フォーカスアウトで保存）
   async function saveTitleIfChanged() {
     if (!albumId) return;
@@ -601,7 +628,8 @@ export default function AlbumDetailPage() {
   const remaining = 4 - myCount;
   // 権限: 画像追加はオーナー/フレンドのみ。コメントはオーナー/フレンド/ウォッチャー。
   const canAddImages = !!user && (isOwner || isFriend);
-  const canPostComment = !!user && (isOwner || isFriend || isWatcher);
+  const isPrivate = (album as any)?.visibility === 'friends';
+  const canPostComment = !!user && (isOwner || isFriend || (!isPrivate && isWatcher));
   // タイトル表示（null/空文字の場合は「タイトルなし」）
   const displayTitle = (album.title && (album.title + '').trim().length > 0) ? (album.title as string) : '無題';
 
@@ -619,6 +647,7 @@ export default function AlbumDetailPage() {
         onTitleBlur={saveTitleIfChanged}
         onPlaceUrlBlur={savePlaceUrlIfChanged}
         onInputKeyDownBlurOnEnter={handleInputKeyDownBlurOnEnter}
+        onVisibilityChange={handleChangeVisibility}
       />
 
       {/* 参加ユーザーのアイコン一覧（タイトル・URLブロックの下） */}

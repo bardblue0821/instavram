@@ -4,9 +4,10 @@ import React, { useEffect, useRef, useState } from "react";
 interface Props {
   albumId: string;
   albumTitle?: string | null;
+  disabled?: boolean;
 }
 
-export default function ShareMenu({ albumId, albumTitle }: Props) {
+export default function ShareMenu({ albumId, albumTitle, disabled }: Props) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [discordOpen, setDiscordOpen] = useState(false);
@@ -84,8 +85,9 @@ export default function ShareMenu({ albumId, albumTitle }: Props) {
         aria-label="共有"
         aria-haspopup="menu"
         aria-expanded={open}
-        className="w-8 h-8 rounded border border-line hover:bg-surface-weak text-muted"
+        className={`w-8 h-8 rounded border border-line ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-surface-weak text-muted'}`}
         onClick={() => {
+          if (disabled) return;
           // Prefer Web Share API when available
           try {
             const nav: any = typeof navigator !== 'undefined' ? navigator : null;

@@ -7,7 +7,7 @@ import { listImages } from "@/lib/repos/imageRepo";
 import { listComments } from "@/lib/repos/commentRepo";
 import { countLikes, hasLiked } from "@/lib/repos/likeRepo";
 import { listReactionsByAlbum } from "@/lib/repos/reactionRepo";
-import { countReposts, hasReposted, listRecentRepostsByUsers, getRepost } from "@/lib/repos/repostRepo";
+import { countReposts, hasReposted, getRepost, listRepostsByAlbumRaw } from "@/lib/repos/repostRepo";
 import { getAlbum } from "@/lib/repos/albumRepo";
 
 function toMillis(v: any): number | null {
@@ -37,6 +37,7 @@ export async function listLatestAlbumsVMLimited(
   // 対象オーナーIDsを構築（自分 + フレンド + ウォッチ）
   const ownerSet = new Set<string>();
   ownerSet.add(currentUserId);
+  const friendOwnerSet = new Set<string>();
   try {
     const [friends, watched] = await Promise.all([
       listAcceptedFriends(currentUserId),
@@ -44,7 +45,7 @@ export async function listLatestAlbumsVMLimited(
     ]);
     for (const f of friends) {
       const other = f.userId === currentUserId ? f.targetId : f.userId;
-      if (other) ownerSet.add(other);
+      if (other) { ownerSet.add(other); friendOwnerSet.add(other); }
     }
     for (const w of watched) ownerSet.add(w);
   } catch (e) {
@@ -52,38 +53,65 @@ export async function listLatestAlbumsVMLimited(
   }
 
   const ownerIds = Array.from(ownerSet);
-  const albums = await fetchLatestAlbums(Math.max(1, limitCount), ownerIds);
+  // フレンドでない（ウォッチのみ等）オーナーは公開アルバムのみ取得するように制約
+  const publicOnlyOwners = new Set<string>(
+    ownerIds.filter((oid) => oid !== currentUserId && !friendOwnerSet.has(oid))
+  );
+  const albums = await fetchLatestAlbums(Math.max(1, limitCount), ownerIds, publicOnlyOwners);
   const cache = userCache ?? new Map<string, UserRef | null>();
 
-  // Reposts: collect recent reposts by friends & watched users
-  let recentReposts: Array<{ albumId: string; userId: string; createdAt: any }> = [];
-  try {
-    // 自分自身のリポストもタイムラインに反映するため、self 除外をやめる
-    const actorIds = Array.from(new Set<string>(ownerIds));
-    if (actorIds.length > 0) {
-      recentReposts = await listRecentRepostsByUsers(actorIds, 50);
-    }
-  } catch (e) {
-    console.warn("listRecentReposts error", e);
-  }
-  // Map albumId -> latest repost info by those actors
+  // Map albumId -> latest repost info by friends/watchers/self（アルバム単位で取得：ルールと整合）
   const latestRepostByAlbum = new Map<string, { userId: string; createdAt: any }>();
-  for (const r of recentReposts) {
-    const prev = latestRepostByAlbum.get(r.albumId);
-    // pick latest
-    const prevMs = toMillis(prev?.createdAt) || 0;
-    const curMs = toMillis(r.createdAt) || 0;
-    if (!prev || curMs > prevMs) latestRepostByAlbum.set(r.albumId, { userId: r.userId, createdAt: r.createdAt });
-  }
 
   // Ensure albums referenced only by reposts are included as well
   const albumIdSet = new Set(albums.map((a: any) => a.id));
   const missingIds = Array.from(latestRepostByAlbum.keys()).filter(id => !albumIdSet.has(id));
   const missingAlbums = await Promise.all(missingIds.map(id => getAlbum(id)));
   const mergedAlbums = [...albums, ...missingAlbums.filter(a => !!a)];
+  // Filter private albums: only owner or friends can see
+  const filteredAlbums = mergedAlbums.filter((a: any) => {
+    const vis = a?.visibility;
+    if (vis === 'friends') {
+      return (a.ownerId === currentUserId) || friendOwnerSet.has(a.ownerId);
+    }
+    return true; // default public
+  });
+
+  // ここでアルバムごとにリポスト行を取得し、友人/ウォッチ（含む自分）の最新を採用
+  try {
+    const actorIds = Array.from(new Set<string>(ownerIds));
+    await Promise.all(filteredAlbums.map(async (album: any) => {
+      try {
+        const rows = await listRepostsByAlbumRaw(album.id, 200);
+        let best: { userId: string; createdAt: any } | null = null;
+        for (const r of rows) {
+          if (!actorIds.includes(r.userId)) continue;
+          const prevMs = toMillis(best?.createdAt) || 0;
+          const curMs = toMillis(r.createdAt) || 0;
+          if (!best || curMs > prevMs) best = { userId: r.userId, createdAt: r.createdAt };
+        }
+        if (best) latestRepostByAlbum.set(album.id, best);
+      } catch (e) {
+        console.warn('listRepostsByAlbumRaw error', album.id, e);
+      }
+    }));
+  } catch (e) {
+    console.warn('build latestRepostByAlbum failed', e);
+  }
 
   const perAlbumRows: TimelineItemVM[][] = await Promise.all(
-    mergedAlbums.map(async (album: any) => {
+    filteredAlbums.map(async (album: any) => {
+      // 個別クエリで permission-denied 等が出てもタイムライン全体が落ちないように、
+      // 小さなフォールバックで防御するユーティリティ
+      async function safe<T>(label: string, p: Promise<T>, fallback: T): Promise<T> {
+        try {
+          return await p;
+        } catch (e) {
+          console.warn(`[timeline] ${label} failed for album ${album?.id}`, e);
+          return fallback;
+        }
+      }
+
       let owner = cache.get(album.ownerId);
       if (owner === undefined) {
         const u = await getUser(album.ownerId);
@@ -92,16 +120,14 @@ export async function listLatestAlbumsVMLimited(
       }
       // reposts 系はルール未反映などで permission-denied の可能性があるため、
       // タイムライン全体を落とさないように安全にフォールバックする
-      const safeCountReposts = countReposts(album.id).catch((e) => { console.warn('countReposts failed', e); return 0; });
-      const safeHasReposted = hasReposted(album.id, currentUserId).catch((e) => { console.warn('hasReposted failed', e); return false; });
       const [imgs, cmts, likeCnt, likedFlag, reactions, repostCnt, repostedFlag] = await Promise.all([
-        listImages(album.id),
-        listComments(album.id),
-        countLikes(album.id),
-        hasLiked(album.id, currentUserId),
-        listReactionsByAlbum(album.id, currentUserId),
-        safeCountReposts,
-        safeHasReposted,
+        safe('listImages', listImages(album.id), [] as any[]),
+        safe('listComments', listComments(album.id), [] as any[]),
+        safe('countLikes', countLikes(album.id), 0),
+        safe('hasLiked', hasLiked(album.id, currentUserId), false),
+        safe('listReactionsByAlbum', listReactionsByAlbum(album.id, currentUserId), [] as any[]),
+        safe('countReposts', countReposts(album.id), 0),
+        safe('hasReposted', hasReposted(album.id, currentUserId), false),
       ]);
 
       // 「誰かが画像を追加しました」表示用: 最新画像の uploader が owner 以外のときに表示

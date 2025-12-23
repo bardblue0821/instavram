@@ -16,6 +16,8 @@ const messages: Record<string, string> = {
   'auth/requires-recent-login': '安全のため再ログインが必要です。一度ログアウトしてログインし直してください。',
   MISSING_PASSWORD: 'パスワードを入力してください',
   MISSING_EMAIL: 'メールアドレスが取得できません。再ログインしてください。',
+  // Firestore
+  'permission-denied': '権限がありません（アルバムの公開範囲・フレンド関係をご確認ください）',
 };
 
 export function translateError(e: unknown): string {

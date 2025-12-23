@@ -1,6 +1,6 @@
 import React from "react";
 
-type Album = { ownerId: string; title?: string; placeUrl?: string; links?: string[] } | null;
+type Album = { ownerId: string; title?: string; placeUrl?: string; links?: string[]; visibility?: 'public' | 'friends' } | null;
 
 export interface AlbumHeaderProps {
   album: Album;
@@ -14,11 +14,12 @@ export interface AlbumHeaderProps {
   onTitleBlur: () => void;
   onPlaceUrlBlur: () => void;
   onInputKeyDownBlurOnEnter?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onVisibilityChange?: (v: 'public' | 'friends') => void;
 }
 
 export default function AlbumHeader(props: AlbumHeaderProps) {
   const { album, isOwner, editTitle, editPlaceUrl, savingAlbum, albumSavedMsg,
-    onTitleChange, onPlaceUrlChange, onTitleBlur, onPlaceUrlBlur, onInputKeyDownBlurOnEnter } = props;
+    onTitleChange, onPlaceUrlChange, onTitleBlur, onPlaceUrlBlur, onInputKeyDownBlurOnEnter, onVisibilityChange } = props;
 
   const displayTitle = (() => {
     const t = album?.title ?? "";
@@ -29,7 +30,12 @@ export default function AlbumHeader(props: AlbumHeaderProps) {
   return (
     <div>
       {!isOwner && (
-        <h1 className="font-bold text-2xl">{displayTitle}</h1>
+        <h1 className="font-bold text-2xl flex items-center gap-2">
+          {displayTitle}
+          {album?.visibility === 'friends' && (
+            <span className="text-[11px] px-2 py-0.5 rounded bg-muted/20 text-muted shrink-0" title="フレンド限定">🔒 フレンド限定</span>
+          )}
+        </h1>
       )}
 
       {isOwner && (
@@ -53,6 +59,34 @@ export default function AlbumHeader(props: AlbumHeaderProps) {
               className="mt-1 input-underline text-sm"
               placeholder="https://vrchat.com/..."
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">公開範囲</label>
+            <div className="flex items-center gap-3 text-sm">
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="visibility"
+                  value="public"
+                  checked={(album?.visibility || 'public') === 'public'}
+                  onChange={() => onVisibilityChange?.('public')}
+                />
+                <span>公開（全員に表示）</span>
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="visibility"
+                  value="friends"
+                  checked={(album?.visibility || 'public') === 'friends'}
+                  onChange={() => onVisibilityChange?.('friends')}
+                />
+                <span>フレンド限定</span>
+              </label>
+            </div>
+            <p className="text-xs text-muted mt-1">
+              フレンド限定にすると、ウォッチャーや非フレンドには完全に表示されません。共有・リポストも無効になります。
+            </p>
           </div>
           {albumSavedMsg && <p className="text-xs text-green-600">{albumSavedMsg}</p>}
         </div>

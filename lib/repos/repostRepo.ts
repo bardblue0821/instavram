@@ -136,3 +136,29 @@ export async function listRepostersByAlbum(albumId: string, limitCount = 20): Pr
     .filter((u): u is NonNullable<typeof u> => !!u)
     .map((u) => ({ uid: u.uid, displayName: u.displayName, handle: (u as any).handle ?? null, iconURL: (u as any).iconURL }))
 }
+
+// 指定アルバムのリポスト行（userId と createdAt の生データ）を返すヘルパー
+export async function listRepostsByAlbumRaw(albumId: string, limitCount = 500): Promise<Array<{ userId: string; createdAt: any }>> {
+  const q = query(collection(db, COL.reposts), where('albumId', '==', albumId), limit(Math.max(1, limitCount)))
+  const snap = await getDocs(q)
+  const rows: Array<{ userId: string; createdAt: any }> = []
+  snap.forEach((d:any) => {
+    const v: any = d.data()
+    const uid = v?.userId
+    if (typeof uid === 'string' && uid) rows.push({ userId: uid, createdAt: v?.createdAt })
+  })
+  return rows
+}
+
+// Delete all reposts for a specific album (used when album is switched to private)
+export async function deleteRepostsByAlbum(albumId: string): Promise<number> {
+  const q = query(collection(db, COL.reposts), where('albumId', '==', albumId))
+  const snap = await getDocs(q)
+  let count = 0
+  const tasks: Promise<void>[] = []
+  snap.forEach((d:any) => {
+    tasks.push(deleteDoc(d.ref).then(()=>{ count += 1; }).catch(()=>{}))
+  })
+  await Promise.all(tasks)
+  return count
+}

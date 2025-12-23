@@ -6,6 +6,22 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isFriendWith(otherId) {
+      return isSignedIn() && (
+        get(/databases/$(database)/documents/friends/$(request.auth.uid + '_' + otherId)).data.status == 'accepted' ||
+        get(/databases/$(database)/documents/friends/$(otherId + '_' + request.auth.uid)).data.status == 'accepted'
+      );
+    }
+
+    function canReadAlbum(albumId) {
+      // Public: everyone can read. Friends-only: only owner or friends can read.
+      let a = get(/databases/$(database)/documents/albums/$(albumId)).data;
+      return (
+        a.visibility != 'friends' ||
+        (isSignedIn() && (a.ownerId == request.auth.uid || isFriendWith(a.ownerId)))
+      );
+    }
+
     // reactions/{rid} （ID = albumId:userId:emoji）
     match /reactions/{rid} {
       allow read: if true;
@@ -30,7 +46,7 @@ service cloud.firestore {
 
     // albums/{albumId}
     match /albums/{albumId} {
-      allow read: if true;
+      allow read: if resource.data.visibility != 'friends' || (isSignedIn() && (resource.data.ownerId == request.auth.uid || isFriendWith(resource.data.ownerId)));
       allow create: if isSignedIn()
         && request.resource.data.ownerId == request.auth.uid;
       allow update: if isSignedIn()
@@ -42,7 +58,7 @@ service cloud.firestore {
 
     // albumImages/{imageId}
     match /albumImages/{imageId} {
-      allow read: if true;
+      allow read: if canReadAlbum(resource.data.albumId);
       allow create: if isSignedIn()
         && request.resource.data.keys().hasAll(['albumId','uploaderId','url'])
         && request.resource.data.uploaderId == request.auth.uid;
@@ -62,12 +78,13 @@ service cloud.firestore {
 
     // comments/{commentId}
     match /comments/{commentId} {
-      allow read: if true;
+      allow read: if canReadAlbum(resource.data.albumId);
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.body is string
         && request.resource.data.body.size() <= 200
-        && request.resource.data.keys().hasAll(['albumId','userId','body','createdAt']);
+        && request.resource.data.keys().hasAll(['albumId','userId','body','createdAt'])
+        && canReadAlbum(request.resource.data.albumId);
       allow update: if isSignedIn()
         && resource.data.userId == request.auth.uid
         && request.resource.data.keys().hasOnly(['albumId','userId','body','createdAt','id']);
@@ -80,22 +97,24 @@ service cloud.firestore {
 
     // likes/{likeId} （ID = albumId_userId）
     match /likes/{likeId} {
-      allow read: if true;
+      allow read: if canReadAlbum(resource.data.albumId);
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
         && likeId == request.resource.data.albumId + '_' + request.resource.data.userId
-        && request.resource.data.keys().hasAll(['albumId','userId','createdAt']);
+        && request.resource.data.keys().hasAll(['albumId','userId','createdAt'])
+        && canReadAlbum(request.resource.data.albumId);
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow update: if false;
     }
 
     // reposts/{repostId} （ID = albumId_userId）
     match /reposts/{repostId} {
-      allow read: if true;
+      allow read: if canReadAlbum(resource.data.albumId);
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
         && repostId == request.resource.data.albumId + '_' + request.resource.data.userId
-        && request.resource.data.keys().hasAll(['albumId','userId','createdAt']);
+        && request.resource.data.keys().hasAll(['albumId','userId','createdAt'])
+        && canReadAlbum(request.resource.data.albumId);
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow update: if false;
     }

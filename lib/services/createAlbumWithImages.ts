@@ -5,7 +5,7 @@ import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { addImage, canUploadMoreImages } from '../repos/imageRepo';
 import { addComment } from '../repos/commentRepo';
 
-interface CreateAlbumOptions { title?: string; placeUrl?: string; firstComment?: string }
+interface CreateAlbumOptions { title?: string; placeUrl?: string; firstComment?: string; visibility?: 'public' | 'friends' }
 export interface AlbumCreateProgress {
   fileIndex: number; // 0-based
   total: number; // 総ファイル数
@@ -92,6 +92,7 @@ export async function createAlbumWithImages(
     ownerId,
     title: opts.title || null,
     placeUrl: opts.placeUrl || null,
+    visibility: (opts.visibility === 'friends' ? 'friends' : 'public'),
     createdAt: now,
     updatedAt: now,
   });

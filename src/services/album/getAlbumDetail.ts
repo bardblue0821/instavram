@@ -16,6 +16,7 @@ export async function getAlbumDetailVM(albumId: string, currentUserId?: string, 
     ownerId: snap.ownerId,
     title: snap.title ?? null,
     placeUrl: snap.placeUrl ?? null,
+    visibility: (snap.visibility === 'friends' ? 'friends' : 'public'),
   };
   const imgsRaw = await listImages(albumId);
   const images: ImgVM[] = (imgsRaw || [])
@@ -62,6 +63,11 @@ export async function getAlbumDetailVM(albumId: string, currentUserId?: string, 
       isFriend = false;
       isWatcher = false;
     }
+  }
+
+  // フレンド限定の場合、オーナーまたはフレンド以外は閲覧不可（404相当）
+  if (album.visibility === 'friends' && !(isOwner || isFriend)) {
+    return null;
   }
 
   return {

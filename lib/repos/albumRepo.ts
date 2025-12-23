@@ -2,12 +2,13 @@ import { db } from '../firebase'
 import { collection, addDoc, doc, getDoc, updateDoc, orderBy, limit, query, where, deleteDoc } from 'firebase/firestore'
 import { COL } from '../paths'
 
-export async function createAlbum(ownerId: string, data: { title?: string; placeUrl?: string }) {
+export async function createAlbum(ownerId: string, data: { title?: string; placeUrl?: string; visibility?: 'public' | 'friends' }) {
   const now = new Date()
   return await addDoc(collection(db, COL.albums), {
     ownerId,
     title: data.title || null,
     placeUrl: data.placeUrl || null,
+    visibility: (data.visibility === 'friends' ? 'friends' : 'public'),
     createdAt: now,
     updatedAt: now,
   })
@@ -23,10 +24,13 @@ export async function touchAlbum(id: string) {
 }
 
 // 部分更新 (title, placeUrl) - 空文字は null へ。オーナー権限チェックは Firestore ルール側で担保。
-export async function updateAlbum(id: string, data: { title?: string; placeUrl?: string }) {
+export async function updateAlbum(id: string, data: { title?: string; placeUrl?: string; visibility?: 'public' | 'friends' }) {
   const patch: any = {}
   if (data.title !== undefined) patch.title = data.title.trim() === '' ? null : data.title
   if (data.placeUrl !== undefined) patch.placeUrl = data.placeUrl.trim() === '' ? null : data.placeUrl
+  if (data.visibility !== undefined) {
+    patch.visibility = (data.visibility === 'friends') ? 'friends' : 'public'
+  }
   patch.updatedAt = new Date()
   await updateDoc(doc(db, COL.albums, id), patch)
 }

@@ -6,7 +6,8 @@ import type { AlbumDoc } from '../../types/models';
 // ownerIds が指定されない場合は最新アルバム全体（暫定）
 // NOTE: ownerIds 絞り込みは "in + orderBy" の複合インデックス問題を避けるため、
 // 各 ownerId ごとに最新を取得してマージする（ウォッチした相手の投稿が落ちないようにする）。
-export async function fetchLatestAlbums(max: number = 50, ownerIds?: string[]): Promise<AlbumDoc[]> {
+// publicOnlyOwners: フレンドでないオーナー（ウォッチ等）については「公開アルバムのみ」を取得するための制約セット
+export async function fetchLatestAlbums(max: number = 50, ownerIds?: string[], publicOnlyOwners?: Set<string>): Promise<AlbumDoc[]> {
   if (!ownerIds || ownerIds.length === 0) {
     const q = query(collection(db, COL.albums), orderBy('createdAt', 'desc'), limit(max));
     const snap = await getDocs(q);
@@ -28,13 +29,17 @@ export async function fetchLatestAlbums(max: number = 50, ownerIds?: string[]): 
   await Promise.all(
     ownerIds.map(async (ownerId) => {
       try {
-        // 正攻法: ownerId== + createdAt orderBy（複合インデックスが必要な場合あり）
-        const q = query(
-          collection(db, COL.albums),
+        const constraints: any[] = [
           where('ownerId', '==', ownerId),
           orderBy('createdAt', 'desc'),
           limit(perOwnerLimit),
-        );
+        ];
+        // フレンド以外のオーナーは公開アルバムのみ取得し、friends 可視アルバムが混ざってクエリ全体が拒否されるのを避ける
+        if (publicOnlyOwners?.has(ownerId)) {
+          // 複合インデックスが必要になる可能性あり（ownerId + visibility + createdAt desc）
+          constraints.unshift(where('visibility', '==', 'public'));
+        }
+        const q = query(collection(db, COL.albums), ...constraints);
         const snap = await getDocs(q);
         snap.forEach((d) => {
           results.push({ id: d.id, ...(d.data() as any) } as AlbumDoc);
@@ -44,11 +49,10 @@ export async function fetchLatestAlbums(max: number = 50, ownerIds?: string[]): 
         const msg = String(e?.message || e || '');
         const isIndex = msg.includes('FAILED_PRECONDITION') || msg.toLowerCase().includes('index');
         if (!isIndex) throw e;
-
-        const q2 = query(
-          collection(db, COL.albums),
-          where('ownerId', '==', ownerId),
-        );
+        // フォールバック: orderBy を外し、必要に応じて visibility==public を含めた単純 where へ
+        const constraints2: any[] = [where('ownerId', '==', ownerId)];
+        if (publicOnlyOwners?.has(ownerId)) constraints2.push(where('visibility', '==', 'public'));
+        const q2 = query(collection(db, COL.albums), ...constraints2);
         const snap2 = await getDocs(q2);
         const rows = snap2.docs
           .map((d) => ({ id: d.id, ...(d.data() as any) } as AlbumDoc))

@@ -19,6 +19,7 @@ export default function AlbumCreateModal({ onCreated }: Props) {
   const [title, setTitle] = useState('');
   const [placeUrl, setPlaceUrl] = useState('');
   const [comment, setComment] = useState('');
+  const [visibility, setVisibility] = useState<'public' | 'friends'>('public');
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<{ file: File; url: string }[]>([]);
   const [croppedPreviews, setCroppedPreviews] = useState<({ file: File; url: string } | null)[]>([]);
@@ -175,7 +176,7 @@ export default function AlbumCreateModal({ onCreated }: Props) {
       console.log('[AlbumCreateModal] submit start', { uid: user.uid, files: uploadFiles.map(f=>({name:f.name,size:f.size})) });
       const albumId = await createAlbumWithImages(
         user.uid,
-        { title: title || undefined, placeUrl: placeUrl || undefined, firstComment: comment || undefined },
+        { title: title || undefined, placeUrl: placeUrl || undefined, firstComment: comment || undefined, visibility },
         uploadFiles,
         (p) => {
           setProgress(p.overallPercent);
@@ -237,6 +238,36 @@ export default function AlbumCreateModal({ onCreated }: Props) {
             placeholder="どうだった？(200文字まで)"
           />
           <p className="text-xs text-gray-500 text-right">{comment.length}/200</p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">公開範囲</label>
+          <div className="flex items-center gap-3 text-sm">
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="radio"
+                name="visibility"
+                value="public"
+                checked={visibility === 'public'}
+                onChange={() => setVisibility('public')}
+                disabled={loading || !user}
+              />
+              <span>公開（全員に表示）</span>
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="radio"
+                name="visibility"
+                value="friends"
+                checked={visibility === 'friends'}
+                onChange={() => setVisibility('friends')}
+                disabled={loading || !user}
+              />
+              <span>フレンド限定</span>
+            </label>
+          </div>
+          <p className="text-xs text-muted mt-1">
+            フレンド限定にすると、ウォッチャーや非フレンドには完全に表示されません。共有・リポストも無効になります。
+          </p>
         </div>
         <div>
           <label className="block text-sm font-medium mb-1" aria-label="画像選択">画像 (最大4枚)</label>

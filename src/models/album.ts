@@ -10,6 +10,7 @@ export type AlbumVM = {
   ownerId: string;
   title?: string | null;
   placeUrl?: string | null;
+  visibility?: 'public' | 'friends';
 };
 
 export type ImgVM = {

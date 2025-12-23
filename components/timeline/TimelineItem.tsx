@@ -78,6 +78,7 @@ export function TimelineItem(props: {
     isFriend,
     isWatched,
   } = props;
+  const isOwner = !!(currentUserId && album.ownerId === currentUserId);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [showCommentBox, setShowCommentBox] = useState(false);
@@ -395,7 +396,7 @@ export function TimelineItem(props: {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            <ShareMenu albumId={album.id} albumTitle={album.title || null} />
+            <ShareMenu albumId={album.id} albumTitle={album.title || null} disabled={((album as any).visibility === 'friends') && !isOwner && !isFriend} />
             <AlbumActionsMenu
               albumId={album.id}
               albumOwnerId={album.ownerId}
@@ -408,6 +409,9 @@ export function TimelineItem(props: {
         {album.title && (
           <h3 className="text-base font-semibold flex items-center gap-2">
             <a href={`/album/${album.id}`}>{album.title}</a>
+            {((album as any).visibility === 'friends') && (
+              <span className="text-[11px] px-2 py-0.5 rounded bg-muted/20 text-muted shrink-0" title="フレンド限定">🔒 フレンド限定</span>
+            )}
           </h3>
         )}
       </header>
@@ -475,8 +479,8 @@ export function TimelineItem(props: {
           <button
             aria-label={reposted ? "リポスト済み" : "リポスト"}
             aria-pressed={reposted}
-            className={`${reposted ? "text-green-600" : "text-muted"}`}
-            onClick={() => onToggleRepost?.()}
+            className={`${reposted ? "text-green-600" : "text-muted"} ${(((album as any).visibility === 'friends') && !isOwner && !isFriend) ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={() => { if ((((album as any).visibility === 'friends') && !isOwner && !isFriend)) return; onToggleRepost?.(); }}
           >
             <RepostIcon filled={reposted} size={20} />
           </button>
