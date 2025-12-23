@@ -10,6 +10,7 @@ import { HeartIcon } from "../icons/HeartIcon";
 import { ChatIcon } from "../icons/ChatIcon";
 import { Button } from "../ui/Button";
 import { RepostIcon } from "../icons/RepostIcon";
+import AlbumActionsMenu from "../album/AlbumActionsMenu";
 
 type Img = { url: string; thumbUrl?: string; uploaderId?: string };
 type LatestComment = { body: string; userId: string } | undefined;
@@ -79,9 +80,6 @@ export function TimelineItem(props: {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [showCommentBox, setShowCommentBox] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-  const menuBtnRef = useRef<HTMLButtonElement | null>(null);
   const [hoveredEmoji, setHoveredEmoji] = useState<string | null>(null);
   const [reactorMap, setReactorMap] = useState<Record<string, Reactor[] | undefined>>({});
   const [reactorLoading, setReactorLoading] = useState<Record<string, boolean>>({});
@@ -214,22 +212,7 @@ export function TimelineItem(props: {
   useEffect(() => { if (pickerOpen) setEmojiQuery(""); }, [pickerOpen]);
 
   // メニュー外クリック/ESCで閉じる
-  useEffect(() => {
-    if (!menuOpen) return;
-    function onMouseDown(e: MouseEvent) {
-      const t = e.target as Node;
-      if (menuRef.current && !menuRef.current.contains(t) && menuBtnRef.current && !menuBtnRef.current.contains(t)) {
-        setMenuOpen(false);
-      }
-    }
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setMenuOpen(false); }
-    window.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('mousedown', onMouseDown);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [menuOpen]);
+  useEffect(() => { /* menu handled in shared component */ }, []);
 
   // リアクション状態が変わったら、ホバー中の絵文字のリストをリフレッシュ（自分の追加/解除を即時反映）
   useEffect(() => {
@@ -410,52 +393,13 @@ export function TimelineItem(props: {
             </a>
           </div>
 
-          <div className="ml-auto relative">
-            <button
-              ref={menuBtnRef}
-              type="button"
-              aria-label="メニュー"
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              className="w-8 h-8 rounded border border-line hover:bg-surface-weak text-muted"
-              onClick={() => setMenuOpen((o) => !o)}
-            >
-              ⋯
-            </button>
-            {menuOpen && (
-              <div
-                ref={menuRef}
-                role="menu"
-                className="absolute right-0 top-full mt-2 w-40 rounded border border-line bg-background shadow-lg z-50 overflow-hidden"
-              >
-                {currentUserId && currentUserId === album.ownerId && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-surface-weak"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onRequestDelete?.(album.id);
-                    }}
-                  >
-                    削除する
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-surface-weak"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onRequestReport?.(album.id);
-                  }}
-                >
-                  通報する
-                </button>
-              </div>
-            )}
-          </div>
+          <AlbumActionsMenu
+            albumId={album.id}
+            albumOwnerId={album.ownerId}
+            currentUserId={currentUserId}
+            onRequestDelete={onRequestDelete}
+            onRequestReport={onRequestReport}
+          />
         </div>
         {album.title && (
           <h3 className="text-base font-semibold flex items-center gap-2">

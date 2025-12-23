@@ -32,6 +32,9 @@ import { listReactionsByAlbum, toggleReaction } from '../../../lib/repos/reactio
 import { addNotification } from '../../../lib/repos/notificationRepo';
 import { getUser } from '../../../lib/repos/userRepo';
 import { Button } from '../../../components/ui/Button';
+import DeleteConfirmModal from '../../../components/album/DeleteConfirmModal';
+import ReportConfirmModal from '../../../components/album/ReportConfirmModal';
+import { deleteAlbum } from '../../../lib/repos/albumRepo';
 
 export default function ProfilePage() {
   const params = useParams();
@@ -117,6 +120,11 @@ export default function ProfilePage() {
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [friendRemoveOpen, setFriendRemoveOpen] = useState(false);
   const [friendRemoveBusy, setFriendRemoveBusy] = useState(false);
+  // Album actions modal state
+  const [deleteTargetAlbumId, setDeleteTargetAlbumId] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [reportTargetAlbumId, setReportTargetAlbumId] = useState<string | null>(null);
+  const [reportBusy, setReportBusy] = useState(false);
 
   // Load profile and social flags
   useEffect(() => {
@@ -839,6 +847,58 @@ export default function ProfilePage() {
   }
   async function reauthGoogle() { try { const provider = new GoogleAuthProvider(); await reauthenticateWithPopup(auth.currentUser!, provider); } catch {} }
 
+  async function handleConfirmDelete() {
+    const albumId = deleteTargetAlbumId;
+    if (!albumId) return;
+    if (!user?.uid) return;
+    setDeleteBusy(true);
+    try {
+      await deleteAlbum(albumId);
+      setOwnRows((prev) => prev.filter((r) => r.album.id !== albumId));
+      setJoinedRows((prev) => prev.filter((r) => r.album.id !== albumId));
+      setDeleteTargetAlbumId(null);
+    } catch (e:any) {
+      const msg = translateError(e);
+      try { show({ message: msg, variant: 'error' }); } catch {}
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
+  async function handleConfirmReport() {
+    const albumId = reportTargetAlbumId;
+    if (!albumId) return;
+    if (!user) return;
+    setReportBusy(true);
+    try {
+      const token = await user.getIdToken();
+      const albumUrl = `${window.location.origin}/album/${encodeURIComponent(albumId)}`;
+      const res = await fetch('/api/reports/album', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
+        body: JSON.stringify({ albumId, albumUrl }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({} as any));
+        const err = (json as any)?.error || 'REPORT_FAILED';
+        const hint = (json as any)?.hint as string | undefined;
+        const missingEnv = (json as any)?.missingEnv as string | undefined;
+        let msg = err;
+        if (typeof err === 'string' && err.startsWith('MISSING_ENV:')) {
+          msg = `通報メール送信の設定が未完了です（${missingEnv || err.slice('MISSING_ENV:'.length)}）`;
+        }
+        if (hint) msg = `${msg} / ${hint}`;
+        throw new Error(msg);
+      }
+      setReportTargetAlbumId(null);
+    } catch (e:any) {
+      const msg = translateError(e);
+      try { show({ message: msg, variant: 'error' }); } catch {}
+    } finally {
+      setReportBusy(false);
+    }
+  }
+
   // Guard
   if (loading) return <div className="p-4 text-sm text-muted/80">読み込み中...</div>;
   if (!profile) return <div className="p-4 text-sm text-muted">ユーザーが見つかりません (handle)</div>;
@@ -1124,6 +1184,9 @@ export default function ProfilePage() {
                       likeCount={row.likeCount}
                       liked={row.liked}
                       onLike={user ? () => handleToggleLikeOwn(i) : () => {}}
+                      currentUserId={user?.uid || undefined}
+                      onRequestDelete={(albumId) => setDeleteTargetAlbumId(albumId)}
+                      onRequestReport={(albumId) => setReportTargetAlbumId(albumId)}
                       commentCount={row.commentCount}
                       latestComment={row.latestComment}
                       commentsPreview={row.commentsPreview}
@@ -1154,6 +1217,9 @@ export default function ProfilePage() {
                       likeCount={row.likeCount}
                       liked={row.liked}
                       onLike={user ? () => handleToggleLikeJoined(i) : () => {}}
+                      currentUserId={user?.uid || undefined}
+                      onRequestDelete={(albumId) => setDeleteTargetAlbumId(albumId)}
+                      onRequestReport={(albumId) => setReportTargetAlbumId(albumId)}
                       commentCount={row.commentCount}
                       latestComment={row.latestComment}
                       commentsPreview={row.commentsPreview}
@@ -1341,6 +1407,20 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
+
+      {/* Album action modals */}
+      <DeleteConfirmModal
+        open={!!deleteTargetAlbumId}
+        busy={deleteBusy}
+        onCancel={() => { if (!deleteBusy) setDeleteTargetAlbumId(null); }}
+        onConfirm={() => { if (!deleteBusy) void handleConfirmDelete(); }}
+      />
+      <ReportConfirmModal
+        open={!!reportTargetAlbumId}
+        busy={reportBusy}
+        onCancel={() => { if (!reportBusy) setReportTargetAlbumId(null); }}
+        onConfirm={() => { if (!reportBusy) void handleConfirmReport(); }}
+      />
     </div>
   );
 }
