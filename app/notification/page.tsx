@@ -6,6 +6,7 @@ import { getUser } from '../../lib/repos/userRepo';
 import { getFriendStatus, acceptFriend, cancelFriendRequest } from '../../lib/repos/friendRepo';
 import { useToast } from '../../components/ui/Toast';
 import Link from 'next/link';
+import { batchGetUsers } from '../../lib/utils/batchQuery';
 
 interface NotificationRow {
   id: string;

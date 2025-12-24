@@ -9,6 +9,7 @@ import { countLikes, hasLiked } from "@/lib/repos/likeRepo";
 import { listReactionsByAlbum } from "@/lib/repos/reactionRepo";
 import { countReposts, hasReposted, getRepost, listRepostsByAlbumRaw } from "@/lib/repos/repostRepo";
 import { getAlbum } from "@/lib/repos/albumRepo";
+import { batchGetUsers } from "@/lib/utils/batchQuery";
 
 function toMillis(v: any): number | null {
   if (!v) return null;
@@ -99,35 +100,55 @@ export async function listLatestAlbumsVMLimited(
     console.warn('build latestRepostByAlbum failed', e);
   }
 
+  // ========================================
+  // ユーザー情報のみバッチクエリで最適化
+  // （画像・コメント・いいね等は並列クエリで十分高速）
+  // ========================================
+  const albumIds = filteredAlbums.map((a: any) => a.id);
+  
+  // 全アルバムのオーナーIDを収集してユーザー情報を一括取得
+  const allOwnerIds = Array.from(new Set(filteredAlbums.map((a: any) => a.ownerId)));
+  let batchedUsers: Map<string, any> = new Map();
+  try {
+    batchedUsers = await batchGetUsers(allOwnerIds);
+    // キャッシュに反映
+    batchedUsers.forEach((user, uid) => {
+      if (!cache.has(uid)) {
+        cache.set(uid, toUserRef(user));
+      }
+    });
+  } catch (e) {
+    console.warn('batchGetUsers failed', e);
+  }
+
+  // ========================================
+  // アルバムごとの処理（画像・コメント・いいね等は並列クエリ）
+  // ========================================
   const perAlbumRows: TimelineItemVM[][] = await Promise.all(
     filteredAlbums.map(async (album: any) => {
-      // 個別クエリで permission-denied 等が出てもタイムライン全体が落ちないように、
-      // 小さなフォールバックで防御するユーティリティ
-      async function safe<T>(label: string, p: Promise<T>, fallback: T): Promise<T> {
+      // オーナー情報はバッチ取得したものを使用
+      let owner = cache.get(album.ownerId);
+      if (!owner) {
+        // フォールバック: キャッシュにない場合は個別取得
         try {
-          return await p;
+          const u = await getUser(album.ownerId);
+          owner = toUserRef(u);
+          cache.set(album.ownerId, owner);
         } catch (e) {
-          console.warn(`[timeline] ${label} failed for album ${album?.id}`, e);
-          return fallback;
+          console.warn(`getUser failed for ${album.ownerId}`, e);
+          owner = null;
         }
       }
 
-      let owner = cache.get(album.ownerId);
-      if (owner === undefined) {
-        const u = await getUser(album.ownerId);
-        owner = toUserRef(u);
-        cache.set(album.ownerId, owner);
-      }
-      // reposts 系はルール未反映などで permission-denied の可能性があるため、
-      // タイムライン全体を落とさないように安全にフォールバックする
+      // 画像・コメント・いいね等は並列取得（高速）
       const [imgs, cmts, likeCnt, likedFlag, reactions, repostCnt, repostedFlag] = await Promise.all([
-        safe('listImages', listImages(album.id), [] as any[]),
-        safe('listComments', listComments(album.id), [] as any[]),
-        safe('countLikes', countLikes(album.id), 0),
-        safe('hasLiked', hasLiked(album.id, currentUserId), false),
-        safe('listReactionsByAlbum', listReactionsByAlbum(album.id, currentUserId), [] as any[]),
-        safe('countReposts', countReposts(album.id), 0),
-        safe('hasReposted', hasReposted(album.id, currentUserId), false),
+        listImages(album.id),
+        listComments(album.id),
+        countLikes(album.id),
+        currentUserId ? hasLiked(album.id, currentUserId) : Promise.resolve(false),
+        listReactionsByAlbum(album.id, currentUserId || ''),
+        countReposts(album.id),
+        currentUserId ? hasReposted(album.id, currentUserId) : Promise.resolve(false),
       ]);
 
       // 「誰かが画像を追加しました」表示用: 最新画像の uploader が owner 以外のときに表示
@@ -142,27 +163,39 @@ export async function listLatestAlbumsVMLimited(
           })[0];
 
         if (latestImg?.uploaderId && latestImg.uploaderId !== album.ownerId) {
+          // バッチ取得したユーザー情報を使用（なければ個別取得）
           let au = cache.get(latestImg.uploaderId);
-          if (au === undefined) {
-            const u = await getUser(latestImg.uploaderId);
-            au = toUserRef(u);
-            cache.set(latestImg.uploaderId, au);
+          if (!au) {
+            try {
+              const u = await getUser(latestImg.uploaderId);
+              au = toUserRef(u);
+              cache.set(latestImg.uploaderId, au);
+            } catch (e) {
+              console.warn(`getUser failed for uploader ${latestImg.uploaderId}`, e);
+            }
           }
           imageAdded = { userId: latestImg.uploaderId, user: au || undefined, createdAt: latestImg.createdAt || latestImg.updatedAt };
         }
       } catch {
         imageAdded = undefined;
       }
+      
       const cAsc = [...cmts]
         .sort((a, b) => (a.createdAt?.seconds || a.createdAt || 0) - (b.createdAt?.seconds || b.createdAt || 0));
       const latest = cAsc.slice(-1)[0];
       const previewDesc = cAsc.slice(-3).reverse();
+      
+      // コメントユーザー情報の取得（個別だが、Promise.allで並列化）
       const commentsPreview = await Promise.all(previewDesc.map(async (c) => {
         let cu = cache.get(c.userId);
-        if (cu === undefined) {
-          const u = await getUser(c.userId);
-          cu = toUserRef(u);
-          cache.set(c.userId, cu);
+        if (!cu) {
+          try {
+            const u = await getUser(c.userId);
+            cu = toUserRef(u);
+            cache.set(c.userId, cu);
+          } catch (e) {
+            console.warn(`getUser failed for comment user ${c.userId}`, e);
+          }
         }
         return { body: c.body, userId: c.userId, user: cu || undefined, createdAt: c.createdAt };
       }));
@@ -178,11 +211,16 @@ export async function listLatestAlbumsVMLimited(
       let repostedBy: any = undefined;
       const lr = latestRepostByAlbum.get(album.id);
       if (lr) {
+        // バッチ取得したユーザー情報を使用
         let ru = cache.get(lr.userId);
-        if (ru === undefined) {
-          const u = await getUser(lr.userId);
-          ru = toUserRef(u);
-          cache.set(lr.userId, ru);
+        if (!ru) {
+          try {
+            const u = await getUser(lr.userId);
+            ru = toUserRef(u);
+            cache.set(lr.userId, ru);
+          } catch (e) {
+            console.warn(`getUser failed for reposter ${lr.userId}`, e);
+          }
         }
         repostedBy = { userId: lr.userId, user: ru || undefined, createdAt: lr.createdAt };
       } else if (repostedFlag) {
@@ -190,10 +228,14 @@ export async function listLatestAlbumsVMLimited(
           const mine = await getRepost(album.id, currentUserId);
           if (mine) {
             let ru = cache.get(currentUserId);
-            if (ru === undefined) {
-              const u = await getUser(currentUserId);
-              ru = toUserRef(u);
-              cache.set(currentUserId, ru);
+            if (!ru) {
+              try {
+                const u = await getUser(currentUserId);
+                ru = toUserRef(u);
+                cache.set(currentUserId, ru);
+              } catch (e) {
+                console.warn(`getUser failed for current user`, e);
+              }
             }
             repostedBy = { userId: currentUserId, user: ru || undefined, createdAt: mine.createdAt };
           }

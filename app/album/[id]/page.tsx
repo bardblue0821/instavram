@@ -43,6 +43,7 @@ import Avatar from "../../../components/profile/Avatar";
 // いいねアイコンは ReactionsBar 内で使用
 import { getAlbumDetailVM } from "@/src/services/album/getAlbumDetail";
 import type { AlbumDetailVM, UserRef } from "@/src/models/album";
+import { batchGetUsers } from "../../../lib/utils/batchQuery";
 
 type CommentRecord = {
   id: string;
@@ -216,24 +217,33 @@ export default function AlbumDetailPage() {
   // 既存画像のサムネイル不足分はフックで自動生成
   useThumbBackfill(albumId, images, visibleCount, setImages);
 
-  // 投稿者アイコンの取得（重複はキャッシュ）
+  // 投稿者アイコンの取得（バッチクエリで一括取得）
   useEffect(() => {
     const ids = Array.from(new Set(images.map((img) => img.uploaderId).filter(Boolean)));
     if (ids.length === 0) return;
     let cancelled = false;
     (async () => {
-      const next: Record<string, { iconURL: string | null; handle: string | null }> = { ...uploaderMap };
-      for (const uid of ids) {
-        if (!uid) continue;
-        if (next[uid] !== undefined) continue;
-        try {
-          const u = await getUser(uid);
-          next[uid] = { iconURL: u?.iconURL || null, handle: u?.handle || null };
-        } catch {
-          next[uid] = { iconURL: null, handle: null };
-        }
+      // ========================================
+      // N+1 問題解決: バッチクエリで一括取得
+      // ========================================
+      try {
+        const batchedUsers = await batchGetUsers(ids);
+        const next: Record<string, { iconURL: string | null; handle: string | null }> = {};
+        
+        ids.forEach((uid) => {
+          const u = batchedUsers.get(uid);
+          next[uid] = { 
+            iconURL: u?.iconURL || null, 
+            handle: u?.handle || null 
+          };
+        });
+        
+        if (!cancelled) setUploaderMap(next);
+      } catch (e) {
+        console.warn('Failed to batch get uploaders', e);
+        // フォールバック: 空のマップをセット
+        if (!cancelled) setUploaderMap({});
       }
-      if (!cancelled) setUploaderMap(next);
     })();
     return () => { cancelled = true; };
   }, [images]);

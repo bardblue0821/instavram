@@ -2006,7 +2006,7 @@ export interface NotificationDoc {
 ### prop drilling が深い（TODO）
 
 
-### エラー表示の統一（TODO）
+### エラー表示の統一（f/u）
 ```typescript
 // ある画面では alert
 alert('エラーが発生しました');

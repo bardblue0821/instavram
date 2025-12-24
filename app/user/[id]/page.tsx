@@ -31,6 +31,7 @@ import { countLikes, hasLiked, toggleLike } from '../../../lib/repos/likeRepo';
 import { listReactionsByAlbum, toggleReaction } from '../../../lib/repos/reactionRepo';
 import { addNotification } from '../../../lib/repos/notificationRepo';
 import { getUser } from '../../../lib/repos/userRepo';
+import { batchGetUsers } from '../../../lib/utils/batchQuery';
 import { Button } from '../../../components/ui/Button';
 import DeleteConfirmModal from '../../../components/album/DeleteConfirmModal';
 import ReportConfirmModal from '../../../components/album/ReportConfirmModal';
