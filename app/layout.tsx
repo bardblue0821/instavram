@@ -3,7 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AuthGate from "../components/AuthGate";
 import { ToastProvider } from "../components/ui/Toast";
-import SideNav from "../components/SideNav";
+import ConditionalSideNav from "../components/ConditionalSideNav";
 import Providers from "./providers";
 import { ColorSchemeScript } from "@mantine/core";
 
@@ -37,7 +37,7 @@ export default function RootLayout({
           <ToastProvider>
             <div className="min-h-dvh">
               <div className="max-w-5xl w-full mx-auto flex">
-                <SideNav />
+                <ConditionalSideNav />
                 <div className="flex-1 min-w-0">
                   <AuthGate>
                     <main className="w-full px-4 py-6">

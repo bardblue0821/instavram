@@ -54,6 +54,21 @@ export async function verifyIdToken(token: string): Promise<any | null> {
   }
 }
 
+export function getAdminAuth() {
+  init();
+  try {
+    const auth = admin.auth();
+    if (!auth) {
+      console.error('[getAdminAuth] auth is null');
+      throw new Error('ADMIN_AUTH_NOT_INITIALIZED');
+    }
+    return auth;
+  } catch (e) {
+    console.error('[getAdminAuth] error:', e);
+    throw new Error('ADMIN_AUTH_NOT_INITIALIZED');
+  }
+}
+
 export function getAdminDb() {
   init();
   try {

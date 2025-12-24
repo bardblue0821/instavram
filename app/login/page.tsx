@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { auth } from '../../lib/firebase';
 import { ensureUser } from '../../lib/authUser';
 import { Button } from '../../components/ui/Button';
@@ -272,6 +273,13 @@ export default function LoginPage() {
             />
             <button type="button" onClick={()=>setShowPwd(s=>!s)} className="text-xs link-accent w-16" aria-label="パスワード表示切替">{showPwd?'隠す':'表示'}</button>
           </div>
+          {mode === 'login' && (
+            <div className="mt-2">
+              <Link href="/forgot-password" className="text-xs link-accent">
+                パスワードを忘れた方
+              </Link>
+            </div>
+          )}
           {mode==='register' && (
             <div className="mt-2 pw-strength-wrapper" aria-live="polite">
               <div className={`pw-strength-bar ${pwdStrength.cls}`}> <span style={{width: pwdStrength.percent+'%'}}></span> </div>

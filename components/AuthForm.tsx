@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { auth } from '../lib/firebase';
 import { ensureUser } from '../lib/authUser';
 import { Button } from './ui/Button';
@@ -240,6 +241,13 @@ export default function AuthForm() {
           </div>
           {mode === 'login' && hasNonAscii(password) && (
             <p className="text-xs text-red-600 mt-1" role="alert">パスワードは半角で入力してください</p>
+          )}
+          {mode === 'login' && (
+            <div className="mt-2">
+              <Link href="/forgot-password" className="text-xs link-accent">
+                パスワードを忘れた方
+              </Link>
+            </div>
           )}
           {mode==='register' && (
             <div className="mt-2 pw-strength-wrapper" aria-live="polite">
