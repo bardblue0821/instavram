@@ -86,6 +86,9 @@ export default function AlbumDetailPage() {
   const [likeBusy, setLikeBusy] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showDeleteImageConfirm, setShowDeleteImageConfirm] = useState(false);
+  const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
+  const [deletingImage, setDeletingImage] = useState(false);
   const [reactions, setReactions] = useState<{ emoji: string; count: number; mine: boolean }[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [emojiQuery, setEmojiQuery] = useState("");
@@ -417,8 +420,16 @@ export default function AlbumDetailPage() {
     setHoveredEmoji(null);
   }
 
-  async function handleDeleteImage(id: string) {
-    if (!confirm("画像を削除しますか？")) return;
+  function askDeleteImage(id: string) {
+    setDeletingImageId(id);
+    setShowDeleteImageConfirm(true);
+  }
+
+  async function confirmDeleteImage() {
+    const id = deletingImageId;
+    if (!id) return;
+    
+    setDeletingImage(true);
     try {
       // 権限チェック: オーナーは全て、フレンドは自分の画像のみ、ウォッチャー不可
       const target = images.find((img) => img.id === id);
@@ -445,8 +456,12 @@ export default function AlbumDetailPage() {
           (a.createdAt?.seconds || a.createdAt || 0),
       );
       setImages(imgs);
+      setShowDeleteImageConfirm(false);
+      setDeletingImageId(null);
     } catch (e: any) {
       setError(translateError(e));
+    } finally {
+      setDeletingImage(false);
     }
   }
 
@@ -740,7 +755,7 @@ export default function AlbumDetailPage() {
           if (isFriend) return p.uploaderId === user?.uid;
           return false;
         }}
-        onDelete={(p) => { if (p.id) handleDeleteImage(p.id); }}
+        onDelete={(p) => { if (p.id) askDeleteImage(p.id); }}
         showUploader={!!(user && canAddImages)}
         albumId={albumId!}
         userId={user?.uid || ''}
@@ -794,6 +809,15 @@ export default function AlbumDetailPage() {
         busy={deleting}
         onCancel={() => setShowDeleteConfirm(false)}
         onConfirm={confirmDeleteAlbum}
+      />
+
+      <DeleteConfirmModal
+        open={showDeleteImageConfirm}
+        busy={deletingImage}
+        onCancel={() => { setShowDeleteImageConfirm(false); setDeletingImageId(null); }}
+        onConfirm={confirmDeleteImage}
+        message="この画像を削除しますか？"
+        description="この操作は取り消せません。画像を削除します。"
       />
     </div>
   );
