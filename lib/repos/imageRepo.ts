@@ -15,6 +15,11 @@ export async function canUploadMoreImages(albumId: string, uploaderId: string) {
   return current < 4
 }
 
+/**
+ * Client SDK で画像を Firestore に追加
+ * 注意: この関数は Client SDK を使用するため、Firestore のセキュリティルールで
+ * アクセス権限が必要です。AlbumImageUploader では /api/images/register を使用してください。
+ */
 export async function addImage(albumId: string, uploaderId: string, url: string, thumbUrl?: string) {
   const current = await countUserImages(albumId, uploaderId)
   if (current >= 4) throw new Error('LIMIT_4_PER_USER')

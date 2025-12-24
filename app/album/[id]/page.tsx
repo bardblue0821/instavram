@@ -9,7 +9,6 @@ import DeleteConfirmModal from "@/components/album/DeleteConfirmModal";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthUser } from "../../../lib/hooks/useAuthUser";
 import {
-  addImage,
   listImages,
   deleteImage,
   canUploadMoreImages,
@@ -260,6 +259,7 @@ export default function AlbumDetailPage() {
     try {
       const url = await fileToDataUrl(file);
       const token = await user.getIdToken();
+      console.log('[album:addImage] uploading image');
       const res = await fetch('/api/images/add', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'authorization': `Bearer ${token}` },
@@ -267,18 +267,41 @@ export default function AlbumDetailPage() {
       });
       if (!res.ok) {
         const data = await res.json().catch(()=>({}));
+        console.error('[album:addImage] API error:', data);
         setError(translateError(data?.error || 'UNKNOWN'));
         return;
       }
-      const imgs = await listImages(albumId);
-      imgs.sort(
-        (a: any, b: any) =>
-          (b.createdAt?.seconds || b.createdAt || 0) -
-          (a.createdAt?.seconds || a.createdAt || 0),
-      );
-      setImages(imgs);
-      setFile(null);
+      console.log('[album:addImage] upload successful, refreshing image list');
+      
+      // ★ 画像リストを再取得（エラーが発生しても無視）
+      try {
+        const imgs = await listImages(albumId);
+        console.log('[album:addImage] image list refreshed', imgs.length);
+        imgs.sort(
+          (a: any, b: any) =>
+            (b.createdAt?.seconds || b.createdAt || 0) -
+            (a.createdAt?.seconds || a.createdAt || 0),
+        );
+        setImages(imgs);
+        setFile(null);
+        console.log('[album:addImage] complete');
+      } catch (listError: any) {
+        // listImages でエラーが発生してもアップロードは成功しているので無視
+        console.warn('[album:addImage] failed to refresh image list, but upload succeeded:', listError);
+        // 楽観的更新: 新しい画像を手動で追加
+        const newImage = {
+          id: Date.now().toString(), // 仮のID
+          albumId,
+          uploaderId: user.uid,
+          url,
+          createdAt: new Date(),
+        };
+        setImages((prev) => [newImage, ...prev]);
+        setFile(null);
+        // エラーメッセージは表示しない（アップロードは成功）
+      }
     } catch (e: any) {
+      console.error('[album:addImage] error:', e);
       setError(translateError(e));
     } finally {
       setUploading(false);

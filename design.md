@@ -2138,7 +2138,7 @@ function ImageCard({ src }: { src: string }) {
 }
 ```
 
-#### リアルタイム購読が過剰(TODO)
+#### リアルタイム購読が過剰
 現状:
 ```typescript
 // app/timeline/page.tsx

@@ -3,11 +3,19 @@ import { COL } from '@/lib/paths';
 import * as admin from 'firebase-admin';
 
 export async function adminAddImage(albumId: string, uploaderId: string, url: string, thumbUrl?: string) {
-  const db = getAdminDb();
-  const data: any = { albumId, uploaderId, url, createdAt: admin.firestore.FieldValue.serverTimestamp() };
-  if (thumbUrl) data.thumbUrl = thumbUrl;
-  const ref = await db.collection(COL.albumImages).add(data);
-  await ref.update({ id: ref.id });
+  try {
+    const db = getAdminDb();
+    const data: any = { albumId, uploaderId, url, createdAt: admin.firestore.FieldValue.serverTimestamp() };
+    if (thumbUrl) data.thumbUrl = thumbUrl;
+    console.log('[adminAddImage] adding image:', { albumId, uploaderId, hasUrl: !!url, hasThumbUrl: !!thumbUrl });
+    const ref = await db.collection(COL.albumImages).add(data);
+    console.log('[adminAddImage] image added, id:', ref.id);
+    await ref.update({ id: ref.id });
+    console.log('[adminAddImage] success');
+  } catch (e) {
+    console.error('[adminAddImage] error:', e);
+    throw e;
+  }
 }
 
 export async function adminDeleteImage(imageId: string) {

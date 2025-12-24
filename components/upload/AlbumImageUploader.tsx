@@ -6,7 +6,8 @@ import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { notifications } from "@mantine/notifications";
 import { storage } from "@/lib/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { addImage, canUploadMoreImages } from "@/lib/repos/imageRepo";
+import { canUploadMoreImages } from "@/lib/repos/imageRepo";
+import { useAuthUser } from "@/lib/hooks/useAuthUser";
 import AlbumImageCropper from "./AlbumImageCropper";
 import { getCroppedBlobSized } from "@/lib/services/avatar";
 
@@ -31,6 +32,7 @@ export default function AlbumImageUploader({
   remaining: number;
   onUploaded?: () => void;
 }) {
+  const { user } = useAuthUser();
   const [busy, setBusy] = useState(false);
   const [items, setItems] = useState<ItemState[]>([]);
   const [overall, setOverall] = useState(0);
@@ -228,6 +230,15 @@ export default function AlbumImageUploader({
     const code = e?.code || e?.message || "";
     if (!navigator.onLine) return "ネットワークに接続できません。接続を確認してください。";
     if (typeof code === "string") {
+      // API エラーコード
+      if (code === "NO_PERMISSION") return "このアルバムに画像を追加する権限がありません";
+      if (code === "LIMIT_EXCEEDED") return "アップロード上限に達しています（1アルバムにつき4枚まで）";
+      if (code === "ALBUM_NOT_FOUND") return "アルバムが見つかりません";
+      if (code === "FORBIDDEN") return "権限がありません";
+      if (code === "UNAUTHORIZED" || code === "NOT_AUTHENTICATED") return "ログインが必要です";
+      if (code === "RATE_LIMITED") return "リクエストが多すぎます。しばらくしてから再試行してください";
+      
+      // Firebase Storage エラー
       if (code.includes("unauthorized") || code.includes("permission-denied")) return "権限がありません（ログインまたは権限設定をご確認ください）";
       if (code.includes("quota-exceeded")) return "容量制限を超えました。管理者にお問い合わせください。";
       if (code.includes("retry-limit-exceeded") || code.includes("network")) return "ネットワークエラーが発生しました。しばらくして再試行してください。";
@@ -291,8 +302,38 @@ export default function AlbumImageUploader({
 
           Promise.all([mainTask, thumbTask])
             .then(async () => {
-              const [mainUrl, thumbUrl] = await Promise.all([getDownloadURL(mainRef), getDownloadURL(thumbRef)]);
-              await addImage(albumId, userId, mainUrl, thumbUrl);
+              const [mainUrl, thumbDownloadUrl] = await Promise.all([getDownloadURL(mainRef), getDownloadURL(thumbRef)]);
+              
+              // API 経由で Firestore に登録
+              if (!user) throw new Error('NOT_AUTHENTICATED');
+              const token = await user.getIdToken();
+              console.log('[AlbumImageUploader] Registering image via API:', { albumId, userId, mainUrl, thumbDownloadUrl });
+              
+              const res = await fetch('/api/images/register', {
+                method: 'POST',
+                headers: { 
+                  'content-type': 'application/json',
+                  'authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ albumId, userId, url: mainUrl, thumbUrl: thumbDownloadUrl }),
+              });
+              
+              console.log('[AlbumImageUploader] API response status:', res.status);
+              
+              if (!res.ok) {
+                let data: any = {};
+                const text = await res.text();
+                console.log('[AlbumImageUploader] API response text:', text);
+                try {
+                  data = JSON.parse(text);
+                } catch (e) {
+                  console.error('[AlbumImageUploader] failed to parse response:', e);
+                }
+                console.error('[AlbumImageUploader] API error:', { status: res.status, error: data?.error, data });
+                throw new Error(data?.error || 'UPLOAD_FAILED');
+              }
+              
+              console.log('[AlbumImageUploader] Image registered successfully');
               resolve();
             })
             .catch(reject);
