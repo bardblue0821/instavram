@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import Avatar from "../profile/Avatar";
 import { listReactorsByAlbumEmoji, Reactor } from "../../lib/repos/reactionRepo";
 import { listLikersByAlbum } from "../../lib/repos/likeRepo";
@@ -12,6 +13,8 @@ import { Button } from "../ui/Button";
 import { RepostIcon } from "../icons/RepostIcon";
 import AlbumActionsMenu from "../album/AlbumActionsMenu";
 import ShareMenu from "../album/ShareMenu";
+import { getOptimizedImageUrl } from "../../lib/utils/imageUrl";
+import { useTimelineItemVisibility } from "../../lib/hooks/useTimelineItemVisibility";
 
 type Img = { url: string; thumbUrl?: string; uploaderId?: string };
 type LatestComment = { body: string; userId: string } | undefined;
@@ -52,6 +55,7 @@ export function TimelineItem(props: {
   repostedBy?: { userId: string; user?: { uid: string; handle: string | null; iconURL?: string | null; displayName?: string }; createdAt?: any };
   isFriend?: boolean;
   isWatched?: boolean;
+  onVisibilityChange?: (albumId: string, isVisible: boolean) => void;
 }) {
   const {
     album,
@@ -77,6 +81,7 @@ export function TimelineItem(props: {
     repostedBy,
     isFriend,
     isWatched,
+    onVisibilityChange,
   } = props;
   const isOwner = !!(currentUserId && album.ownerId === currentUserId);
   const [text, setText] = useState("");
@@ -321,8 +326,14 @@ export function TimelineItem(props: {
     return `${y}/${m}/${d} ${hh}:${mm}`;
   }
 
+  // ★ 可視判定フックを使用
+  const { ref: visibilityRef } = useTimelineItemVisibility(
+    album.id,
+    onVisibilityChange
+  );
+
   return (
-    <article className="py-4 space-y-3">        
+    <article ref={visibilityRef} className="py-4 space-y-3">        
       <header className="space-y-2">
         {repostedBy?.userId && (
           <div className="flex items-center gap-2">
@@ -450,7 +461,23 @@ export function TimelineItem(props: {
                         <li key={u.uid}>
                           <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 px-2 py-1 hover:bg-surface-weak">
                             {u.iconURL ? (
-                              <img src={u.iconURL} alt="" className="h-5 w-5 rounded-full object-cover" />
+                              <div className="relative h-5 w-5 rounded-full overflow-hidden flex-shrink-0">
+                                <Image 
+                                  src={u.iconURL.startsWith('data:') ? u.iconURL : getOptimizedImageUrl(u.iconURL, 'thumb')} 
+                                  alt="" 
+                                  fill
+                                  sizes="20px"
+                                  className="object-cover"
+                                  unoptimized={u.iconURL.startsWith('data:')}
+                                  onError={(e) => {
+                                    // リサイズ版が存在しない場合は元のURLにフォールバック
+                                    const target = e.target as HTMLImageElement;
+                                    if (target.src !== u.iconURL) {
+                                      target.src = u.iconURL || '';
+                                    }
+                                  }}
+                                />
+                              </div>
                             ) : (
                               <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-surface-weak text-[10px] text-muted">{u.displayName?.[0] || '?'}</span>
                             )}
@@ -499,7 +526,23 @@ export function TimelineItem(props: {
                         <li key={u.uid}>
                           <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 px-2 py-1 hover:bg-surface-weak">
                             {u.iconURL ? (
-                              <img src={u.iconURL} alt="" className="h-5 w-5 rounded-full object-cover" />
+                              <div className="relative h-5 w-5 rounded-full overflow-hidden flex-shrink-0">
+                                <Image 
+                                  src={u.iconURL.startsWith('data:') ? u.iconURL : getOptimizedImageUrl(u.iconURL, 'thumb')} 
+                                  alt="" 
+                                  fill
+                                  sizes="20px"
+                                  className="object-cover"
+                                  unoptimized={u.iconURL.startsWith('data:')}
+                                  onError={(e) => {
+                                    // リサイズ版が存在しない場合は元のURLにフォールバック
+                                    const target = e.target as HTMLImageElement;
+                                    if (target.src !== u.iconURL) {
+                                      target.src = u.iconURL || '';
+                                    }
+                                  }}
+                                />
+                              </div>
                             ) : (
                               <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-surface-weak text-[10px] text-muted">{u.displayName?.[0] || '?'}</span>
                             )}
@@ -564,8 +607,23 @@ export function TimelineItem(props: {
                               <li key={u.uid}>
                                 <a href={`/user/${u.handle || u.uid}`} className="flex items-center gap-2 px-2 py-1 hover:bg-surface-weak">
                                   {u.iconURL ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={u.iconURL} alt="" className="h-5 w-5 rounded-full object-cover" />
+                                    <div className="relative h-5 w-5 rounded-full overflow-hidden flex-shrink-0">
+                                      <Image 
+                                        src={u.iconURL.startsWith('data:') ? u.iconURL : getOptimizedImageUrl(u.iconURL, 'thumb')} 
+                                        alt="" 
+                                        fill
+                                        sizes="20px"
+                                        className="object-cover"
+                                        unoptimized={u.iconURL.startsWith('data:')}
+                                        onError={(e) => {
+                                          // リサイズ版が存在しない場合は元のURLにフォールバック
+                                          const target = e.target as HTMLImageElement;
+                                          if (target.src !== u.iconURL) {
+                                            target.src = u.iconURL || '';
+                                          }
+                                        }}
+                                      />
+                                    </div>
                                   ) : (
                                     <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-surface-weak text-[10px] text-muted">{u.displayName?.[0] || '?'}</span>
                                   )}

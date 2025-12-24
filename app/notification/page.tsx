@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useAuthUser } from '../../lib/hooks/useAuthUser';
 import { listNotifications, markAllRead, subscribeNotifications } from '../../lib/repos/notificationRepo';
 import { getUser } from '../../lib/repos/userRepo';
@@ -7,6 +8,7 @@ import { getFriendStatus, acceptFriend, cancelFriendRequest } from '../../lib/re
 import { useToast } from '../../components/ui/Toast';
 import Link from 'next/link';
 import { batchGetUsers } from '../../lib/utils/batchQuery';
+import { getOptimizedImageUrl } from '../../lib/utils/imageUrl';
 
 interface NotificationRow {
   id: string;
@@ -141,8 +143,23 @@ export default function NotificationsPage(){
                 <div>
                   <Link href={`/user/${actor?.handle || r.actorId}`} className="block" aria-label="プロフィールへ">
                     {actor?.iconURL ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={actor.iconURL} alt="" className="h-12 w-12 rounded-md object-cover" />
+                      <div className="relative h-12 w-12 rounded-md overflow-hidden flex-shrink-0">
+                        <Image 
+                          src={actor.iconURL.startsWith('data:') ? actor.iconURL : getOptimizedImageUrl(actor.iconURL, 'thumb')} 
+                          alt="" 
+                          fill
+                          sizes="48px"
+                          className="object-cover"
+                          unoptimized={actor.iconURL.startsWith('data:')}
+                          onError={(e) => {
+                            // リサイズ版が存在しない場合は元のURLにフォールバック
+                            const target = e.target as HTMLImageElement;
+                            if (actor?.iconURL && target.src !== actor.iconURL) {
+                              target.src = actor.iconURL;
+                            }
+                          }}
+                        />
+                      </div>
                     ) : (
                       <span className="inline-flex h-10 w-10 items-center justify-center rounded-md surface-alt text-[12px] fg-muted">
                         {(actorName || '?').slice(0,1)}

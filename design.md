@@ -2094,7 +2094,7 @@ const { loading, execute: sendRequest } = useAsyncOperation(sendFriendRequest);
 await sendRequest(userId, targetId);
 ```
 
-### パフォーマンス改善（TODO）
+### パフォーマンス改善
 #### N+1 クエリ
 現状
 ```typescript
@@ -2138,7 +2138,7 @@ function ImageCard({ src }: { src: string }) {
 }
 ```
 
-#### リアルタイム購読が過剰
+#### リアルタイム購読が過剰(TODO)
 現状:
 ```typescript
 // app/timeline/page.tsx

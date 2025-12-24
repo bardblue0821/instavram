@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthUser } from "../../lib/hooks/useAuthUser";
 import { TimelineItem } from "../../components/timeline/TimelineItem";
@@ -47,6 +47,11 @@ export default function TimelinePage() {
   const loadMoreRef = useRef<() => void>(() => {});
   const [friendSet, setFriendSet] = useState<Set<string>>(new Set());
   const [watchSet, setWatchSet] = useState<Set<string>>(new Set());
+
+  // ★ 可視範囲のアルバムIDを追跡
+  const visibleAlbumIdsRef = useRef<Set<string>>(new Set());
+  // ★ 同時購読数の上限
+  const MAX_CONCURRENT_SUBSCRIPTIONS = 10;
 
   useEffect(() => {
     rowsRef.current = rows;
@@ -99,6 +104,43 @@ export default function TimelinePage() {
   function updateRowByAlbumId(albumId: string, updater: (row: TimelineItemVM) => TimelineItemVM) {
     setRows((prev) => prev.map((r) => (r.album.id === albumId ? updater(r) : r)));
   }
+
+  // ★ 可視状態変化時のコールバック
+  const handleVisibilityChange = useCallback(async (albumId: string, isVisible: boolean) => {
+    const currentUid = user?.uid;
+    if (!currentUid) return;
+
+    if (isVisible) {
+      // 可視範囲に入った → 購読開始（まだ購読していない場合）
+      visibleAlbumIdsRef.current.add(albumId);
+      
+      // 同時購読数の制限チェック
+      const currentSubscriptions = unsubsByAlbumIdRef.current.size;
+      if (currentSubscriptions >= MAX_CONCURRENT_SUBSCRIPTIONS) {
+        console.log(`[timeline] subscription limit reached (${currentSubscriptions}/${MAX_CONCURRENT_SUBSCRIPTIONS})`);
+        return;
+      }
+
+      if (!unsubsByAlbumIdRef.current.has(albumId)) {
+        const row = rowsRef.current.find(r => r.album.id === albumId);
+        if (row) {
+          console.log(`[timeline] subscribing to visible album: ${albumId}`);
+          await subscribeForRow(row, currentUid);
+        }
+      }
+    } else {
+      // 可視範囲外に出た → 購読解除
+      visibleAlbumIdsRef.current.delete(albumId);
+      
+      // 少し遅延させてから解除（すぐにスクロールで戻ってくる可能性を考慮）
+      setTimeout(() => {
+        if (!visibleAlbumIdsRef.current.has(albumId)) {
+          console.log(`[timeline] unsubscribing from invisible album: ${albumId}`);
+          cleanupSubscriptionForAlbum(albumId);
+        }
+      }, 2000); // 2秒後に解除
+    }
+  }, [user]);
 
   async function subscribeForRow(row: TimelineItemVM, currentUid: string) {
     const albumId = row.album.id;
@@ -192,13 +234,10 @@ export default function TimelinePage() {
 
       if (prev.length === 0) {
         setRows(enriched);
-        // 初回はアルバムごとに一回のみ購読
-        const uniqAlbumIds = Array.from(new Set(enriched.map(r => r.album.id)));
-        for (let i = 0; i < uniqAlbumIds.length; i++) {
-          const id = uniqAlbumIds[i];
-          const row = enriched.find(r => r.album.id === id)!;
-          await subscribeForRow(row, currentUid);
-        }
+        // ★ 初回は購読しない（Intersection Observer に任せる）
+        // Intersection Observer が可視範囲のアイテムのみ購読開始する
+        console.log(`[timeline] initial load: ${enriched.length} items (subscriptions managed by Intersection Observer)`);
+        
         // 初回にフレンド/ウォッチの関係をまとめて取得
         try {
           const [friends, watchedOwners] = await Promise.all([
@@ -218,12 +257,8 @@ export default function TimelinePage() {
         const appended = enriched.filter(r => r?.album?.id && !existingIds.has(r.album.id));
         if (appended.length > 0) {
           setRows(p => [...p, ...appended]);
-          const uniqNewIds = Array.from(new Set(appended.map(r => r.album.id))).filter(id => !unsubsByAlbumIdRef.current.has(id));
-          for (let j = 0; j < uniqNewIds.length; j++) {
-            const id = uniqNewIds[j];
-            const row = appended.find(r => r.album.id === id)!;
-            await subscribeForRow(row, currentUid);
-          }
+          // ★ 追加読み込み時も購読しない（Intersection Observer に任せる）
+          console.log(`[timeline] loaded ${appended.length} more items (subscriptions managed by Intersection Observer)`);
         }
       }
 
@@ -575,6 +610,7 @@ export default function TimelinePage() {
               repostedBy={row.repostedBy}
               isFriend={!!(row.owner?.uid && friendSet.has(row.owner.uid))}
               isWatched={!!(row.owner?.uid && watchSet.has(row.owner.uid))}
+              onVisibilityChange={handleVisibilityChange}
             />
           ))}
         </div>

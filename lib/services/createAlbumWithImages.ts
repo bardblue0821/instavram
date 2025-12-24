@@ -1,6 +1,6 @@
 import { db, storage } from '../../lib/firebase';
 import { COL } from '../../lib/paths';
-import { doc, setDoc, collection } from 'firebase/firestore';
+import { doc, setDoc, collection, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { addImage, canUploadMoreImages } from '../repos/imageRepo';
 import { addComment } from '../repos/commentRepo';
@@ -34,8 +34,21 @@ export async function createAlbumWithImages(
   const albumId = albumRef.id;
   const now = new Date();
 
-  // 全体進捗のため bytes 合計
-  const totalBytes = files.reduce((sum, f) => sum + (f.size || 0), 0);
+  // ★ アルバムドキュメントを先に作成（セキュリティルールのため）
+  await setDoc(albumRef, {
+    id: albumId,
+    ownerId,
+    title: opts.title || null,
+    placeUrl: opts.placeUrl || null,
+    visibility: (opts.visibility === 'friends' ? 'friends' : 'public'),
+    createdAt: now,
+    updatedAt: now,
+  });
+  console.log('[album:create] album doc created first', { albumId, ownerId });
+
+  try {
+    // 全体進捗のため bytes 合計
+    const totalBytes = files.reduce((sum, f) => sum + (f.size || 0), 0);
   let completedBytes = 0;
   const perFileBytesTransferred: number[] = files.map(() => 0);
 
@@ -86,18 +99,6 @@ export async function createAlbumWithImages(
     });
   }
 
-  // アルバム作成
-  await setDoc(albumRef, {
-    id: albumId,
-    ownerId,
-    title: opts.title || null,
-    placeUrl: opts.placeUrl || null,
-    visibility: (opts.visibility === 'friends' ? 'friends' : 'public'),
-    createdAt: now,
-    updatedAt: now,
-  });
-  console.log('[album:create] album doc created', { albumId, ownerId });
-
   // 初回コメント
   if (opts.firstComment && opts.firstComment.trim()) {
     console.log('[album:create] adding first comment');
@@ -107,6 +108,17 @@ export async function createAlbumWithImages(
 
   console.log('[album:create] done', { albumId });
   return albumId;
+  } catch (error) {
+    // エラー時はアルバムドキュメントを削除（クリーンアップ）
+    console.error('[album:create] error occurred, cleaning up album doc', { albumId, error });
+    try {
+      await deleteDoc(albumRef);
+      console.log('[album:create] album doc deleted', { albumId });
+    } catch (cleanupError) {
+      console.error('[album:create] cleanup failed', { albumId, cleanupError });
+    }
+    throw error;
+  }
 }
 
 function extractExt(name: string): string {
