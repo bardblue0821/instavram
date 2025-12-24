@@ -8,6 +8,7 @@ const messages: Record<string, string> = {
   SELF_FRIEND: '自分自身をフレンドにはできません',
   REQUEST_NOT_FOUND: 'フレンド申請が見つかりません',
   SELF_WATCH: '自分自身をウォッチする必要はありません',
+  ALBUM_REQUIRES_IMAGE: 'アルバムには少なくとも1枚の画像が必要です',
 
   // Firebase Auth
   'auth/invalid-credential': '認証に失敗しました（パスワードが違うか、再ログインが必要です）',

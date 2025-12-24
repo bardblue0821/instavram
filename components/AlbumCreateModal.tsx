@@ -163,6 +163,10 @@ export default function AlbumCreateModal({ onCreated }: Props) {
       setError('ログインが必要です');
       return;
     }
+    if (previews.length === 0) {
+      setError('画像を少なくとも1枚選択してください');
+      return;
+    }
     if (previews.length > 4) {
       setError('画像は最大4枚までです');
       return;

@@ -49,12 +49,16 @@ service cloud.firestore {
     // albums/{albumId}
     match /albums/{albumId} {
       allow read: if true;
+      // アルバム作成: オーナーのみ可能
+      // 注意: Firestore Rules では画像の存在をチェックできないため、
+      // アプリケーション側で少なくとも1枚の画像がある場合のみ作成するよう制御する
       allow create: if isSignedIn()
         && request.resource.data.ownerId == request.auth.uid;
       allow update: if isSignedIn()
         && resource.data.ownerId == request.auth.uid
         && request.resource.data.ownerId == resource.data.ownerId
         && request.resource.data.createdAt == resource.data.createdAt;
+      // アルバム削除: オーナーのみ可能
       allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
     }
 
@@ -65,6 +69,9 @@ service cloud.firestore {
         && request.resource.data.keys().hasAll(['albumId','uploaderId','url'])
         && request.resource.data.uploaderId == request.auth.uid
         && canReadAlbum(request.resource.data.albumId);
+      // 画像削除: アップロード者本人またはアルバムオーナーのみ可能
+      // 注意: Firestore Rules では「アルバムに残る画像数」を効率的にカウントできないため、
+      // アプリケーション側で最後の1枚を削除しようとした場合にアルバムごと削除するよう制御する
       allow delete: if isSignedIn()
         && (
           resource.data.uploaderId == request.auth.uid ||

@@ -26,6 +26,7 @@ export async function createAlbumWithImages(
   onProgress?: (p: AlbumCreateProgress) => void,
 ): Promise<string> {
   console.log('[album:create] start', { ownerId, files: files.map(f => ({ name: f.name, size: f.size })) , opts });
+  if (files.length === 0) throw new Error('ALBUM_REQUIRES_IMAGE');
   if (files.length > 4) throw new Error('LIMIT_4_PER_USER');
   if (opts.firstComment && opts.firstComment.length > 200) throw new Error('TOO_LONG');
 

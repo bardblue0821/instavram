@@ -89,6 +89,8 @@ export default function AlbumDetailPage() {
   const [showDeleteImageConfirm, setShowDeleteImageConfirm] = useState(false);
   const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
   const [deletingImage, setDeletingImage] = useState(false);
+  const [showDeleteLastImageModal, setShowDeleteLastImageModal] = useState(false);
+  const [deletingLastImageId, setDeletingLastImageId] = useState<string | null>(null);
   const [reactions, setReactions] = useState<{ emoji: string; count: number; mine: boolean }[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [emojiQuery, setEmojiQuery] = useState("");
@@ -421,6 +423,13 @@ export default function AlbumDetailPage() {
   }
 
   function askDeleteImage(id: string) {
+    // 最後の1枚の場合は専用モーダルを表示
+    if (images.length <= 1) {
+      setDeletingLastImageId(id);
+      setShowDeleteLastImageModal(true);
+      return;
+    }
+    
     setDeletingImageId(id);
     setShowDeleteImageConfirm(true);
   }
@@ -583,6 +592,35 @@ export default function AlbumDetailPage() {
       setDeleting(false);
       setShowDeleteConfirm(false);
     }
+  }
+
+  async function confirmDeleteLastImageWithAlbum() {
+    if (!albumId || !user) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      // アルバムごと削除
+      await deleteAlbum(albumId);
+      // 削除後の遷移（タイムラインへ）
+      try {
+        sessionStorage.setItem(
+          'app:toast',
+          JSON.stringify({ message: 'アルバムを削除しました', variant: 'success', duration: 3000 })
+        );
+      } catch {}
+      router.replace('/timeline');
+    } catch (e: any) {
+      setError(translateError(e));
+    } finally {
+      setDeleting(false);
+      setShowDeleteLastImageModal(false);
+      setDeletingLastImageId(null);
+    }
+  }
+
+  function cancelDeleteLastImage() {
+    setShowDeleteLastImageModal(false);
+    setDeletingLastImageId(null);
   }
 
   function beginEditComment(commentId: string) {
@@ -751,6 +789,7 @@ export default function AlbumDetailPage() {
         visibleCount={visibleCount}
         onSeeMore={() => setVisibleCount((n) => Math.min(images.length, n + 16))}
         canDelete={(p) => {
+          // 削除ボタンは常に表示可能（最後の1枚の場合はアルバム削除モーダルが表示される）
           if (isOwner) return true;
           if (isFriend) return p.uploaderId === user?.uid;
           return false;
@@ -818,6 +857,15 @@ export default function AlbumDetailPage() {
         onConfirm={confirmDeleteImage}
         message="この画像を削除しますか？"
         description="この操作は取り消せません。画像を削除します。"
+      />
+
+      <DeleteConfirmModal
+        open={showDeleteLastImageModal}
+        busy={deleting}
+        onCancel={cancelDeleteLastImage}
+        onConfirm={confirmDeleteLastImageWithAlbum}
+        message="最後の画像を削除しようとしています"
+        description="アルバムには最低1枚の画像が必要です。画像を削除する場合は、アルバムごと削除されます。アルバムを削除しますか？"
       />
     </div>
   );
