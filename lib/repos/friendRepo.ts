@@ -2,6 +2,7 @@ import { db } from '../firebase';
 import { COL } from '../paths';
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import type { FriendDoc } from '../../types/models';
+import { AppError, ErrorHelpers } from '../errors/ErrorHandler';
 
 // ドキュメントID: userId_targetId （申請方向）
 function friendId(userId: string, targetId: string) {
@@ -9,11 +10,15 @@ function friendId(userId: string, targetId: string) {
 }
 
 export async function sendFriendRequest(userId: string, targetId: string) {
-  if (userId === targetId) throw new Error('SELF_FRIEND');
+  if (userId === targetId) {
+    throw ErrorHelpers.selfOperation('フレンド申請');
+  }
   const id = friendId(userId, targetId);
   const ref = doc(db, COL.friends, id);
   const snap = await getDoc(ref);
-  if (snap.exists()) return; // 既に存在→何もしない（再送抑止）
+  if (snap.exists()) {
+    throw ErrorHelpers.duplicate('フレンド申請');
+  }
   const now = new Date();
   await setDoc(ref, { id, userId, targetId, status: 'pending', createdAt: now } satisfies FriendDoc);
   // 通知: 申請された側へ
@@ -30,9 +35,13 @@ export async function acceptFriend(userId: string, targetId: string) {
   const id = friendId(userId, targetId);
   const ref = doc(db, COL.friends, id);
   const snap = await getDoc(ref);
-  if (!snap.exists()) throw new Error('REQUEST_NOT_FOUND');
+  if (!snap.exists()) {
+    throw ErrorHelpers.notFound('フレンド申請');
+  }
   const data = snap.data() as FriendDoc;
-  if (data.status === 'accepted') return; // 既に承認済み
+  if (data.status === 'accepted') {
+    throw ErrorHelpers.duplicate('承認済みのフレンド');
+  }
   await updateDoc(ref, { status: 'accepted' });
   // 通知: 承認したことを申請元に知らせる（任意：ここでは送らない。必要なら下記コメント外）
   // try {
@@ -65,9 +74,17 @@ export async function cancelFriendRequest(userId: string, targetId: string) {
   const id = friendId(userId, targetId);
   const ref = doc(db, COL.friends, id);
   const snap = await getDoc(ref);
-  if (!snap.exists()) return; // 既に無ければ何もしない
+  if (!snap.exists()) {
+    throw ErrorHelpers.notFound('フレンド申請');
+  }
   const data = snap.data() as FriendDoc;
-  if (data.status !== 'pending') throw new Error('NOT_PENDING');
+  if (data.status !== 'pending') {
+    throw new AppError(
+      'Cannot cancel non-pending friend request',
+      'キャンセルできるのは申請中のフレンドのみです',
+      'warning'
+    );
+  }
   await deleteDoc(ref);
 }
 
@@ -84,7 +101,7 @@ export async function removeFriend(userId: string, targetId: string) {
   } else if (snapB.exists() && (snapB.data() as FriendDoc).status === 'accepted') {
     await deleteDoc(refB);
   } else {
-    throw new Error('NO_ACCEPTED_FRIEND');
+    throw ErrorHelpers.notFound('承認済みのフレンド');
   }
 }
 

@@ -22,7 +22,15 @@ const ToastContext = createContext<ToastContextType | null>(null);
 export function useToast() {
   const ctx = useContext(ToastContext);
   if (!ctx) throw new Error("useToast must be used within <ToastProvider>");
-  return ctx;
+  
+  // ErrorHandler との統合用のヘルパーメソッドを追加
+  return {
+    ...ctx,
+    error: (message: string, duration?: number) => ctx.show({ message, variant: 'error', duration }),
+    warning: (message: string, duration?: number) => ctx.show({ message, variant: 'warning', duration }),
+    info: (message: string, duration?: number) => ctx.show({ message, variant: 'info', duration }),
+    success: (message: string, duration?: number) => ctx.show({ message, variant: 'success', duration }),
+  };
 }
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
