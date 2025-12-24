@@ -1896,15 +1896,13 @@ export interface NotificationDoc {
 - 画面遷移（例: timeline へ）とエラーハンドリング（popup-blocked / operation-not-allowed 等）の日本語化対応
 - 注意: Xはメール未提供が多い前提で設計（メール必須ロジックと分離）
 
-### フレンド限定投稿（TODO）
+### フレンド限定投稿
 - アルバムを公開するかフレンド限定にするかを選択できる。
 - 公開にすると、誰でも見ることができる
 - フレンド限定にすると、フレンドしか見れなくなり、リポストも出来なくなる
 - アルバム投稿画面にチェックボックスで設定することができる
 - アルバム詳細画面で、オーナーにだけチェックボックスが表示され、公開にしたりフレンド限定にしたりの変更ができる。
 - 名称は「フレンド限定」とした。
-
-
 
 ### パスワードリセット（「パスワードを忘れた方」）設計と安全性
 - 目的: メールアドレスを知っているだけで第三者が勝手に変更できないように、再設定は「登録済みメールの受信者だけ」が完了できる安全なフローを採用する。
@@ -1971,6 +1969,8 @@ export interface NotificationDoc {
 - メールの性質
   - 実際にメールが届くのは登録済みの宛先のみですが、第三者からは「届いたかどうか」を知る手段はありません（画面やAPIの応答は常に中立のため）。
 
+
+
 ### モバイル対応（TODO）
 - モバイルの幅になったとき、以下のような見た目にする。
 - 
@@ -1983,14 +1983,6 @@ export interface NotificationDoc {
 
 ### ブロック機能（TODO）
 - ツイッターのブロック機能と全く同じ。
-- ユーザー詳細画面の右側に・・・ボタンを設置して、それを押すと「ブロックする」が表示される
-- 「ブロックする」を選択した場合「本当にブロックしますか？」モーダルが表示され、はいを選択した場合は、対象ユーザーをブロックし、「ブロックする」ボタンは「ブロック解除する」になる
-- 自分自身をブロックすることはできない。
-- 「ブロックする」「ブロック解除する」は赤字にする
-- ブロックされたユーザーは、ブロックしてきたユーザーの全投稿を閲覧することができない。
-- ブロックされたユーザーがブロックしてきたユーザーのプロフィール画面を閲覧すると、「あなたは xx さんにブロックされています」と表示する。
-- ブロック対象のユーザーのコメントやリアクションはすべて見えなくなる。
-- ブロックされたユーザーはコメントやリアクションを送るすべを失う
 
 
 ### ミュート機能（TODO）
@@ -2010,6 +2002,182 @@ export interface NotificationDoc {
 
 ### テストケースを考える（TODO）
 
+
+### prop drilling が深い（TODO）
+
+
+### エラー表示の統一（TODO）
+```typescript
+// ある画面では alert
+alert('エラーが発生しました');
+
+// ある画面では Toast
+toast.error('エラーが発生しました');
+
+// ある画面では useState でインライン表示
+setError('エラーが発生しました');
+
+// ある画面では console.error のみ
+console.error('エラー', e);
+```
+改善案
+```typescript
+// lib/errors/ErrorHandler.ts
+export class AppError extends Error {
+  constructor(
+    message: string,
+    public userMessage: string,
+    public severity: 'error' | 'warning' | 'info' = 'error'
+  ) {
+    super(message);
+  }
+}
+
+export function handleError(error: unknown, toast: ToastContext) {
+  if (error instanceof AppError) {
+    toast[error.severity](error.userMessage);
+    console.error(error.message, error);
+  } else if (error instanceof FirebaseError) {
+    toast.error(translateFirebaseError(error));
+  } else {
+    toast.error('予期しないエラーが発生しました');
+    console.error(error);
+  }
+}
+
+// 使用例
+try {
+  await someOperation();
+} catch (e) {
+  handleError(e, toast);
+}
+```
+
+
+### ローディング状態の管理が散在（TODO）
+現状:
+```typescript
+// 各コンポーネントで個別に useState
+const [loading, setLoading] = useState(false);
+const [submitting, setSubmitting] = useState(false);
+const [busy, setBusy] = useState(false);
+```
+推奨改善:
+```typescript
+// lib/hooks/useAsyncOperation.ts
+export function useAsyncOperation<T extends any[], R>(
+  operation: (...args: T) => Promise<R>
+) {
+  const [state, setState] = useState<{
+    loading: boolean;
+    error: Error | null;
+    data: R | null;
+  }>({ loading: false, error: null, data: null });
+
+  const execute = async (...args: T) => {
+    setState({ loading: true, error: null, data: null });
+    try {
+      const result = await operation(...args);
+      setState({ loading: false, error: null, data: result });
+      return result;
+    } catch (error) {
+      setState({ loading: false, error: error as Error, data: null });
+      throw error;
+    }
+  };
+
+  return { ...state, execute };
+}
+
+// 使用例
+const { loading, execute: sendRequest } = useAsyncOperation(sendFriendRequest);
+await sendRequest(userId, targetId);
+```
+
+### パフォーマンス改善（TODO）
+#### N+1 クエリ
+現状
+```typescript
+// src/services/timeline/listLatestAlbums.ts
+for (const album of albums) {
+  const owner = await getUser(album.ownerId); // N+1 問題
+  const images = await listImages(album.id);  // N+1 問題
+  // ...
+}
+```
+影響:
+- タイムラインに50件のアルバムがあると、50回 × 複数のクエリが発行される
+- 初期表示が遅い
+改善案は？
+
+
+#### 画像最適化が不十分
+```typescript
+// 1. Next.js Image コンポーネントの活用
+import Image from 'next/image';
+
+<Image
+  src={img.url}
+  alt="..."
+  width={300}
+  height={300}
+  loading="lazy"
+  placeholder="blur"
+  blurDataURL={img.thumbUrl}
+/>
+
+// 2. Storage で自動リサイズ（Firebase Extensions）
+// Firebase Console > Extensions > Resize Images をインストール
+
+// 3. クライアント側で遅延ロード
+import { useInView } from 'react-intersection-observer';
+
+function ImageCard({ src }: { src: string }) {
+  const { ref, inView } = useInView({ triggerOnce: true });
+  return <div ref={ref}>{inView && <img src={src} />}</div>;
+}
+```
+
+#### リアルタイム購読が過剰
+現状:
+```typescript
+// app/timeline/page.tsx
+// すべてのアルバムのコメント/いいね/リポストを購読
+useEffect(() => {
+  const unsubscribes = albums.map(album => 
+    subscribeComments(album.id, ...)  // 50個のアルバム × 購読
+  );
+}, [albums]);
+```
+問題点:
+- 同時購読数が多すぎる
+- ネットワーク帯域とクライアント CPU を消費
+- Firestore の読み取り課金が増加
+
+推奨改善:
+```typescript
+// オプション1: 可視範囲のみ購読
+const { ref, inView } = useInView();
+useEffect(() => {
+  if (!inView) return;
+  const unsub = subscribeComments(album.id, ...);
+  return unsub;
+}, [inView]);
+
+// オプション2: ポーリングに切り替え
+// リアルタイム性が重要でない部分はポーリングで十分
+setInterval(() => {
+  fetchCommentCount(album.id);
+}, 30000); // 30秒ごと
+
+// オプション3: 集約クエリ（サーバー側）
+// API route で複数アルバムのコメント数を一括取得
+POST /api/albums/batch-stats
+{ albumIds: ['id1', 'id2', ...] }
+→ { 'id1': { comments: 5, likes: 10 }, ... }
+```
+
+### 型安全性
 
 
 
