@@ -61,7 +61,6 @@ export default function AlbumHeader(props: AlbumHeaderProps) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">公開範囲</label>
             <div className="flex items-center gap-3 text-sm">
               <label className="inline-flex items-center gap-2">
                 <input
@@ -71,7 +70,7 @@ export default function AlbumHeader(props: AlbumHeaderProps) {
                   checked={(album?.visibility || 'public') === 'public'}
                   onChange={() => onVisibilityChange?.('public')}
                 />
-                <span>公開（全員に表示）</span>
+                <span>公開</span>
               </label>
               <label className="inline-flex items-center gap-2">
                 <input
@@ -84,9 +83,6 @@ export default function AlbumHeader(props: AlbumHeaderProps) {
                 <span>フレンド限定</span>
               </label>
             </div>
-            <p className="text-xs text-muted mt-1">
-              フレンド限定にすると、ウォッチャーや非フレンドには完全に表示されません。共有・リポストも無効になります。
-            </p>
           </div>
           {albumSavedMsg && <p className="text-xs text-green-600">{albumSavedMsg}</p>}
         </div>
