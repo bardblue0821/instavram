@@ -122,8 +122,10 @@ export default function AlbumDetailPage() {
       setLoading(true);
       setError(null);
       try {
+        console.log('[AlbumDetail] Loading album:', albumId, 'user:', user?.uid);
         const userCache = new Map<string, UserRef | null>();
         const vm = await getAlbumDetailVM(albumId, user?.uid, userCache);
+        console.log('[AlbumDetail] VM result:', vm ? 'found' : 'null', vm);
         if (!vm) {
           if (!cancelled) {
             setAlbum(null);
@@ -170,7 +172,7 @@ export default function AlbumDetailPage() {
       cancelled = true;
       if (unsubComments) unsubComments();
     };
-  }, [albumId]);
+  }, [albumId, user?.uid]);  // user?.uid を依存配列に追加
 
   useEffect(() => {
     if (!albumId) return;

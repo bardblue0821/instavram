@@ -47,7 +47,8 @@ export async function getAlbumDetailVM(albumId: string, currentUserId?: string, 
   }
 
   // 権限判定
-  let isOwner = !!(currentUserId && currentUserId === album.ownerId);
+  const isOwner = !!(currentUserId && currentUserId === album.ownerId);
+  
   let isFriend = false;
   let isWatcher = false;
   if (currentUserId) {

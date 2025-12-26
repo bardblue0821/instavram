@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { isWatched, addWatch, removeWatch } from "../repos/watchRepo";
 import { translateError } from "../errors";
+import { useAsyncOperation } from "./useAsyncOperation";
 
 interface Options {
   viewerUid?: string | null;
@@ -10,8 +11,14 @@ interface Options {
 
 export function useWatch({ viewerUid, profileUid }: Options) {
   const [watching, setWatching] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loadingInitial, setLoadingInitial] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ウォッチ追加・削除操作用
+  const addOp = useAsyncOperation(addWatch);
+  const removeOp = useAsyncOperation(removeWatch);
+
+  const loading = loadingInitial || addOp.loading || removeOp.loading;
 
   useEffect(() => {
     let ignore = false;
@@ -20,7 +27,7 @@ export function useWatch({ viewerUid, profileUid }: Options) {
         setWatching(false);
         return;
       }
-      setLoading(true);
+      setLoadingInitial(true);
       setError(null);
       try {
         const flag = await isWatched(viewerUid, profileUid);
@@ -28,7 +35,7 @@ export function useWatch({ viewerUid, profileUid }: Options) {
       } catch (e) {
         if (!ignore) setError(translateError(e));
       } finally {
-        if (!ignore) setLoading(false);
+        if (!ignore) setLoadingInitial(false);
       }
     }
     load();
@@ -45,24 +52,21 @@ export function useWatch({ viewerUid, profileUid }: Options) {
     }
     return {
       toggle: async () => {
-        setLoading(true);
         setError(null);
         try {
           if (watching) {
-            await removeWatch(viewerUid, profileUid);
+            await removeOp.execute(viewerUid, profileUid);
             setWatching(false);
           } else {
-            await addWatch(viewerUid, profileUid);
+            await addOp.execute(viewerUid, profileUid);
             setWatching(true);
           }
         } catch (e) {
           setError(translateError(e));
-        } finally {
-          setLoading(false);
         }
       },
     };
-  }, [viewerUid, profileUid, watching]);
+  }, [viewerUid, profileUid, watching, addOp, removeOp]);
 
   return {
     watching,

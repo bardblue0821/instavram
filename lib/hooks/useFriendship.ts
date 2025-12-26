@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getFriendStatus, sendFriendRequest, acceptFriend, cancelFriendRequest, removeFriend } from "../repos/friendRepo";
 import { translateError } from "../errors";
+import { useAsyncOperation } from "./useAsyncOperation";
 
 export type FriendState = "none" | "sent" | "received" | "accepted";
 
@@ -12,8 +13,17 @@ interface Options {
 
 export function useFriendship({ viewerUid, profileUid }: Options) {
   const [state, setState] = useState<FriendState>("none");
-  const [loading, setLoading] = useState(false);
+  const [loadingInitial, setLoadingInitial] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 各操作用のuseAsyncOperationフック
+  const sendOp = useAsyncOperation(sendFriendRequest);
+  const cancelOp = useAsyncOperation(cancelFriendRequest);
+  const acceptOp = useAsyncOperation(acceptFriend);
+  const removeOp = useAsyncOperation(removeFriend);
+
+  // いずれかの操作が実行中かどうか
+  const loading = loadingInitial || sendOp.loading || cancelOp.loading || acceptOp.loading || removeOp.loading;
 
   useEffect(() => {
     let ignore = false;
@@ -22,7 +32,7 @@ export function useFriendship({ viewerUid, profileUid }: Options) {
         setState("none");
         return;
       }
-      setLoading(true);
+      setLoadingInitial(true);
       setError(null);
       try {
         const [forward, backward] = await Promise.all([
@@ -37,7 +47,7 @@ export function useFriendship({ viewerUid, profileUid }: Options) {
       } catch (e) {
         if (!ignore) setError(translateError(e));
       } finally {
-        if (!ignore) setLoading(false);
+        if (!ignore) setLoadingInitial(false);
       }
     }
     load();
@@ -57,55 +67,43 @@ export function useFriendship({ viewerUid, profileUid }: Options) {
     }
     return {
       send: async () => {
-        setLoading(true);
         setError(null);
         try {
-          await sendFriendRequest(viewerUid, profileUid);
+          await sendOp.execute(viewerUid, profileUid);
           setState("sent");
         } catch (e) {
           setError(translateError(e));
-        } finally {
-          setLoading(false);
         }
       },
       cancel: async () => {
-        setLoading(true);
         setError(null);
         try {
-          await cancelFriendRequest(viewerUid, profileUid);
+          await cancelOp.execute(viewerUid, profileUid);
           setState("none");
         } catch (e) {
           setError(translateError(e));
-        } finally {
-          setLoading(false);
         }
       },
       accept: async () => {
-        setLoading(true);
         setError(null);
         try {
-          await acceptFriend(profileUid, viewerUid);
+          await acceptOp.execute(profileUid, viewerUid);
           setState("accepted");
         } catch (e) {
           setError(translateError(e));
-        } finally {
-          setLoading(false);
         }
       },
       remove: async () => {
-        setLoading(true);
         setError(null);
         try {
-          await removeFriend(viewerUid, profileUid);
+          await removeOp.execute(viewerUid, profileUid);
           setState("none");
         } catch (e) {
           setError(translateError(e));
-        } finally {
-          setLoading(false);
         }
       },
     };
-  }, [viewerUid, profileUid]);
+  }, [viewerUid, profileUid, sendOp, cancelOp, acceptOp, removeOp]);
 
   return {
     state,
