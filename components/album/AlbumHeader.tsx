@@ -8,7 +8,6 @@ export interface AlbumHeaderProps {
   editTitle: string;
   editPlaceUrl: string;
   savingAlbum: boolean;
-  albumSavedMsg: string;
   onTitleChange: (v: string) => void;
   onPlaceUrlChange: (v: string) => void;
   onTitleBlur: () => void;
@@ -18,7 +17,7 @@ export interface AlbumHeaderProps {
 }
 
 export default function AlbumHeader(props: AlbumHeaderProps) {
-  const { album, isOwner, editTitle, editPlaceUrl, savingAlbum, albumSavedMsg,
+  const { album, isOwner, editTitle, editPlaceUrl, savingAlbum,
     onTitleChange, onPlaceUrlChange, onTitleBlur, onPlaceUrlBlur, onInputKeyDownBlurOnEnter, onVisibilityChange } = props;
 
   const displayTitle = (() => {
@@ -84,7 +83,6 @@ export default function AlbumHeader(props: AlbumHeaderProps) {
               </label>
             </div>
           </div>
-          {albumSavedMsg && <p className="text-xs text-green-600">{albumSavedMsg}</p>}
         </div>
       )}
 

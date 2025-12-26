@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { translateError } from '../lib/errors';
 import { Paper, Stack, Group, Text, Image as MantineImage, Button, Progress } from '@mantine/core';
 import { Dropzone, IMAGE_MIME_TYPE } from '@mantine/dropzone';
-import { notifications } from '@mantine/notifications';
+import { useToast } from './ui/Toast';
 import AlbumImageCropper from './upload/AlbumImageCropper';
 import { getCroppedBlobSized } from '../lib/services/avatar';
 import { Button as AppButton, IconButton as AppIconButton } from './ui/Button';
@@ -16,6 +16,7 @@ interface Props { onCreated?: (albumId: string) => void }
 export default function AlbumCreateModal({ onCreated }: Props) {
   const { user } = useAuthUser();
   const router = useRouter();
+  const toast = useToast();
   const [title, setTitle] = useState('');
   const [placeUrl, setPlaceUrl] = useState('');
   const [comment, setComment] = useState('');
@@ -75,11 +76,11 @@ export default function AlbumCreateModal({ onCreated }: Props) {
       const more = tooLarge.length > 3 ? ` ほか${tooLarge.length - 3}件` : '';
       const msg = `サイズ上限 5MB を超えています: ${names}${more}`;
       setError(msg);
-      notifications.show({ color: 'red', message: msg });
+      toast.error(msg);
     } else if (rejected.length > 0) {
       const msg = '追加できないファイルがあります（画像のみ / 1枚 5MB まで）';
       setError(msg);
-      notifications.show({ color: 'red', message: msg });
+      toast.error(msg);
     }
   }
 
@@ -197,7 +198,11 @@ export default function AlbumCreateModal({ onCreated }: Props) {
       setProgress(100);
       if (onCreated) onCreated(albumId);
       console.log('[AlbumCreateModal] success', { albumId });
-      router.push(`/album/${albumId}`); // 詳細ページは後で
+      // 画面遷移時にトーストを表示
+      try {
+        sessionStorage.setItem('app:toast', JSON.stringify({ message: 'アルバムを作成しました', variant: 'success' }));
+      } catch {}
+      router.push(`/album/${albumId}`);
     } catch (err: any) {
       console.error('[AlbumCreateModal] submit error', err);
       setError(translateError(err));

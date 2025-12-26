@@ -32,6 +32,7 @@ import { listComments, subscribeComments } from "../../../lib/repos/commentRepo"
 import { CommentForm } from "../../../components/comments/CommentForm";
 import { ERR } from "../../../types/models";
 import { listReactionsByAlbum, toggleReaction, listReactorsByAlbumEmoji, Reactor } from "../../../lib/repos/reactionRepo";
+import { useToast } from "../../../components/ui/Toast";
 // サムネイル自動生成・アクセス判定のフックへ分離
 import { useThumbBackfill } from "@/src/hooks/useThumbBackfill";
 import { useAlbumAccess } from "@/src/hooks/useAlbumAccess";
@@ -65,6 +66,7 @@ export default function AlbumDetailPage() {
   const albumId = params?.id as string | undefined;
   const { user } = useAuthUser();
   const router = useRouter();
+  const toast = useToast();
 
   const [album, setAlbum] = useState<AlbumRecord | null>(null);
   const [images, setImages] = useState<any[]>([]);
@@ -72,7 +74,6 @@ export default function AlbumDetailPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editPlaceUrl, setEditPlaceUrl] = useState("");
   const [savingAlbum, setSavingAlbum] = useState(false);
-  const [albumSavedMsg, setAlbumSavedMsg] = useState("");
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentBody, setEditingCommentBody] = useState("");
   const [loading, setLoading] = useState(true);
@@ -479,29 +480,26 @@ export default function AlbumDetailPage() {
   async function handleSaveAlbum() {
     if (!albumId) return;
     setSavingAlbum(true);
-    setAlbumSavedMsg("");
     setError(null);
     try {
       await updateAlbum(albumId, { title: editTitle, placeUrl: editPlaceUrl });
-      setAlbumSavedMsg("保存しました");
+      toast.success("保存しました");
       const updated = await getAlbumSafe(albumId);
       if (updated) setAlbum(updated as AlbumRecord);
     } catch (e: any) {
       setError(translateError(e));
     } finally {
       setSavingAlbum(false);
-      setTimeout(() => setAlbumSavedMsg(""), 2500);
     }
   }
 
   async function handleChangeVisibility(v: 'public' | 'friends') {
     if (!albumId || !album) return;
     setSavingAlbum(true);
-    setAlbumSavedMsg("");
     setError(null);
     try {
       await updateAlbum(albumId, { visibility: v });
-  // 公開→フレンド限定へ切り替え時は既存のリポストを無効化（削除）
+  // 公開→フレンド限定へ切り替え時は既存のリポストを無効化(削除)
       if (v === 'friends') {
         try {
           const { deleteRepostsByAlbum } = await import("../../../lib/repos/repostRepo");
@@ -512,8 +510,7 @@ export default function AlbumDetailPage() {
       }
       const updated = await getAlbumSafe(albumId);
       if (updated) setAlbum(updated as AlbumRecord);
-      setAlbumSavedMsg("保存しました");
-      setTimeout(() => setAlbumSavedMsg(""), 2500);
+      toast.success("保存しました");
     } catch (e: any) {
       setError(translateError(e));
     } finally {
@@ -528,13 +525,11 @@ export default function AlbumDetailPage() {
     const next = (editTitle ?? "").trim();
     if (next === current) return;
     setSavingAlbum(true);
-    setAlbumSavedMsg("");
     setError(null);
     try {
       await updateAlbum(albumId, { title: next });
       setAlbum((prev) => (prev ? { ...prev, title: next } : prev));
-      setAlbumSavedMsg("保存しました");
-      setTimeout(() => setAlbumSavedMsg(""), 2500);
+      toast.success("保存しました");
     } catch (e: any) {
       setError(translateError(e));
     } finally {
@@ -548,13 +543,11 @@ export default function AlbumDetailPage() {
     const next = (editPlaceUrl ?? "").trim();
     if (next === current) return;
     setSavingAlbum(true);
-    setAlbumSavedMsg("");
     setError(null);
     try {
       await updateAlbum(albumId, { placeUrl: next });
       setAlbum((prev) => (prev ? { ...prev, placeUrl: next } : prev));
-      setAlbumSavedMsg("保存しました");
-      setTimeout(() => setAlbumSavedMsg(""), 2500);
+      toast.success("保存しました");
     } catch (e: any) {
       setError(translateError(e));
     } finally {
@@ -729,7 +722,6 @@ export default function AlbumDetailPage() {
         editTitle={editTitle}
         editPlaceUrl={editPlaceUrl}
         savingAlbum={savingAlbum}
-        albumSavedMsg={albumSavedMsg}
         onTitleChange={setEditTitle}
         onPlaceUrlChange={setEditPlaceUrl}
         onTitleBlur={saveTitleIfChanged}

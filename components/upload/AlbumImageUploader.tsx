@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Group, Button, Progress, Text, Stack, Paper, Image as MantineImage } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
-import { notifications } from "@mantine/notifications";
+import { useToast } from "../ui/Toast";
 import { storage } from "@/lib/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { canUploadMoreImages } from "@/lib/repos/imageRepo";
@@ -33,6 +33,7 @@ export default function AlbumImageUploader({
   onUploaded?: () => void;
 }) {
   const { user } = useAuthUser();
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [items, setItems] = useState<ItemState[]>([]);
   const [overall, setOverall] = useState(0);
@@ -90,20 +91,20 @@ export default function AlbumImageUploader({
   function handleDrop(files: File[]) {
     if (!files || files.length === 0) return;
     if (remaining <= 0) {
-      notifications.show({ color: "red", message: "これ以上追加できません" });
+      toast.error("これ以上追加できません");
       return;
     }
     const allowCount = Math.min(remaining, files.length);
     const accepted = files.slice(0, allowCount);
     const rejected = files.slice(allowCount);
     if (rejected.length > 0) {
-      notifications.show({ color: "yellow", message: `${rejected.length} 件は上限のためスキップされました` });
+      toast.warning(`${rejected.length} 件は上限のためスキップされました`);
     }
     clearSelection();
     const next: ItemState[] = [];
     for (const f of accepted) {
       if (f.size > 5 * 1024 * 1024) {
-        notifications.show({ color: "red", message: `${f.name}: サイズ上限 5MB を超えています` });
+        toast.error(`${f.name}: サイズ上限 5MB を超えています`);
         continue;
       }
       try {
@@ -125,9 +126,9 @@ export default function AlbumImageUploader({
     if (tooLarge.length > 0) {
       const names = tooLarge.slice(0, 3).map((f) => f.name).join("、");
       const more = tooLarge.length > 3 ? ` ほか${tooLarge.length - 3}件` : "";
-      notifications.show({ color: "red", message: `サイズ上限 5MB を超えています: ${names}${more}` });
+      toast.error(`サイズ上限 5MB を超えています: ${names}${more}`);
     } else if (rejected.length > 0) {
-      notifications.show({ color: "red", message: "追加できないファイルがあります（画像のみ / 1枚 5MB まで）" });
+      toast.error("追加できないファイルがあります（画像のみ / 1枚 5MB まで）");
     }
   }
 
@@ -182,7 +183,7 @@ export default function AlbumImageUploader({
       );
     } catch (e: any) {
       const msg = e?.message || "切り抜きに失敗しました";
-      notifications.show({ color: "red", message: msg });
+      toast.error(msg);
       setItems((prev) => prev.map((x, i) => (i === idx ? { ...x, error: msg } : x)));
     } finally {
       setCropping(false);
@@ -254,7 +255,7 @@ export default function AlbumImageUploader({
 
       const allow = await canUploadMoreImages(albumId, userId);
       if (!allow) {
-        notifications.show({ color: "red", message: "アップロード上限に達しています" });
+        toast.error("アップロード上限に達しています");
         return;
       }
 
@@ -352,7 +353,7 @@ export default function AlbumImageUploader({
               errors.push(e);
               const msg = explainError(e);
               setItems((prev) => prev.map((x) => (x.file === cur.it.file ? { ...x, error: msg } : x)));
-              notifications.show({ color: "red", message: `${cur.it.file.name}: ${msg}` });
+              toast.error(`${cur.it.file.name}: ${msg}`);
             })
             .finally(() => {
               active--;
@@ -369,13 +370,13 @@ export default function AlbumImageUploader({
       await Promise.allSettled(results);
 
       if (errors.length === 0) {
-        notifications.show({ color: "teal", message: `${prepared.length} 件の画像を追加しました` });
+        toast.success(`${prepared.length} 件の画像を追加しました`);
       }
       clearSelection();
       onUploaded?.();
     } catch (e: any) {
       console.error(e);
-      notifications.show({ color: "red", message: explainError(e) });
+      toast.error(explainError(e));
     } finally {
       setBusy(false);
     }
