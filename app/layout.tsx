@@ -4,6 +4,7 @@ import "./globals.css";
 import AuthGate from "../components/AuthGate";
 import { ToastProvider } from "../components/ui/Toast";
 import ConditionalSideNav from "../components/ConditionalSideNav";
+import MobileTopNav from "../components/MobileTopNav";
 import Providers from "./providers";
 import { ColorSchemeScript } from "@mantine/core";
 
@@ -36,11 +37,12 @@ export default function RootLayout({
         <Providers>
           <ToastProvider>
             <div className="min-h-dvh">
+              <MobileTopNav />
               <div className="max-w-5xl w-full mx-auto flex">
                 <ConditionalSideNav />
                 <div className="flex-1 min-w-0">
                   <AuthGate>
-                    <main className="w-full px-4 py-6">
+                    <main className="w-full px-4 py-6 pb-20 sm:pb-6">
                       {children}
                     </main>
                   </AuthGate>
