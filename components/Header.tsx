@@ -126,7 +126,7 @@ export default function Header() {
           </svg>
         </button>
         {/* ブランド中央配置 */}
-  <Link href="/" className="font-semibold text-lg link-accent" aria-label="トップへ">instaVRam</Link>
+  <Link href="/" className="font-semibold text-lg link-accent" aria-label="トップへ">Virtualbum</Link>
         {open && (
           <div
             ref={menuRef}

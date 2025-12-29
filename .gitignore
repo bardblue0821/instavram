@@ -39,4 +39,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+virtualbum-firebase-adminsdk-*.json
 instavram3-firebase-adminsdk-fbsvc-*.json

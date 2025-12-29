@@ -1886,7 +1886,7 @@ export interface NotificationDoc {
 
 
 ### X での登録・ログイン方式（TODO）
-- Twitter Dev Portal でアプリ作成 → Callback URL に https://<あなたのAuthドメイン>/__/auth/handler を登録 → API Key/Secret を取得
+- Twitter Dev Portal でアプリ作成 → Callback URL に https://instavram3.firebaseapp.com/__/auth/handler を登録 → API Key/Secret を取得
 - Firebase Console → Authentication → サインイン方法 → Twitter を有効化 → API Key/Secret を入力
 - Firebase Authentication の承認済みドメインにプロジェクト/カスタムドメインを追加
 - ログイン画面に「Xでログイン」ボタン追加

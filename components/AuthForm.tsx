@@ -166,7 +166,7 @@ export default function AuthForm() {
 
   return (
     <div className="w-full max-w-md mx-auto p-6">
-      <h1 className="text-3xl font-bold my-6 text-teal-500 text-center">instaVRam</h1>
+      <h1 className="text-3xl font-bold my-6 text-teal-500 text-center">Virtualbum</h1>
       <div className="flex gap-2 mb-4">
         <Button
           type="button"

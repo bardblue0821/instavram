@@ -187,7 +187,7 @@ export default function LoginPage() {
   return (
     <div className="fixed inset-0 flex items-center justify-center overflow-hidden">
       <div className="max-w-md w-full mx-auto p-6">
-      <h1 className="text-4xl font-bold my-8 text-teal-500 text-center">instaVRam</h1>
+      <h1 className="text-4xl font-bold my-8 text-teal-500 text-center">Virtualbum</h1>
       <div className="flex gap-2 mb-4">
         <Button
           type="button"
