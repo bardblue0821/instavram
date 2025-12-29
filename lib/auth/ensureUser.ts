@@ -1,7 +1,6 @@
 import { User } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
-import { generateUniqueHandle } from '../utils/handleGenerator';
 
 /**
  * Twitter (X) 認証後、Firestore の users コレクションにユーザーを登録
