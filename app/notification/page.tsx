@@ -123,7 +123,7 @@ export default function NotificationsPage(){
 
   return (
     <div className="max-w-2xl mx-auto p-4">
-      <h1 className="text-2xl font-semibold mb-4">通知</h1>
+      <h1 className="text-2xl font-semibold mb-4 sticky top-0 z-10 bg-background py-2 border-b border-line">通知</h1>
   {loading && <p className="text-sm fg-subtle">読み込み中...</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
   {!loading && rows.length === 0 && <p className="text-sm fg-subtle">通知はありません。</p>}

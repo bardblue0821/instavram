@@ -577,7 +577,7 @@ export default function TimelinePage() {
 
   return (
     <div className="max-w-2xl mx-auto p-4">
-    <h1 className="text-xl font-semibold mb-4">タイムライン</h1>
+    <h1 className="text-xl font-semibold mb-4 sticky top-0 z-10 bg-background py-2 border-b border-line">タイムライン</h1>
   {rows.length === 0 && <p className="text-sm text-muted/80">対象アルバムがありません</p>}
       {rows.length > 0 && (
   <div className="divide-y divide-line *:pb-12">

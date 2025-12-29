@@ -214,7 +214,7 @@ export default function AlbumCreateModal({ onCreated }: Props) {
 
   return (
     <div className="w-full">
-      <h1 className="text-xl font-semibold mb-4">アルバム作成</h1>
+      <h1 className="text-xl font-semibold mb-4 sticky top-0 z-10 bg-background py-2 border-b border-line">アルバム作成</h1>
       {!user && <p className="text-sm text-gray-600 mb-4">ログインすると作成できます。</p>}
       <form onSubmit={handleSubmit} className="space-y-4" aria-live="polite">
         <div>
