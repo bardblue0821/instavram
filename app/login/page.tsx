@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { isHandleTaken } from '../../lib/repos/userRepo';
 import { getHandleBlockReason, getDisplayNameBlockReason, isHandleBlocked } from '../../lib/constants/userFilters';
 import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, signOut } from 'firebase/auth';
+import { signInWithTwitter, handleTwitterRedirectResult, translateTwitterAuthError } from '../../lib/auth/twitterAuth';
 
 // セキュリティ方針: アカウント存在可否を推測されないため、認証失敗は統一メッセージにまとめる。
 // ただし UI/UX 維持のためフォーマット不正・弱いパスワードなど入力検証系は区別。
@@ -61,6 +62,32 @@ export default function LoginPage() {
       }
     });
     return () => unsub();
+  }, [router]);
+
+  // Twitter リダイレクト認証の結果を処理
+  useEffect(() => {
+    let mounted = true;
+    
+    async function checkRedirectResult() {
+      try {
+        const result = await handleTwitterRedirectResult();
+        
+        if (result && mounted) {
+          setInfo('X (Twitter) ログイン成功');
+          router.push('/timeline');
+        }
+      } catch (err: any) {
+        if (mounted) {
+          setError(translateTwitterAuthError(err));
+        }
+      }
+    }
+    
+    checkRedirectResult();
+    
+    return () => {
+      mounted = false;
+    };
   }, [router]);
 
   function evaluateStrength(pw: string){
@@ -154,6 +181,28 @@ export default function LoginPage() {
       router.push('/timeline');
     } catch (err: any) {
   setError(mapAuthError(err.code || 'unknown'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleTwitter() {
+    setError(null);
+    setInfo(null);
+    setLoading(true);
+    try {
+      const result = await signInWithTwitter();
+      
+      // ポップアップ成功の場合
+      if (result) {
+        setInfo('X (Twitter) ログイン成功');
+        router.push('/timeline');
+      } else {
+        // リダイレクトにフォールバックした場合
+        setInfo('認証ページにリダイレクトしています...');
+      }
+    } catch (err: any) {
+      setError(translateTwitterAuthError(err));
     } finally {
       setLoading(false);
     }
@@ -344,6 +393,16 @@ export default function LoginPage() {
           disabled={loading}
         >
           {loading ? '...' : 'Google で続行'}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          fullWidth
+          isLoading={loading}
+          onClick={handleTwitter}
+          disabled={loading}
+        >
+          {loading ? '...' : 'X で続行'}
         </Button>
       </div>
       </div>

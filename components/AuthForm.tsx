@@ -8,6 +8,7 @@ import { Button } from './ui/Button';
 import { isHandleTaken } from '../lib/repos/userRepo';
 import { getHandleBlockReason, getDisplayNameBlockReason } from '../lib/constants/userFilters';
 import { GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, signOut } from 'firebase/auth';
+import { signInWithTwitter, handleTwitterRedirectResult, translateTwitterAuthError } from '../lib/auth/twitterAuth';
 
 function hasNonAscii(input: string): boolean {
   // Treat any non-ASCII character (e.g. 全角英数/記号、日本語、絵文字) as invalid for login password input.
@@ -58,6 +59,32 @@ export default function AuthForm() {
       if (u) router.replace('/timeline');
     });
     return () => unsub();
+  }, [router]);
+
+  // Twitter リダイレクト認証の結果を処理
+  useEffect(() => {
+    let mounted = true;
+    
+    async function checkRedirectResult() {
+      try {
+        const result = await handleTwitterRedirectResult();
+        
+        if (result && mounted) {
+          setInfo('X (Twitter) ログイン成功');
+          router.push('/timeline');
+        }
+      } catch (err: any) {
+        if (mounted) {
+          setError(translateTwitterAuthError(err));
+        }
+      }
+    }
+    
+    checkRedirectResult();
+    
+    return () => {
+      mounted = false;
+    };
   }, [router]);
 
   function evaluateStrength(pw: string){
@@ -135,6 +162,26 @@ export default function AuthForm() {
       router.push('/timeline');
     } catch (err: any) {
       setError(mapAuthError(err.code || 'unknown'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleTwitter() {
+    setError(null); setInfo(null); setLoading(true);
+    try {
+      const result = await signInWithTwitter();
+      
+      // ポップアップ成功の場合
+      if (result) {
+        setInfo('X (Twitter) ログイン成功');
+        router.push('/timeline');
+      } else {
+        // リダイレクトにフォールバックした場合
+        setInfo('認証ページにリダイレクトしています...');
+      }
+    } catch (err: any) {
+      setError(translateTwitterAuthError(err));
     } finally {
       setLoading(false);
     }
@@ -288,6 +335,9 @@ export default function AuthForm() {
       <div className="mt-6 space-y-2">
         <Button type="button" variant="ghost" fullWidth isLoading={loading} onClick={handleGoogle} disabled={loading}>
           {loading ? '...' : 'Google で続行'}
+        </Button>
+        <Button type="button" variant="ghost" fullWidth isLoading={loading} onClick={handleTwitter} disabled={loading}>
+          {loading ? '...' : 'X で続行'}
         </Button>
       </div>
     </div>

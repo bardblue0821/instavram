@@ -1013,7 +1013,7 @@
 - 表示非表示ボタン
 - firebase側の設定で、パスワードの要件を設定。小文字と数字を必須にした。
 
-### 登録時のフロー（ここ）
+### 登録時のフロー
 - 未登録状態
   - / か /login にしかアクセスできない。その他にアクセスすると、/ に飛ばされる。
   - アドレスとパスワードを設定することで、二段階認証の連絡が飛ぶ
@@ -1886,7 +1886,7 @@ export interface NotificationDoc {
 
 
 ### X での登録・ログイン方式（TODO）
-- Twitter Dev Portal でアプリ作成 → Callback URL に https://instavram3.firebaseapp.com/__/auth/handler を登録 → API Key/Secret を取得
+- Twitter Dev Portal でアプリ作成 → Callback URL に https://virtualbum.firebaseapp.com/__/auth/handler を登録 → API Key/Secret を取得
 - Firebase Console → Authentication → サインイン方法 → Twitter を有効化 → API Key/Secret を入力
 - Firebase Authentication の承認済みドメインにプロジェクト/カスタムドメインを追加
 - ログイン画面に「Xでログイン」ボタン追加
@@ -1996,6 +1996,12 @@ export interface NotificationDoc {
 - ミュート対象のプロフィール画面をみるのはできる。
 - ミュート対象のユーザーが投稿したコメントやリアクションは表示されなくなる
 
+
+### コンソールログの削除（TODO）
+
+
+
+### アカウントを削除したら、ログアウトしてルートディレクトリを表示(TODO)
 
 
 ### 無限スクロール（WIP）
